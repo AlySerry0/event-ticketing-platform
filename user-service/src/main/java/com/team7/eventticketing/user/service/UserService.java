@@ -1,0 +1,208 @@
+package com.team7.eventticketing.user.service;
+
+import com.team7.eventticketing.user.dto.CreateUserDTO;
+import com.team7.eventticketing.user.dto.UpdateUserDTO;
+import com.team7.eventticketing.user.dto.UserDTO;
+import com.team7.eventticketing.user.model.User;
+import com.team7.eventticketing.user.model.UserStatus;
+import com.team7.eventticketing.user.repository.UserRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+@Transactional(readOnly = true)
+public class UserService {
+
+    private final UserRepository userRepository;
+
+    public UserService(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    /**
+     * Create a new user
+     */
+    @Transactional
+    public UserDTO createUser(CreateUserDTO createUserDTO) {
+        if (userRepository.existsByEmail(createUserDTO.getEmail())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Email already exists: " + createUserDTO.getEmail()
+            );
+        }
+
+        if (userRepository.existsByPhone(createUserDTO.getPhone())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Phone already exists: " + createUserDTO.getPhone()
+            );
+        }
+
+        User user = new User(
+                createUserDTO.getName(),
+                createUserDTO.getEmail(),
+                createUserDTO.getPassword(),
+                createUserDTO.getPhone(),
+                createUserDTO.getRole()
+        );
+
+        User savedUser = userRepository.save(user);
+        return convertToDTO(savedUser);
+    }
+
+    /**
+     * Get user by ID
+     */
+    public UserDTO getUserById(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "User not found with ID: " + id
+                ));
+        return convertToDTO(user);
+    }
+
+    /**
+     * Get user by email
+     */
+    public UserDTO getUserByEmail(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "User not found with email: " + email
+                ));
+        return convertToDTO(user);
+    }
+
+    /**
+     * Get user by phone
+     */
+    public UserDTO getUserByPhone(String phone) {
+        User user = userRepository.findByPhone(phone)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "User not found with phone: " + phone
+                ));
+        return convertToDTO(user);
+    }
+
+    /**
+     * Get all users
+     */
+    public List<UserDTO> getAllUsers() {
+        return userRepository.findAll()
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Update user
+     */
+    @Transactional
+    public UserDTO updateUser(Long id, UpdateUserDTO userDTO) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "User not found with ID: " + id
+                ));
+
+        if (userDTO.getName() != null) {
+            user.setName(userDTO.getName());
+        }
+
+        if (userDTO.getEmail() != null && !userDTO.getEmail().equals(user.getEmail())) {
+            if (userRepository.existsByEmail(userDTO.getEmail())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Email already exists: " + userDTO.getEmail()
+                );
+            }
+            user.setEmail(userDTO.getEmail());
+        }
+
+        if (userDTO.getPassword() != null) {
+            user.setPassword(userDTO.getPassword());
+        }
+
+        if (userDTO.getPhone() != null && !userDTO.getPhone().equals(user.getPhone())) {
+            if (userRepository.existsByPhone(userDTO.getPhone())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Phone already exists: " + userDTO.getPhone()
+                );
+            }
+            user.setPhone(userDTO.getPhone());
+        }
+
+        User updatedUser = userRepository.save(user);
+        return convertToDTO(updatedUser);
+    }
+
+    /**
+     * Deactivate user
+     */
+    @Transactional
+    public UserDTO deactivateUser(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "User not found with ID: " + id
+                ));
+
+        user.setStatus(UserStatus.DEACTIVATED);
+        User updatedUser = userRepository.save(user);
+        return convertToDTO(updatedUser);
+    }
+
+    /**
+     * Activate user
+     */
+    @Transactional
+    public UserDTO activateUser(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "User not found with ID: " + id
+                ));
+
+        user.setStatus(UserStatus.ACTIVE);
+        User updatedUser = userRepository.save(user);
+        return convertToDTO(updatedUser);
+    }
+
+    /**
+     * Delete user
+     */
+    @Transactional
+    public void deleteUser(Long id) {
+        if (!userRepository.existsById(id)) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "User not found with ID: " + id
+            );
+        }
+        userRepository.deleteById(id);
+    }
+
+    /**
+     * Convert User entity to UserDTO
+     */
+    private UserDTO convertToDTO(User user) {
+        UserDTO userDTO = new UserDTO();
+        userDTO.setId(user.getId());
+        userDTO.setName(user.getName());
+        userDTO.setEmail(user.getEmail());
+        userDTO.setPhone(user.getPhone());
+        userDTO.setRole(user.getRole());
+        userDTO.setStatus(user.getStatus());
+        userDTO.setPreferences(user.getPreferences());
+        userDTO.setCreatedAt(user.getCreatedAt());
+        return userDTO;
+    }
+}
