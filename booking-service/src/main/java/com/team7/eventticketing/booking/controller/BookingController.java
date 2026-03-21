@@ -1,11 +1,15 @@
 package com.team7.eventticketing.booking.controller;
 
 import com.team7.eventticketing.booking.model.Booking;
+import com.team7.eventticketing.booking.model.BookingStatus;
 import com.team7.eventticketing.booking.service.BookingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 @RestController
@@ -30,6 +34,33 @@ public class BookingController {
     @GetMapping
     public List<Booking> getAll() {
         return bookingService.findAll();
+    }
+
+    @GetMapping("/search")
+    public List<Booking> searchBookings(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
+
+        BookingStatus bookingStatus = null;
+        if (status != null && !status.trim().isEmpty()) {
+            try {
+                bookingStatus = BookingStatus.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                // Ignore or handle invalid status
+            }
+        }
+
+        LocalDateTime start = null;
+        LocalDateTime end = null;
+        if (startDate != null && !startDate.trim().isEmpty()) {
+            start = LocalDate.parse(startDate).atStartOfDay();
+        }
+        if (endDate != null && !endDate.trim().isEmpty()) {
+            end = LocalDate.parse(endDate).atTime(LocalTime.MAX);
+        }
+
+        return bookingService.searchBookings(bookingStatus, start, end);
     }
 
     @PutMapping("/{id}")
