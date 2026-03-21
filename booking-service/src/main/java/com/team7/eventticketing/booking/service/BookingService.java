@@ -10,6 +10,11 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -87,5 +92,29 @@ public class BookingService {
 		} else {
 			return bookingRepository.findAllByOrderByBookingDateDesc();
 		}
+	}
+
+	@Transactional
+	public Booking confirmBookingAndAssignEvent(Long bookingId, Long eventId) {
+		Booking booking = bookingRepository.findById(bookingId)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+
+		if (booking.getStatus() != BookingStatus.PENDING) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking is not PENDING");
+		}
+
+		String eventStatus = bookingRepository.findEventStatusById(eventId);
+		if (eventStatus == null) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found");
+		}
+		if (!"UPCOMING".equals(eventStatus)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Event is not UPCOMING");
+		}
+
+		booking.setEventId(eventId);
+		booking.setStatus(BookingStatus.CONFIRMED);
+		booking.setConfirmedAt(LocalDateTime.now());
+
+		return bookingRepository.save(booking);
 	}
 }

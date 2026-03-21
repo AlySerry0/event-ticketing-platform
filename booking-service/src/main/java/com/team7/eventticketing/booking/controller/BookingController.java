@@ -55,6 +55,11 @@ public class BookingController {
 		}
 	}
 
+	@PutMapping("/{id}/confirm")
+	public Booking confirmBooking(@PathVariable Long id, @RequestParam Long eventId) {
+		return bookingService.confirmBookingAndAssignEvent(id, eventId);
+	}
+
 	@PutMapping("/{id}")
 	public ResponseEntity<Booking> update(@PathVariable Long id, @RequestBody BookingDTO bookingDetails) {
 		return bookingService.updateBooking(id, bookingDetails)
