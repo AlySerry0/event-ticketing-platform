@@ -10,6 +10,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.team7.eventticketing.user.model.UserRole;
+
+import org.springframework.data.domain.Example;
+import org.springframework.data.domain.ExampleMatcher;
+import com.team7.eventticketing.user.model.UserRole;
+import com.team7.eventticketing.user.model.User;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -188,6 +194,27 @@ public class UserService {
             );
         }
         userRepository.deleteById(id);
+    }
+
+    /**
+     * [S1-F1] Search Users with Filters
+     */
+    public List<UserDTO> searchUsers(String name, String email, String role) {
+
+        // Convert nulls to empty strings so the database doesn't crash
+        String safeName = (name != null) ? name : "";
+        String safeEmail = (email != null) ? email : "";
+
+        // Convert the role string to an Enum
+        UserRole safeRole = null;
+        if (role != null && !role.isEmpty()) {
+            safeRole = UserRole.valueOf(role.toUpperCase());
+        }
+
+        return userRepository.searchUsers(safeName, safeEmail, safeRole)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
     }
 
     /**

@@ -110,4 +110,18 @@ public class UserController {
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
     }
+
+    /**
+     * [S1-F1] Search Users with Filters
+     * GET /api/users/search?name={name}&email={email}&role={role}
+     */
+    @GetMapping("/search")
+    public ResponseEntity<List<UserDTO>> searchUsers(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String role) {
+
+        List<UserDTO> users = userService.searchUsers(name, email, role);
+        return ResponseEntity.ok(users);
+    }
 }
