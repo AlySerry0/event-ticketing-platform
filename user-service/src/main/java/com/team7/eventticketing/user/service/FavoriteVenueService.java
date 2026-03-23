@@ -54,6 +54,7 @@ public class FavoriteVenueService {
         }
 
         FavoriteVenue savedVenue = favoriteVenueRepository.save(favoriteVenue);
+        user.getFavoriteVenues().add(savedVenue);
         return convertToDTO(savedVenue);
     }
 
