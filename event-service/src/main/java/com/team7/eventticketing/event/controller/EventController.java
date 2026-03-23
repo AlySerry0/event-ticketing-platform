@@ -1,0 +1,186 @@
+package com.team7.eventticketing.event.controller;
+
+import com.team7.eventticketing.event.dto.CreateEventDTO;
+import com.team7.eventticketing.event.dto.EventDTO;
+import com.team7.eventticketing.event.dto.UpdateEventDTO;
+import com.team7.eventticketing.event.service.EventService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * REST Controller for Event operations
+ */
+@RestController
+@RequestMapping("/api/events")
+public class EventController {
+
+    private final EventService eventService;
+
+    public EventController(EventService eventService) {
+        this.eventService = eventService;
+    }
+
+    /**
+     * Create a new event
+     * POST /api/events
+     */
+    @PostMapping
+    public ResponseEntity<EventDTO> createEvent(@RequestBody CreateEventDTO request) {
+        EventDTO event = eventService.createEvent(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(event);
+    }
+
+    /**
+     * Get event by ID
+     * GET /api/events/{id}
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<EventDTO> getEventById(@PathVariable Long id) {
+        EventDTO event = eventService.getEventById(id);
+        return ResponseEntity.ok(event);
+    }
+
+    /**
+     * Get all events
+     * GET /api/events
+     */
+    @GetMapping
+    public ResponseEntity<List<EventDTO>> getAllEvents() {
+        List<EventDTO> events = eventService.getAllEvents();
+        return ResponseEntity.ok(events);
+    }
+
+    /**
+     * Get events by category
+     * GET /api/events/category/{category}
+     */
+    @GetMapping("/category/{category}")
+    public ResponseEntity<List<EventDTO>> getEventsByCategory(@PathVariable String category) {
+        List<EventDTO> events = eventService.getEventsByCategory(category);
+        return ResponseEntity.ok(events);
+    }
+
+    /**
+     * Get events by status
+     * GET /api/events/status/{status}
+     */
+    @GetMapping("/status/{status}")
+    public ResponseEntity<List<EventDTO>> getEventsByStatus(@PathVariable String status) {
+        List<EventDTO> events = eventService.getEventsByStatus(status);
+        return ResponseEntity.ok(events);
+    }
+
+    /**
+     * Get events by category and status
+     * GET /api/events/category/{category}/status/{status}
+     */
+    @GetMapping("/category/{category}/status/{status}")
+    public ResponseEntity<List<EventDTO>> getEventsByCategoryAndStatus(
+            @PathVariable String category,
+            @PathVariable String status) {
+        List<EventDTO> events = eventService.getEventsByCategoryAndStatus(category, status);
+        return ResponseEntity.ok(events);
+    }
+
+    /**
+     * Search events by name
+     * GET /api/events/search/name?query=xyz
+     */
+    @GetMapping("/search/name")
+    public ResponseEntity<List<EventDTO>> searchEventsByName(@RequestParam String query) {
+        List<EventDTO> events = eventService.searchEventsByName(query);
+        return ResponseEntity.ok(events);
+    }
+
+    /**
+     * Search events by venue
+     * GET /api/events/search/venue?query=xyz
+     */
+    @GetMapping("/search/venue")
+    public ResponseEntity<List<EventDTO>> searchEventsByVenue(@RequestParam String query) {
+        List<EventDTO> events = eventService.searchEventsByVenue(query);
+        return ResponseEntity.ok(events);
+    }
+
+    /**
+     * Get upcoming events
+     * GET /api/events/upcoming
+     */
+    @GetMapping("/upcoming")
+    public ResponseEntity<List<EventDTO>> getUpcomingEvents() {
+        List<EventDTO> events = eventService.getUpcomingEvents();
+        return ResponseEntity.ok(events);
+    }
+
+    /**
+     * Get events between dates
+     * GET /api/events/between?startDate=2024-01-01T00:00:00&endDate=2024-12-31T23:59:59
+     */
+    @GetMapping("/between")
+    public ResponseEntity<List<EventDTO>> getEventsBetweenDates(
+            @RequestParam LocalDateTime startDate,
+            @RequestParam LocalDateTime endDate) {
+        List<EventDTO> events = eventService.getEventsBetweenDates(startDate, endDate);
+        return ResponseEntity.ok(events);
+    }
+
+    /**
+     * Get events by minimum rating
+     * GET /api/events/rating/{rating}
+     */
+    @GetMapping("/rating/{rating}")
+    public ResponseEntity<List<EventDTO>> getEventsByMinimumRating(@PathVariable Double rating) {
+        List<EventDTO> events = eventService.getEventsByMinimumRating(rating);
+        return ResponseEntity.ok(events);
+    }
+
+    /**
+     * Update an event
+     * PUT /api/events/{id}
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<EventDTO> updateEvent(
+            @PathVariable Long id,
+            @RequestBody UpdateEventDTO request) {
+        EventDTO event = eventService.updateEvent(id, request);
+        return ResponseEntity.ok(event);
+    }
+
+    /**
+     * Update event status
+     * PATCH /api/events/{id}/status/{status}
+     */
+    @PatchMapping("/{id}/status/{status}")
+    public ResponseEntity<EventDTO> updateEventStatus(
+            @PathVariable Long id,
+            @PathVariable String status) {
+        EventDTO event = eventService.updateEventStatus(id, status);
+        return ResponseEntity.ok(event);
+    }
+
+    /**
+     * Update event rating
+     * PATCH /api/events/{id}/rating/{rating}
+     */
+    @PatchMapping("/{id}/rating/{rating}")
+    public ResponseEntity<EventDTO> updateEventRating(
+            @PathVariable Long id,
+            @PathVariable Double rating) {
+        EventDTO event = eventService.updateEventRating(id, rating);
+        return ResponseEntity.ok(event);
+    }
+
+    /**
+     * Delete an event
+     * DELETE /api/events/{id}
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteEvent(@PathVariable Long id) {
+        eventService.deleteEvent(id);
+        return ResponseEntity.noContent().build();
+    }
+}
