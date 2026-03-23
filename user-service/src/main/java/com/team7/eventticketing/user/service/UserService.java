@@ -61,7 +61,9 @@ public class UserService {
         );
 
         // Added this line because prefrences was not saved befor
-        user.setPreferences(createUserDTO.getPreferences());
+        if (createUserDTO.getPreferences() != null){
+            user.setPreferences(createUserDTO.getPreferences());
+        }
 
         User savedUser = userRepository.save(user);
         return convertToDTO(savedUser);
