@@ -9,6 +9,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 import java.util.List;
 
 @RestController
@@ -123,5 +125,18 @@ public class UserController {
 
         List<UserDTO> users = userService.searchUsers(name, email, role);
         return ResponseEntity.ok(users);
+    }
+
+    /**
+     * [S1-F2] Update User Preferences (JSONB)
+     * PUT /api/users/{id}/preferences
+     */
+    @PutMapping("/{id}/preferences")
+    public ResponseEntity<UserDTO> updateUserPreferences(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> preferences) {
+
+        UserDTO updatedUser = userService.updateUserPreferences(id, preferences);
+        return ResponseEntity.ok(updatedUser);
     }
 }

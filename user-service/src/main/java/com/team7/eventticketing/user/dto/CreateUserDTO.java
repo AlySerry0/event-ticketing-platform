@@ -2,12 +2,17 @@ package com.team7.eventticketing.user.dto;
 
 import com.team7.eventticketing.user.model.UserRole;
 
+import java.util.Map;
+
 public class CreateUserDTO {
     private String name;
     private String email;
     private String password;
     private String phone;
     private UserRole role;
+
+    //added this
+    private Map<String, Object> preferences;
 
     // Constructors
     public CreateUserDTO() {
@@ -60,5 +65,14 @@ public class CreateUserDTO {
 
     public void setRole(UserRole role) {
         this.role = role;
+    }
+
+    //  Added the Getter and Setter for preferences
+    public Map<String, Object> getPreferences() {
+        return preferences;
+    }
+
+    public void setPreferences(Map<String, Object> preferences) {
+        this.preferences = preferences;
     }
 }
