@@ -17,6 +17,9 @@ import org.springframework.data.domain.ExampleMatcher;
 import com.team7.eventticketing.user.model.UserRole;
 import com.team7.eventticketing.user.model.User;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -56,6 +59,11 @@ public class UserService {
                 createUserDTO.getPhone(),
                 createUserDTO.getRole()
         );
+
+        // Added this line because prefrences was not saved befor
+        if (createUserDTO.getPreferences() != null){
+            user.setPreferences(createUserDTO.getPreferences());
+        }
 
         User savedUser = userRepository.save(user);
         return convertToDTO(savedUser);
@@ -215,6 +223,33 @@ public class UserService {
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * [S1-F2] Update User Preferences (JSONB)
+     */
+    @Transactional
+    public UserDTO updateUserPreferences(Long id, Map<String, Object> newPreferences) {
+        // 1. Find the user or throw a 404 Not Found
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with ID: " + id));
+
+        // 2. Get current preferences, or initialize a new map if it's null
+        Map<String, Object> currentPreferences = user.getPreferences();
+        if (currentPreferences == null) {
+            currentPreferences = new HashMap<>();
+        }
+
+        // 3. Merge the new preferences into the existing ones
+        if (newPreferences != null) {
+            currentPreferences.putAll(newPreferences);
+        }
+
+        // 4. Save and return
+        user.setPreferences(currentPreferences);
+        User updatedUser = userRepository.save(user);
+
+        return convertToDTO(updatedUser);
     }
 
     /**
