@@ -49,7 +49,6 @@ public class BookingController {
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
-		// 1. Validate and parse status
 		BookingStatus bookingStatus = null;
 		if (status != null && !status.trim().isEmpty()) {
 			try {
@@ -59,21 +58,17 @@ public class BookingController {
 			}
 		}
 
-		// 2. Validate date range logic (both or neither)
 		if ((startDate != null && endDate == null) || (startDate == null && endDate != null)) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Both startDate and endDate must be provided together.");
 		}
 
-		// 3. Ensure startDate is not after endDate
 		if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "startDate cannot be after endDate.");
 		}
 
-		// 4. Convert LocalDate to LocalDateTime for accurate querying
 		LocalDateTime startDateTime = (startDate != null) ? startDate.atStartOfDay() : null;
 		LocalDateTime endDateTime = (endDate != null) ? endDate.atTime(LocalTime.MAX) : null;
 
-		// 5. Fetch results
 		List<Booking> bookings = bookingService.searchBookings(bookingStatus, startDateTime, endDateTime);
 
 		return ResponseEntity.ok(bookings);
