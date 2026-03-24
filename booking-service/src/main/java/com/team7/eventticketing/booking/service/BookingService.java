@@ -13,34 +13,34 @@ import java.util.Optional;
 @Service
 public class BookingService {
 
-    @Autowired
-    private BookingRepository bookingRepository;
+	@Autowired
+	private BookingRepository bookingRepository;
 
-    public Booking save(Booking booking) {
-        return bookingRepository.save(booking);
-    }
+	public Booking save(Booking booking) {
+		return bookingRepository.save(booking);
+	}
 
-    public Optional<Booking> findById(Long id) {
-        return bookingRepository.findById(id);
-    }
+	public Optional<Booking> findById(Long id) {
+		return bookingRepository.findById(id);
+	}
 
-    public List<Booking> findAll() {
-        return bookingRepository.findAll();
-    }
+	public List<Booking> findAll() {
+		return bookingRepository.findAll();
+	}
 
-    public void deleteById(Long id) {
-        bookingRepository.deleteById(id);
-    }
+	public void deleteById(Long id) {
+		bookingRepository.deleteById(id);
+	}
 
-    public List<Booking> searchBookings(BookingStatus status, LocalDateTime startDate, LocalDateTime endDate) {
-        if (status != null && startDate != null && endDate != null) {
-            return bookingRepository.findByStatusAndBookingDateBetweenOrderByBookingDateDesc(status, startDate, endDate);
-        } else if (status != null) {
-            return bookingRepository.findByStatusOrderByBookingDateDesc(status);
-        } else if (startDate != null && endDate != null) {
-            return bookingRepository.findByBookingDateBetweenOrderByBookingDateDesc(startDate, endDate);
-        } else {
-            return bookingRepository.findAllByOrderByBookingDateDesc();
-        }
-    }
+	public List<Booking> searchBookings(BookingStatus status, LocalDateTime startDate, LocalDateTime endDate) {
+		if (status != null && startDate != null && endDate != null) {
+			return bookingRepository.findByStatusAndBookingDateBetweenOrderByBookingDateDesc(status, startDate, endDate);
+		} else if (status != null) {
+			return bookingRepository.findByStatusOrderByBookingDateDesc(status);
+		} else if (startDate != null && endDate != null) {
+			return bookingRepository.findByBookingDateBetweenOrderByBookingDateDesc(startDate, endDate);
+		} else {
+			return bookingRepository.findAllByOrderByBookingDateDesc();
+		}
+	}
 }
