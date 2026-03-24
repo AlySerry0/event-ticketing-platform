@@ -10,8 +10,11 @@ import java.util.List;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
-    List<Booking> findByStatusAndBookingDateBetweenOrderByBookingDateDesc(BookingStatus status, LocalDateTime startDate, LocalDateTime endDate);
-    List<Booking> findByStatusOrderByBookingDateDesc(BookingStatus status);
-    List<Booking> findByBookingDateBetweenOrderByBookingDateDesc(LocalDateTime startDate, LocalDateTime endDate);
-    List<Booking> findAllByOrderByBookingDateDesc();
+	List<Booking> findByStatusAndBookingDateBetweenOrderByBookingDateDesc(BookingStatus status, LocalDateTime startDate, LocalDateTime endDate);
+
+	List<Booking> findByStatusOrderByBookingDateDesc(BookingStatus status);
+
+	List<Booking> findByBookingDateBetweenOrderByBookingDateDesc(LocalDateTime startDate, LocalDateTime endDate);
+
+	List<Booking> findAllByOrderByBookingDateDesc();
 }

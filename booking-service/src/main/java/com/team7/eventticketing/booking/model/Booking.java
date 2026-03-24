@@ -13,80 +13,131 @@ import java.util.Map;
 @Table(name = "bookings")
 public class Booking {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long id;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+	@Column(name = "user_id", nullable = false)
+	private Long userId;
 
-    @Column(name = "event_id")
-    private Long eventId;
+	@Column(name = "event_id")
+	private Long eventId;
 
-    @Column(name = "contact_email", nullable = false)
-    private String contactEmail;
+	@Column(name = "contact_email", nullable = false)
+	private String contactEmail;
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(nullable = false)
-    private BookingStatus status;
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(nullable = false)
+	private BookingStatus status;
 
-    @Column(name = "total_amount")
-    private Double totalAmount;
+	@Column(name = "total_amount")
+	private Double totalAmount;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
-    private Map<String, Object> metadata;
+	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(columnDefinition = "jsonb")
+	private Map<String, Object> metadata;
 
-    @Column(name = "booking_date", nullable = false)
-    private LocalDateTime bookingDate;
+	@Column(name = "booking_date", nullable = false)
+	private LocalDateTime bookingDate;
 
-    @Column(name = "confirmed_at")
-    private LocalDateTime confirmedAt;
+	@Column(name = "confirmed_at")
+	private LocalDateTime confirmedAt;
 
-    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<BookingItem> bookingItems = new ArrayList<>();
+	@OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true)
+	private List<BookingItem> bookingItems = new ArrayList<>();
 
-    public Booking() {}
+	public Booking() {
+	}
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+	public Long getId() {
+		return id;
+	}
 
-    public Long getUserId() { return userId; }
-    public void setUserId(Long userId) { this.userId = userId; }
+	public void setId(Long id) {
+		this.id = id;
+	}
 
-    public Long getEventId() { return eventId; }
-    public void setEventId(Long eventId) { this.eventId = eventId; }
+	public Long getUserId() {
+		return userId;
+	}
 
-    public String getContactEmail() { return contactEmail; }
-    public void setContactEmail(String contactEmail) { this.contactEmail = contactEmail; }
+	public void setUserId(Long userId) {
+		this.userId = userId;
+	}
 
-    public BookingStatus getStatus() { return status; }
-    public void setStatus(BookingStatus status) { this.status = status; }
+	public Long getEventId() {
+		return eventId;
+	}
 
-    public Double getTotalAmount() { return totalAmount; }
-    public void setTotalAmount(Double totalAmount) { this.totalAmount = totalAmount; }
+	public void setEventId(Long eventId) {
+		this.eventId = eventId;
+	}
 
-    public Map<String, Object> getMetadata() { return metadata; }
-    public void setMetadata(Map<String, Object> metadata) { this.metadata = metadata; }
+	public String getContactEmail() {
+		return contactEmail;
+	}
 
-    public LocalDateTime getBookingDate() { return bookingDate; }
-    public void setBookingDate(LocalDateTime bookingDate) { this.bookingDate = bookingDate; }
+	public void setContactEmail(String contactEmail) {
+		this.contactEmail = contactEmail;
+	}
 
-    public LocalDateTime getConfirmedAt() { return confirmedAt; }
-    public void setConfirmedAt(LocalDateTime confirmedAt) { this.confirmedAt = confirmedAt; }
+	public BookingStatus getStatus() {
+		return status;
+	}
 
-    public List<BookingItem> getBookingItems() { return bookingItems; }
-    public void setBookingItems(List<BookingItem> bookingItems) { this.bookingItems = bookingItems; }
+	public void setStatus(BookingStatus status) {
+		this.status = status;
+	}
 
-    // helper methods
-    public void addBookingItem(BookingItem item) {
-        bookingItems.add(item);
-        item.setBooking(this);
-    }
+	public Double getTotalAmount() {
+		return totalAmount;
+	}
 
-    public void removeBookingItem(BookingItem item) {
-        bookingItems.remove(item);
-        item.setBooking(null);
-    }
+	public void setTotalAmount(Double totalAmount) {
+		this.totalAmount = totalAmount;
+	}
+
+	public Map<String, Object> getMetadata() {
+		return metadata;
+	}
+
+	public void setMetadata(Map<String, Object> metadata) {
+		this.metadata = metadata;
+	}
+
+	public LocalDateTime getBookingDate() {
+		return bookingDate;
+	}
+
+	public void setBookingDate(LocalDateTime bookingDate) {
+		this.bookingDate = bookingDate;
+	}
+
+	public LocalDateTime getConfirmedAt() {
+		return confirmedAt;
+	}
+
+	public void setConfirmedAt(LocalDateTime confirmedAt) {
+		this.confirmedAt = confirmedAt;
+	}
+
+	public List<BookingItem> getBookingItems() {
+		return bookingItems;
+	}
+
+	public void setBookingItems(List<BookingItem> bookingItems) {
+		this.bookingItems = bookingItems;
+	}
+
+	// helper methods
+	public void addBookingItem(BookingItem item) {
+		bookingItems.add(item);
+		item.setBooking(this);
+	}
+
+	public void removeBookingItem(BookingItem item) {
+		bookingItems.remove(item);
+		item.setBooking(null);
+	}
 }
