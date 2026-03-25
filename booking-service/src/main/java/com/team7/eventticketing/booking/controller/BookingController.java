@@ -1,7 +1,7 @@
 package com.team7.eventticketing.booking.controller;
 
+import com.team7.eventticketing.booking.dto.BookingDTO;
 import com.team7.eventticketing.booking.model.Booking;
-import com.team7.eventticketing.booking.model.BookingStatus;
 import com.team7.eventticketing.booking.service.BookingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -11,8 +11,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 
 @RestController
@@ -49,44 +47,19 @@ public class BookingController {
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
-		BookingStatus bookingStatus = null;
-		if (status != null && !status.trim().isEmpty()) {
-			try {
-				bookingStatus = BookingStatus.valueOf(status.toUpperCase());
-			} catch (IllegalArgumentException e) {
-				throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid booking status: " + status);
-			}
+		try {
+			List<Booking> bookings = bookingService.searchBookings(status, startDate, endDate);
+			return ResponseEntity.ok(bookings);
+		} catch (IllegalArgumentException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
 		}
-
-		if ((startDate != null && endDate == null) || (startDate == null && endDate != null)) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Both startDate and endDate must be provided together.");
-		}
-
-		if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "startDate cannot be after endDate.");
-		}
-
-		LocalDateTime startDateTime = (startDate != null) ? startDate.atStartOfDay() : null;
-		LocalDateTime endDateTime = (endDate != null) ? endDate.atTime(LocalTime.MAX) : null;
-
-		List<Booking> bookings = bookingService.searchBookings(bookingStatus, startDateTime, endDateTime);
-
-		return ResponseEntity.ok(bookings);
 	}
 
 	@PutMapping("/{id}")
-	public ResponseEntity<Booking> update(@PathVariable Long id, @RequestBody Booking bookingDetails) {
-		return bookingService.findById(id).map(booking -> {
-			booking.setContactEmail(bookingDetails.getContactEmail());
-			booking.setStatus(bookingDetails.getStatus());
-			booking.setTotalAmount(bookingDetails.getTotalAmount());
-			booking.setMetadata(bookingDetails.getMetadata());
-			booking.setBookingDate(bookingDetails.getBookingDate());
-			booking.setConfirmedAt(bookingDetails.getConfirmedAt());
-			booking.setEventId(bookingDetails.getEventId());
-			booking.setUserId(bookingDetails.getUserId());
-			return ResponseEntity.ok(bookingService.save(booking));
-		}).orElse(ResponseEntity.notFound().build());
+	public ResponseEntity<Booking> update(@PathVariable Long id, @RequestBody BookingDTO bookingDetails) {
+		return bookingService.updateBooking(id, bookingDetails)
+				.map(ResponseEntity::ok)
+				.orElse(ResponseEntity.notFound().build());
 	}
 
 	@DeleteMapping("/{id}")
