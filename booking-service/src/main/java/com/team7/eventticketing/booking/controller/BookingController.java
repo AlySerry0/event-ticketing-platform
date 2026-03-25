@@ -1,58 +1,73 @@
 package com.team7.eventticketing.booking.controller;
 
+import com.team7.eventticketing.booking.dto.BookingDTO;
 import com.team7.eventticketing.booking.model.Booking;
 import com.team7.eventticketing.booking.service.BookingService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/bookings")
 public class BookingController {
 
-    @Autowired
-    private BookingService bookingService;
+	@Autowired
+	private BookingService bookingService;
 
-    @PostMapping
-    public Booking create(@RequestBody Booking booking) {
-        return bookingService.save(booking);
-    }
+	@PostMapping
+	public Booking create(@RequestBody Booking booking) {
+		return bookingService.save(booking);
+	}
 
-    @GetMapping("/{id}")
-    public ResponseEntity<Booking> getById(@PathVariable Long id) {
-        return bookingService.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
+	@GetMapping("/{id}")
+	public ResponseEntity<Booking> getById(@PathVariable Long id) {
+		return bookingService.findById(id)
+				.map(ResponseEntity::ok)
+				.orElse(ResponseEntity.notFound().build());
+	}
 
-    @GetMapping
-    public List<Booking> getAll() {
-        return bookingService.findAll();
-    }
+	@GetMapping
+	public List<Booking> getAll() {
+		return bookingService.findAll();
+	}
 
-    @PutMapping("/{id}")
-    public ResponseEntity<Booking> update(@PathVariable Long id, @RequestBody Booking bookingDetails) {
-        return bookingService.findById(id).map(booking -> {
-            booking.setContactEmail(bookingDetails.getContactEmail());
-            booking.setStatus(bookingDetails.getStatus());
-            booking.setTotalAmount(bookingDetails.getTotalAmount());
-            booking.setMetadata(bookingDetails.getMetadata());
-            booking.setBookingDate(bookingDetails.getBookingDate());
-            booking.setConfirmedAt(bookingDetails.getConfirmedAt());
-            booking.setEventId(bookingDetails.getEventId());
-            booking.setUserId(bookingDetails.getUserId());
-            return ResponseEntity.ok(bookingService.save(booking));
-        }).orElse(ResponseEntity.notFound().build());
-    }
+	/**
+	 * [S3-F1] Get Bookings by Status and Date Range
+	 * GET /api/bookings/search?status={s}&startDate={d}&endDate={d}
+	 */
+	@GetMapping("/search")
+	public ResponseEntity<List<Booking>> searchBookings(
+			@RequestParam(required = false) String status,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        if (bookingService.findById(id).isPresent()) {
-            bookingService.deleteById(id);
-            return ResponseEntity.noContent().build();
-        }
-        return ResponseEntity.notFound().build();
-    }
+		try {
+			List<Booking> bookings = bookingService.searchBookings(status, startDate, endDate);
+			return ResponseEntity.ok(bookings);
+		} catch (IllegalArgumentException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+		}
+	}
+
+	@PutMapping("/{id}")
+	public ResponseEntity<Booking> update(@PathVariable Long id, @RequestBody BookingDTO bookingDetails) {
+		return bookingService.updateBooking(id, bookingDetails)
+				.map(ResponseEntity::ok)
+				.orElse(ResponseEntity.notFound().build());
+	}
+
+	@DeleteMapping("/{id}")
+	public ResponseEntity<Void> delete(@PathVariable Long id) {
+		if (bookingService.findById(id).isPresent()) {
+			bookingService.deleteById(id);
+			return ResponseEntity.noContent().build();
+		}
+		return ResponseEntity.notFound().build();
+	}
 }
