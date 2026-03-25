@@ -1,5 +1,6 @@
 package com.team7.eventticketing.booking.controller;
 
+import com.team7.eventticketing.booking.dto.BookingItemDTO;
 import com.team7.eventticketing.booking.model.BookingItem;
 import com.team7.eventticketing.booking.service.BookingItemService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,17 +34,10 @@ public class BookingItemController {
 	}
 
 	@PutMapping("/{id}")
-	public ResponseEntity<BookingItem> update(@PathVariable Long id, @RequestBody BookingItem itemDetails) {
-		return bookingItemService.findById(id).map(item -> {
-			item.setEventOrder(itemDetails.getEventOrder());
-			item.setSessionId(itemDetails.getSessionId());
-			item.setSessionTitle(itemDetails.getSessionTitle());
-			item.setQuantity(itemDetails.getQuantity());
-			item.setUnitPrice(itemDetails.getUnitPrice());
-			item.setStatus(itemDetails.getStatus());
-			item.setMetadata(itemDetails.getMetadata());
-			return ResponseEntity.ok(bookingItemService.save(item));
-		}).orElse(ResponseEntity.notFound().build());
+	public ResponseEntity<BookingItem> update(@PathVariable Long id, @RequestBody BookingItemDTO itemDetails) {
+		return bookingItemService.updateBookingItem(id, itemDetails)
+				.map(ResponseEntity::ok)
+				.orElse(ResponseEntity.notFound().build());
 	}
 
 	@DeleteMapping("/{id}")
