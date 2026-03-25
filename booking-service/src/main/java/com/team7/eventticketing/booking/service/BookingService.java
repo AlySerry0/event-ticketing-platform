@@ -6,11 +6,13 @@ import com.team7.eventticketing.booking.model.BookingStatus;
 import com.team7.eventticketing.booking.repository.BookingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 @Service
@@ -87,5 +89,29 @@ public class BookingService {
 		} else {
 			return bookingRepository.findAllByOrderByBookingDateDesc();
 		}
+	}
+
+	@Transactional
+	public Booking confirmBookingAndAssignEvent(Long bookingId, Long eventId) {
+		Booking booking = bookingRepository.findById(bookingId)
+				.orElseThrow(() -> new NoSuchElementException("Booking not found"));
+
+		if (booking.getStatus() != BookingStatus.PENDING) {
+			throw new IllegalArgumentException("Booking is not PENDING");
+		}
+
+		String eventStatus = bookingRepository.findEventStatusById(eventId);
+		if (eventStatus == null) {
+			throw new NoSuchElementException("Event not found");
+		}
+		if (!"UPCOMING".equals(eventStatus)) {
+			throw new IllegalArgumentException("Event is not UPCOMING");
+		}
+
+		booking.setEventId(eventId);
+		booking.setStatus(BookingStatus.CONFIRMED);
+		booking.setConfirmedAt(LocalDateTime.now());
+
+		return bookingRepository.save(booking);
 	}
 }
