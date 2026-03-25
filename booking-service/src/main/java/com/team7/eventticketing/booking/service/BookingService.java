@@ -6,16 +6,13 @@ import com.team7.eventticketing.booking.model.BookingStatus;
 import com.team7.eventticketing.booking.repository.BookingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
-
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 @Service
@@ -97,18 +94,18 @@ public class BookingService {
 	@Transactional
 	public Booking confirmBookingAndAssignEvent(Long bookingId, Long eventId) {
 		Booking booking = bookingRepository.findById(bookingId)
-				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+				.orElseThrow(() -> new NoSuchElementException("Booking not found"));
 
 		if (booking.getStatus() != BookingStatus.PENDING) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking is not PENDING");
+			throw new IllegalArgumentException("Booking is not PENDING");
 		}
 
 		String eventStatus = bookingRepository.findEventStatusById(eventId);
 		if (eventStatus == null) {
-			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found");
+			throw new NoSuchElementException("Event not found");
 		}
 		if (!"UPCOMING".equals(eventStatus)) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Event is not UPCOMING");
+			throw new IllegalArgumentException("Event is not UPCOMING");
 		}
 
 		booking.setEventId(eventId);

@@ -12,6 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 @RestController
 @RequestMapping("/api/bookings")
@@ -56,8 +57,17 @@ public class BookingController {
 	}
 
 	@PutMapping("/{id}/confirm")
-	public Booking confirmBooking(@PathVariable Long id, @RequestParam Long eventId) {
-		return bookingService.confirmBookingAndAssignEvent(id, eventId);
+	public ResponseEntity<Booking> confirmBooking(@PathVariable Long id, @RequestParam Long eventId) {
+		try {
+			Booking confirmedBooking = bookingService.confirmBookingAndAssignEvent(id, eventId);
+			return ResponseEntity.ok(confirmedBooking);
+		} catch (NoSuchElementException e) {
+			// Catches "Booking not found" and "Event not found"
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+		} catch (IllegalArgumentException e) {
+			// Catches "Booking is not PENDING" and "Event is not UPCOMING"
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+		}
 	}
 
 	@PutMapping("/{id}")
