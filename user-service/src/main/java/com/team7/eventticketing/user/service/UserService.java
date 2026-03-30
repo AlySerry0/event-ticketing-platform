@@ -1,16 +1,12 @@
 package com.team7.eventticketing.user.service;
 
-import com.team7.eventticketing.user.dto.CreateUserDTO;
-import com.team7.eventticketing.user.dto.UpdateUserDTO;
-import com.team7.eventticketing.user.dto.UserDTO;
-import com.team7.eventticketing.user.model.User;
-import com.team7.eventticketing.user.model.UserStatus;
+import com.team7.eventticketing.user.dto.*;
+import com.team7.eventticketing.user.model.*;
 import com.team7.eventticketing.user.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import com.team7.eventticketing.user.model.UserRole;
 
 import org.springframework.data.domain.Example;
 import org.springframework.data.domain.ExampleMatcher;
@@ -253,6 +249,32 @@ public class UserService {
     }
 
     /**
+     * [S1-F8] Get User Profile with Favorite Venues
+     */
+    public UserProfileDTO getUserProfileWithFavoriteVenues(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "User not found with ID: " + id
+                ));
+
+        UserProfileDTO userProfileDTO = new UserProfileDTO();
+        userProfileDTO.setUserId(user.getId());
+        userProfileDTO.setName(user.getName());
+        userProfileDTO.setEmail(user.getEmail());
+        userProfileDTO.setPhone(user.getPhone());
+        userProfileDTO.setPreferences(user.getPreferences());
+        userProfileDTO.setFavoriteVenues(user.getFavoriteVenues()
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList()));
+        userProfileDTO.setTotalFavoriteVenues(user.getFavoriteVenues().size());
+
+        return userProfileDTO;
+
+    }
+
+    /**
      * Convert User entity to UserDTO
      */
     private UserDTO convertToDTO(User user) {
@@ -266,5 +288,17 @@ public class UserService {
         userDTO.setPreferences(user.getPreferences());
         userDTO.setCreatedAt(user.getCreatedAt());
         return userDTO;
+    }
+
+    private FavoriteVenueDTO convertToDTO(FavoriteVenue favoriteVenue) {
+        FavoriteVenueDTO dto = new FavoriteVenueDTO();
+        dto.setId(favoriteVenue.getId());
+        dto.setLabel(favoriteVenue.getLabel());
+        dto.setVenueName(favoriteVenue.getVenueName());
+        dto.setLocation(favoriteVenue.getLocation());
+        dto.setCapacity(favoriteVenue.getCapacity());
+        dto.setIsDefault(favoriteVenue.getIsDefault());
+        dto.setMetadata(favoriteVenue.getMetadata());
+        return dto;
     }
 }

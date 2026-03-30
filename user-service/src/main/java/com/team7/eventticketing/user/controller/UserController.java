@@ -4,6 +4,7 @@ package com.team7.eventticketing.user.controller;
 import com.team7.eventticketing.user.dto.CreateUserDTO;
 import com.team7.eventticketing.user.dto.UpdateUserDTO;
 import com.team7.eventticketing.user.dto.UserDTO;
+import com.team7.eventticketing.user.dto.UserProfileDTO;
 import com.team7.eventticketing.user.service.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -138,5 +139,15 @@ public class UserController {
 
         UserDTO updatedUser = userService.updateUserPreferences(id, preferences);
         return ResponseEntity.ok(updatedUser);
+    }
+
+    /**
+     * [S1-F8] Get User Profile with Favorite Venues
+     * GET /api/users/{id}/profile
+     */
+    @GetMapping("/{id}/profile")
+    public ResponseEntity<UserProfileDTO> getUserProfile(@PathVariable Long id) {
+        UserProfileDTO userProfile = userService.getUserProfileWithFavoriteVenues(id);
+        return ResponseEntity.ok(userProfile);
     }
 }
