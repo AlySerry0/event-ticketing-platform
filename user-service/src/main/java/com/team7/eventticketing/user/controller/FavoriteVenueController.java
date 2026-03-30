@@ -32,7 +32,7 @@ public class FavoriteVenueController {
 
     /**
      * Get all favorite venues for a user
-     * GET /api/users/{userId}/favorite-venues
+     * GET /api/users/{userId}/venues
      */
     @GetMapping
     public ResponseEntity<List<FavoriteVenueDTO>> getUserFavoriteVenues(@PathVariable Long userId) {
@@ -42,7 +42,7 @@ public class FavoriteVenueController {
 
     /**
      * Get favorite venue by ID
-     * GET /api/users/{userId}/favorite-venues/{venueId}
+     * GET /api/users/{userId}/venues/{venueId}
      */
     @GetMapping("/{venueId}")
     public ResponseEntity<FavoriteVenueDTO> getFavoriteVenueById(
@@ -54,7 +54,7 @@ public class FavoriteVenueController {
 
     /**
      * Update favorite venue
-     * PUT /api/users/{userId}/favorite-venues/{venueId}
+     * PUT /api/users/{userId}/venues/{venueId}
      */
     @PutMapping("/{venueId}")
     public ResponseEntity<FavoriteVenueDTO> updateFavoriteVenue(
@@ -67,7 +67,7 @@ public class FavoriteVenueController {
 
     /**
      * Delete favorite venue
-     * DELETE /api/users/{userId}/favorite-venues/{venueId}
+     * DELETE /api/users/{userId}/venues/{venueId}
      */
     @DeleteMapping("/{venueId}")
     public ResponseEntity<Void> deleteFavoriteVenue(
@@ -79,7 +79,7 @@ public class FavoriteVenueController {
 
     /**
      * Get default favorite venue for a user
-     * GET /api/users/{userId}/favorite-venues/default
+     * GET /api/users/{userId}/venues/default
      */
     @GetMapping("/default")
     public ResponseEntity<FavoriteVenueDTO> getDefaultFavoriteVenue(@PathVariable Long userId) {
