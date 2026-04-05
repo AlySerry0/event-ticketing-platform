@@ -1,7 +1,6 @@
 package com.team7.eventticketing.booking.controller;
 
 import com.team7.eventticketing.booking.dto.BookingItemDTO;
-import com.team7.eventticketing.booking.model.BookingItem;
 import com.team7.eventticketing.booking.service.BookingItemService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -17,24 +16,24 @@ public class BookingItemController {
 	private BookingItemService bookingItemService;
 
 	@PostMapping
-	public BookingItem create(@RequestBody BookingItem bookingItem) {
-		return bookingItemService.save(bookingItem);
+	public BookingItemDTO create(@RequestBody BookingItemDTO bookingItemDTO) {
+		return bookingItemService.save(bookingItemDTO);
 	}
 
 	@GetMapping("/{id}")
-	public ResponseEntity<BookingItem> getById(@PathVariable Long id) {
+	public ResponseEntity<BookingItemDTO> getById(@PathVariable Long id) {
 		return bookingItemService.findById(id)
 				.map(ResponseEntity::ok)
 				.orElse(ResponseEntity.notFound().build());
 	}
 
 	@GetMapping
-	public List<BookingItem> getAll() {
+	public List<BookingItemDTO> getAll() {
 		return bookingItemService.findAll();
 	}
 
 	@PutMapping("/{id}")
-	public ResponseEntity<BookingItem> update(@PathVariable Long id, @RequestBody BookingItemDTO itemDetails) {
+	public ResponseEntity<BookingItemDTO> update(@PathVariable Long id, @RequestBody BookingItemDTO itemDetails) {
 		return bookingItemService.updateBookingItem(id, itemDetails)
 				.map(ResponseEntity::ok)
 				.orElse(ResponseEntity.notFound().build());

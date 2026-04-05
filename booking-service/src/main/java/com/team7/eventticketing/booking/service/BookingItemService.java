@@ -15,23 +15,26 @@ public class BookingItemService {
 	@Autowired
 	private BookingItemRepository bookingItemRepository;
 
-	public BookingItem save(BookingItem bookingItem) {
-		return bookingItemRepository.save(bookingItem);
+	public BookingItemDTO save(BookingItemDTO bookingItemDTO) {
+		BookingItem bookingItem = convertToEntity(bookingItemDTO);
+		return convertToDTO(bookingItemRepository.save(bookingItem));
 	}
 
-	public Optional<BookingItem> findById(Long id) {
-		return bookingItemRepository.findById(id);
+	public Optional<BookingItemDTO> findById(Long id) {
+		return bookingItemRepository.findById(id).map(this::convertToDTO);
 	}
 
-	public List<BookingItem> findAll() {
-		return bookingItemRepository.findAll();
+	public List<BookingItemDTO> findAll() {
+		return bookingItemRepository.findAll().stream()
+				.map(this::convertToDTO)
+				.toList();
 	}
 
 	public void deleteById(Long id) {
 		bookingItemRepository.deleteById(id);
 	}
 
-	public Optional<BookingItem> updateBookingItem(Long id, BookingItemDTO itemDetails) {
+	public Optional<BookingItemDTO> updateBookingItem(Long id, BookingItemDTO itemDetails) {
 		return bookingItemRepository.findById(id).map(item -> {
 			if (itemDetails.getEventOrder() != null) item.setEventOrder(itemDetails.getEventOrder());
 			if (itemDetails.getSessionId() != null) item.setSessionId(itemDetails.getSessionId());
@@ -48,7 +51,33 @@ public class BookingItemService {
 					item.getMetadata().putAll(itemDetails.getMetadata());
 				}
 			}
-			return bookingItemRepository.save(item);
+			return convertToDTO(bookingItemRepository.save(item));
 		});
+	}
+
+	private BookingItemDTO convertToDTO(BookingItem item) {
+		BookingItemDTO dto = new BookingItemDTO();
+		dto.setId(item.getId());
+		dto.setEventOrder(item.getEventOrder());
+		dto.setSessionId(item.getSessionId());
+		dto.setSessionTitle(item.getSessionTitle());
+		dto.setQuantity(item.getQuantity());
+		dto.setUnitPrice(item.getUnitPrice());
+		dto.setStatus(item.getStatus());
+		dto.setMetadata(item.getMetadata());
+		return dto;
+	}
+
+	private BookingItem convertToEntity(BookingItemDTO dto) {
+		BookingItem item = new BookingItem();
+		item.setId(dto.getId());
+		item.setEventOrder(dto.getEventOrder());
+		item.setSessionId(dto.getSessionId());
+		item.setSessionTitle(dto.getSessionTitle());
+		item.setQuantity(dto.getQuantity());
+		item.setUnitPrice(dto.getUnitPrice());
+		item.setStatus(dto.getStatus());
+		item.setMetadata(dto.getMetadata());
+		return item;
 	}
 }
