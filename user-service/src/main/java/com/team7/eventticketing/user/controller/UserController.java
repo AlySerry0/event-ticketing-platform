@@ -10,6 +10,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.team7.eventticketing.user.dto.UserBookingSummaryDTO;
+
 import java.util.Map;
 
 import java.util.List;
@@ -139,6 +141,15 @@ public class UserController {
 
         UserDTO updatedUser = userService.updateUserPreferences(id, preferences);
         return ResponseEntity.ok(updatedUser);
+    }
+
+    /**
+     * [S1-F3]
+     */
+    @GetMapping("/{id}/booking-summary")
+    public ResponseEntity<UserBookingSummaryDTO> getUserBookingSummary(@PathVariable Long id) {
+        UserBookingSummaryDTO summary = userService.getBookingSummary(id);
+        return ResponseEntity.ok(summary);
     }
 
     /**
