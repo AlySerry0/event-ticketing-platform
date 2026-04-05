@@ -25,4 +25,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> searchUsers(@Param("name") String name,
                            @Param("email") String email,
                            @Param("role") UserRole role);
+    // Check if user has any active bookings
+    @Query(value = "SELECT COUNT(*) > 0 FROM bookings " +
+            "WHERE user_id = :userId " +
+            "AND status IN ('PENDING','CONFIRMED','CHECKED_IN')",
+            nativeQuery = true)
+    boolean existsActiveBookingForUser(@Param("userId") Long userId);
 }

@@ -8,8 +8,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import org.springframework.data.domain.Example;
-import org.springframework.data.domain.ExampleMatcher;
 import com.team7.eventticketing.user.model.UserRole;
 import com.team7.eventticketing.user.model.User;
 
@@ -22,6 +20,7 @@ import java.util.stream.Collectors;
 @Service
 @Transactional(readOnly = true)
 public class UserService {
+
 
     private final UserRepository userRepository;
 
@@ -164,6 +163,15 @@ public class UserService {
                         HttpStatus.NOT_FOUND,
                         "User not found with ID: " + id
                 ));
+
+        boolean hasActiveBookings = userRepository.existsActiveBookingForUser(id);
+
+        if (hasActiveBookings) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "User has active bookings"
+            );
+        }
 
         user.setStatus(UserStatus.DEACTIVATED);
         User updatedUser = userRepository.save(user);
