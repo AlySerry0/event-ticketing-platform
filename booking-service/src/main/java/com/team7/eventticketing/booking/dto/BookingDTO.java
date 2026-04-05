@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 public class BookingDTO {
+	private Long id;
 	private Long userId;
 	private Long eventId;
 	private String contactEmail;
@@ -14,6 +15,14 @@ public class BookingDTO {
 	private Map<String, Object> metadata;
 	private LocalDateTime bookingDate;
 	private LocalDateTime confirmedAt;
+
+	public Long getId() {
+		return id;
+	}
+
+	public void setId(Long id) {
+		this.id = id;
+	}
 
 	public Long getUserId() {
 		return userId;

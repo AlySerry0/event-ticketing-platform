@@ -5,6 +5,7 @@ import com.team7.eventticketing.booking.model.BookingItemStatus;
 import java.util.Map;
 
 public class BookingItemDTO {
+	private Long id;
 	private Integer eventOrder;
 	private Long sessionId;
 	private String sessionTitle;
@@ -12,6 +13,14 @@ public class BookingItemDTO {
 	private Double unitPrice;
 	private BookingItemStatus status;
 	private Map<String, Object> metadata;
+
+	public Long getId() {
+		return id;
+	}
+
+	public void setId(Long id) {
+		this.id = id;
+	}
 
 	public Integer getEventOrder() {
 		return eventOrder;

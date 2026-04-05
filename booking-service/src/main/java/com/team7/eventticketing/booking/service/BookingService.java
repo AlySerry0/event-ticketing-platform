@@ -21,23 +21,30 @@ public class BookingService {
 	@Autowired
 	private BookingRepository bookingRepository;
 
-	public Booking save(Booking booking) {
-		return bookingRepository.save(booking);
+	public BookingDTO save(BookingDTO bookingDTO) {
+		Booking booking = convertToEntity(bookingDTO);
+		booking.setBookingDate(LocalDateTime.now());
+		if (booking.getStatus() == null) {
+			booking.setStatus(BookingStatus.PENDING);
+		}
+		return convertToDTO(bookingRepository.save(booking));
 	}
 
-	public Optional<Booking> findById(Long id) {
-		return bookingRepository.findById(id);
+	public Optional<BookingDTO> findById(Long id) {
+		return bookingRepository.findById(id).map(this::convertToDTO);
 	}
 
-	public List<Booking> findAll() {
-		return bookingRepository.findAll();
+	public List<BookingDTO> findAll() {
+		return bookingRepository.findAll().stream()
+				.map(this::convertToDTO)
+				.toList();
 	}
 
 	public void deleteById(Long id) {
 		bookingRepository.deleteById(id);
 	}
 
-	public Optional<Booking> updateBooking(Long id, BookingDTO bookingDetails) {
+	public Optional<BookingDTO> updateBooking(Long id, BookingDTO bookingDetails) {
 		return bookingRepository.findById(id).map(booking -> {
 			if (bookingDetails.getContactEmail() != null) booking.setContactEmail(bookingDetails.getContactEmail());
 			if (bookingDetails.getStatus() != null) booking.setStatus(bookingDetails.getStatus());
@@ -55,11 +62,11 @@ public class BookingService {
 					booking.getMetadata().putAll(bookingDetails.getMetadata());
 				}
 			}
-			return bookingRepository.save(booking);
+			return convertToDTO(bookingRepository.save(booking));
 		});
 	}
 
-	public List<Booking> searchBookings(String statusStr, LocalDate startDate, LocalDate endDate) {
+	public List<BookingDTO> searchBookings(String statusStr, LocalDate startDate, LocalDate endDate) {
 		BookingStatus status = null;
 
 		if (statusStr != null && !statusStr.trim().isEmpty()) {
@@ -80,19 +87,22 @@ public class BookingService {
 		LocalDateTime startDateTime = (startDate != null) ? startDate.atStartOfDay() : null;
 		LocalDateTime endDateTime = (endDate != null) ? endDate.atTime(LocalTime.MAX) : null;
 
+		List<Booking> bookings;
 		if (status != null && startDateTime != null && endDateTime != null) {
-			return bookingRepository.findByStatusAndBookingDateBetweenOrderByBookingDateDesc(status, startDateTime, endDateTime);
+			bookings = bookingRepository.findByStatusAndBookingDateBetweenOrderByBookingDateDesc(status, startDateTime, endDateTime);
 		} else if (status != null) {
-			return bookingRepository.findByStatusOrderByBookingDateDesc(status);
+			bookings = bookingRepository.findByStatusOrderByBookingDateDesc(status);
 		} else if (startDateTime != null && endDateTime != null) {
-			return bookingRepository.findByBookingDateBetweenOrderByBookingDateDesc(startDateTime, endDateTime);
+			bookings = bookingRepository.findByBookingDateBetweenOrderByBookingDateDesc(startDateTime, endDateTime);
 		} else {
-			return bookingRepository.findAllByOrderByBookingDateDesc();
+			bookings = bookingRepository.findAllByOrderByBookingDateDesc();
 		}
+
+		return bookings.stream().map(this::convertToDTO).toList();
 	}
 
 	@Transactional
-	public Booking confirmBookingAndAssignEvent(Long bookingId, Long eventId) {
+	public BookingDTO confirmBookingAndAssignEvent(Long bookingId, Long eventId) {
 		Booking booking = bookingRepository.findById(bookingId)
 				.orElseThrow(() -> new NoSuchElementException("Booking not found"));
 
@@ -112,6 +122,34 @@ public class BookingService {
 		booking.setStatus(BookingStatus.CONFIRMED);
 		booking.setConfirmedAt(LocalDateTime.now());
 
-		return bookingRepository.save(booking);
+		return convertToDTO(bookingRepository.save(booking));
+	}
+
+	private BookingDTO convertToDTO(Booking booking) {
+		BookingDTO dto = new BookingDTO();
+		dto.setId(booking.getId());
+		dto.setUserId(booking.getUserId());
+		dto.setEventId(booking.getEventId());
+		dto.setContactEmail(booking.getContactEmail());
+		dto.setStatus(booking.getStatus());
+		dto.setTotalAmount(booking.getTotalAmount());
+		dto.setMetadata(booking.getMetadata());
+		dto.setBookingDate(booking.getBookingDate());
+		dto.setConfirmedAt(booking.getConfirmedAt());
+		return dto;
+	}
+
+	private Booking convertToEntity(BookingDTO dto) {
+		Booking booking = new Booking();
+		booking.setId(dto.getId());
+		booking.setUserId(dto.getUserId());
+		booking.setEventId(dto.getEventId());
+		booking.setContactEmail(dto.getContactEmail());
+		booking.setStatus(dto.getStatus());
+		booking.setTotalAmount(dto.getTotalAmount());
+		booking.setMetadata(dto.getMetadata());
+		booking.setBookingDate(dto.getBookingDate());
+		booking.setConfirmedAt(dto.getConfirmedAt());
+		return booking;
 	}
 }

@@ -1,7 +1,6 @@
 package com.team7.eventticketing.booking.controller;
 
 import com.team7.eventticketing.booking.dto.BookingDTO;
-import com.team7.eventticketing.booking.model.Booking;
 import com.team7.eventticketing.booking.service.BookingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -22,19 +21,19 @@ public class BookingController {
 	private BookingService bookingService;
 
 	@PostMapping
-	public Booking create(@RequestBody Booking booking) {
-		return bookingService.save(booking);
+	public BookingDTO create(@RequestBody BookingDTO bookingDTO) {
+		return bookingService.save(bookingDTO);
 	}
 
 	@GetMapping("/{id}")
-	public ResponseEntity<Booking> getById(@PathVariable Long id) {
+	public ResponseEntity<BookingDTO> getById(@PathVariable Long id) {
 		return bookingService.findById(id)
 				.map(ResponseEntity::ok)
 				.orElse(ResponseEntity.notFound().build());
 	}
 
 	@GetMapping
-	public List<Booking> getAll() {
+	public List<BookingDTO> getAll() {
 		return bookingService.findAll();
 	}
 
@@ -43,13 +42,13 @@ public class BookingController {
 	 * GET /api/bookings/search?status={s}&startDate={d}&endDate={d}
 	 */
 	@GetMapping("/search")
-	public ResponseEntity<List<Booking>> searchBookings(
+	public ResponseEntity<List<BookingDTO>> searchBookings(
 			@RequestParam(required = false) String status,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
 		try {
-			List<Booking> bookings = bookingService.searchBookings(status, startDate, endDate);
+			List<BookingDTO> bookings = bookingService.searchBookings(status, startDate, endDate);
 			return ResponseEntity.ok(bookings);
 		} catch (IllegalArgumentException e) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
@@ -57,9 +56,9 @@ public class BookingController {
 	}
 
 	@PutMapping("/{id}/confirm")
-	public ResponseEntity<Booking> confirmBooking(@PathVariable Long id, @RequestParam Long eventId) {
+	public ResponseEntity<BookingDTO> confirmBooking(@PathVariable Long id, @RequestParam Long eventId) {
 		try {
-			Booking confirmedBooking = bookingService.confirmBookingAndAssignEvent(id, eventId);
+			BookingDTO confirmedBooking = bookingService.confirmBookingAndAssignEvent(id, eventId);
 			return ResponseEntity.ok(confirmedBooking);
 		} catch (NoSuchElementException e) {
 			// Catches "Booking not found" and "Event not found"
@@ -71,7 +70,7 @@ public class BookingController {
 	}
 
 	@PutMapping("/{id}")
-	public ResponseEntity<Booking> update(@PathVariable Long id, @RequestBody BookingDTO bookingDetails) {
+	public ResponseEntity<BookingDTO> update(@PathVariable Long id, @RequestBody BookingDTO bookingDetails) {
 		return bookingService.updateBooking(id, bookingDetails)
 				.map(ResponseEntity::ok)
 				.orElse(ResponseEntity.notFound().build());
