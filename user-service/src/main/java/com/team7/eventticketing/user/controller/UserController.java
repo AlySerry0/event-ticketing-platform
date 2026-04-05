@@ -90,7 +90,7 @@ public class UserController {
      * Deactivate user
      * PATCH /api/users/{id}/deactivate
      */
-    @PatchMapping("/{id}/deactivate")
+    @PutMapping("/{id}/deactivate")
     public ResponseEntity<UserDTO> deactivateUser(@PathVariable Long id) {
         UserDTO userDTO = userService.deactivateUser(id);
         return ResponseEntity.ok(userDTO);

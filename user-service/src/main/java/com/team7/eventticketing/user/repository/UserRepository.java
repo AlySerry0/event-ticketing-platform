@@ -42,4 +42,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "GROUP BY u.id, u.name", nativeQuery = true)
     BookingSummaryProjection getUserBookingSummary(@Param("id") Long id);
 
+    // Check if user has any active bookings
+    @Query(value = "SELECT COUNT(*) > 0 FROM bookings " +
+            "WHERE user_id = :userId " +
+            "AND status IN ('PENDING','CONFIRMED','CHECKED_IN')",
+            nativeQuery = true)
+    boolean existsActiveBookingForUser(@Param("userId") Long userId);
 }
