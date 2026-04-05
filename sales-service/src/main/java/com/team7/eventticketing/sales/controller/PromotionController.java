@@ -1,6 +1,6 @@
 package com.team7.eventticketing.sales.controller;
 
-import com.team7.eventticketing.sales.model.Promotion;
+import com.team7.eventticketing.sales.dto.PromotionDTO;
 import com.team7.eventticketing.sales.service.PromotionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -16,24 +16,24 @@ public class PromotionController {
     private PromotionService promotionService;
 
     @PostMapping
-    public Promotion create(@RequestBody Promotion promotion) {
-        return promotionService.save(promotion);
+    public PromotionDTO create(@RequestBody PromotionDTO promotionDTO) {
+        return promotionService.save(promotionDTO);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Promotion> getById(@PathVariable Long id) {
+    public ResponseEntity<PromotionDTO> getById(@PathVariable Long id) {
         return promotionService.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping
-    public List<Promotion> getAll() {
+    public List<PromotionDTO> getAll() {
         return promotionService.findAll();
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Promotion> update(@PathVariable Long id, @RequestBody Promotion promotionDetails) {
+    public ResponseEntity<PromotionDTO> update(@PathVariable Long id, @RequestBody PromotionDTO promotionDetails) {
         return promotionService.findById(id).map(promotion -> {
             promotion.setCode(promotionDetails.getCode());
             promotion.setDiscountType(promotionDetails.getDiscountType());
