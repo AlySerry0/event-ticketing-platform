@@ -17,6 +17,9 @@ import java.util.Map;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.team7.eventticketing.user.dto.UserBookingSummaryDTO;
+import com.team7.eventticketing.user.repository.BookingSummaryProjection;
+
 @Service
 @Transactional(readOnly = true)
 public class UserService {
@@ -254,6 +257,30 @@ public class UserService {
         User updatedUser = userRepository.save(user);
 
         return convertToDTO(updatedUser);
+    }
+
+    /**
+     * [S1-F3] Get User Booking Summary
+     */
+    public UserBookingSummaryDTO getBookingSummary(Long id) {
+        // 1. Find user or throw 404 (Test Scenario D)
+        userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with ID: " + id));
+
+        // 2. Execute Native SQL JOIN query
+        BookingSummaryProjection projection = userRepository.getUserBookingSummary(id);
+
+        // 3. Build and return DTO
+        UserBookingSummaryDTO dto = new UserBookingSummaryDTO();
+        dto.setUserId(projection.getUserId());
+        dto.setName(projection.getName());
+        dto.setTotalBookings(projection.getTotalBookings());
+        dto.setCompletedBookings(projection.getCompletedBookings());
+        dto.setCancelledBookings(projection.getCancelledBookings());
+        dto.setTotalSpent(projection.getTotalSpent());
+        dto.setAverageBookingAmount(projection.getAverageBookingAmount());
+
+        return dto;
     }
 
     /**
