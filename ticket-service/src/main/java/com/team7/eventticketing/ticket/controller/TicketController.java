@@ -1,6 +1,6 @@
 package com.team7.eventticketing.ticket.controller;
 
-import com.team7.eventticketing.ticket.model.Ticket;
+import com.team7.eventticketing.ticket.dto.TicketDTO;
 import com.team7.eventticketing.ticket.service.TicketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -16,24 +16,24 @@ public class TicketController {
     private TicketService ticketService;
 
     @PostMapping
-    public Ticket create(@RequestBody Ticket ticket) {
-        return ticketService.save(ticket);
+    public TicketDTO create(@RequestBody TicketDTO ticketDTO) {
+        return ticketService.save(ticketDTO);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Ticket> getById(@PathVariable Long id) {
+    public ResponseEntity<TicketDTO> getById(@PathVariable Long id) {
         return ticketService.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping
-    public List<Ticket> getAll() {
+    public List<TicketDTO> getAll() {
         return ticketService.findAll();
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Ticket> update(@PathVariable Long id, @RequestBody Ticket ticketDetails) {
+    public ResponseEntity<TicketDTO> update(@PathVariable Long id, @RequestBody TicketDTO ticketDetails) {
         return ticketService.findById(id).map(ticket -> {
             ticket.setBookingId(ticketDetails.getBookingId());
             ticket.setAttendeeName(ticketDetails.getAttendeeName());
