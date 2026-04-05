@@ -1,6 +1,6 @@
 package com.team7.eventticketing.sales.controller;
 
-import com.team7.eventticketing.sales.model.SalePromotion;
+import com.team7.eventticketing.sales.dto.SalePromotionDTO;
 import com.team7.eventticketing.sales.service.SalePromotionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -16,24 +16,24 @@ public class SalePromotionController {
     private SalePromotionService salePromotionService;
 
     @PostMapping
-    public SalePromotion create(@RequestBody SalePromotion salePromotion) {
-        return salePromotionService.save(salePromotion);
+    public SalePromotionDTO create(@RequestBody SalePromotionDTO salePromotionDTO) {
+        return salePromotionService.save(salePromotionDTO);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<SalePromotion> getById(@PathVariable Long id) {
+    public ResponseEntity<SalePromotionDTO> getById(@PathVariable Long id) {
         return salePromotionService.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping
-    public List<SalePromotion> getAll() {
+    public List<SalePromotionDTO> getAll() {
         return salePromotionService.findAll();
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<SalePromotion> update(@PathVariable Long id, @RequestBody SalePromotion salePromotionDetails) {
+    public ResponseEntity<SalePromotionDTO> update(@PathVariable Long id, @RequestBody SalePromotionDTO salePromotionDetails) {
         return salePromotionService.findById(id).map(salePromotion -> {
             salePromotion.setDiscountApplied(salePromotionDetails.getDiscountApplied());
             salePromotion.setAppliedAt(salePromotionDetails.getAppliedAt());

@@ -1,6 +1,6 @@
 package com.team7.eventticketing.sales.controller;
 
-import com.team7.eventticketing.sales.model.TicketSale;
+import com.team7.eventticketing.sales.dto.TicketSaleDTO;
 import com.team7.eventticketing.sales.service.TicketSaleService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -16,24 +16,24 @@ public class TicketSaleController {
     private TicketSaleService ticketSaleService;
 
     @PostMapping
-    public TicketSale create(@RequestBody TicketSale ticketSale) {
-        return ticketSaleService.save(ticketSale);
+    public TicketSaleDTO create(@RequestBody TicketSaleDTO ticketSaleDTO) {
+        return ticketSaleService.save(ticketSaleDTO);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<TicketSale> getById(@PathVariable Long id) {
+    public ResponseEntity<TicketSaleDTO> getById(@PathVariable Long id) {
         return ticketSaleService.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping
-    public List<TicketSale> getAll() {
+    public List<TicketSaleDTO> getAll() {
         return ticketSaleService.findAll();
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<TicketSale> update(@PathVariable Long id, @RequestBody TicketSale ticketSaleDetails) {
+    public ResponseEntity<TicketSaleDTO> update(@PathVariable Long id, @RequestBody TicketSaleDTO ticketSaleDetails) {
         return ticketSaleService.findById(id).map(ticketSale -> {
             ticketSale.setBookingId(ticketSaleDetails.getBookingId());
             ticketSale.setUserId(ticketSaleDetails.getUserId());
