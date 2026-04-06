@@ -1,6 +1,7 @@
 package com.team7.eventticketing.sales.controller;
 
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
+import com.team7.eventticketing.sales.model.TicketSale;
 import com.team7.eventticketing.sales.service.TicketSaleService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -9,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/ticket-sales")
+@RequestMapping("/api/sales")
 public class TicketSaleController {
 
     @Autowired
@@ -53,5 +54,14 @@ public class TicketSaleController {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.notFound().build();
+    }
+
+    @PostMapping("/{saleId}/promotions/{promotionId}")
+    public ResponseEntity<TicketSaleDTO> applyPromotion(
+            @PathVariable Long saleId,
+            @PathVariable Long promotionId) {
+
+        TicketSale updatedSale = ticketSaleService.applyPromotionToSale(saleId, promotionId);
+        return ResponseEntity.ok(ticketSaleService.convertToDTO(updatedSale));
     }
 }
