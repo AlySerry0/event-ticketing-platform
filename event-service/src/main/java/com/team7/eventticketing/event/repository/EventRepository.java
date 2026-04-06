@@ -81,4 +81,15 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findByDetailAttributeAndStatus(@Param("key") String key,
                                                @Param("value") String value,
                                                @Param("status") String status);
+
+    /**
+     * Find all events that have at least one unverified session
+     */
+    @Query("""
+       SELECT DISTINCT e
+       FROM Event e
+       JOIN e.eventSessions s
+       WHERE s.verified = false
+       """)
+    List<Event> findEventsWithUnverifiedSessions();
 }

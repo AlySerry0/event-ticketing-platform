@@ -1,5 +1,6 @@
 package com.team7.eventticketing.event.controller;
 
+import com.team7.eventticketing.event.dto.EventSessionAlertDTO;
 import com.team7.eventticketing.event.dto.EventSessionDTO;
 import com.team7.eventticketing.event.service.EventSessionService;
 import org.springframework.http.ResponseEntity;
@@ -92,5 +93,13 @@ public class EventSessionGlobalController {
         return ResponseEntity.ok(sessions);
     }
 
-
+    /**
+     * Get events that have at least one unverified session
+     * GET /api/events/sessions/unverified
+     */
+    @GetMapping("/unverified")
+    public ResponseEntity<List<EventSessionAlertDTO>> getEventsWithUnverifiedSessions() {
+        List<EventSessionAlertDTO> alerts = eventSessionService.getEventsWithUnverifiedSessions();
+        return ResponseEntity.ok(alerts);
+    }
 }

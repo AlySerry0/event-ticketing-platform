@@ -1,6 +1,7 @@
 package com.team7.eventticketing.event.service;
 
 import com.team7.eventticketing.event.dto.CreateEventSessionDTO;
+import com.team7.eventticketing.event.dto.EventSessionAlertDTO;
 import com.team7.eventticketing.event.dto.EventSessionDTO;
 import com.team7.eventticketing.event.dto.UpdateEventSessionDTO;
 import com.team7.eventticketing.event.model.Event;
@@ -353,6 +354,28 @@ public class EventSessionService {
         }
 
         eventSessionRepository.delete(session);
+    }
+
+    public List<EventSessionAlertDTO> getEventsWithUnverifiedSessions() {
+        return eventRepository.findEventsWithUnverifiedSessions()
+                .stream()
+                .map(event -> {
+                    List<EventSessionDTO> unverifiedSessions = event.getEventSessions()
+                            .stream()
+                            .filter(session -> Boolean.FALSE.equals(session.getVerified()))
+                            .map(this::convertToDTO)
+                            .collect(Collectors.toList());
+
+                    return new EventSessionAlertDTO(
+                            event.getId(),
+                            event.getName(),
+                            event.getStatus().name(),
+                            unverifiedSessions,
+                            unverifiedSessions.size()
+                    );
+                })
+                .filter(alert -> alert.getUnverifiedCount() > 0)
+                .collect(Collectors.toList());
     }
 
     /**
