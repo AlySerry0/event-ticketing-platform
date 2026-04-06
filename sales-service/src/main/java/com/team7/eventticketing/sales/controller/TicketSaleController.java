@@ -1,5 +1,6 @@
 package com.team7.eventticketing.sales.controller;
 
+import com.team7.eventticketing.sales.dto.ProcessTicketDTO;
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
 import com.team7.eventticketing.sales.model.PaymentMethod;
 import com.team7.eventticketing.sales.model.TicketSale;
@@ -8,9 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/sales")
@@ -70,13 +69,30 @@ public class TicketSaleController {
     @PostMapping("/booking/{bookingId}")
     public ResponseEntity<Void> processTicketSale(
             @PathVariable Long bookingId,
-            @RequestBody Map<String, Object> body
+            @RequestBody ProcessTicketDTO request
     ) {
-        PaymentMethod method = PaymentMethod.valueOf((String) body.get("method"));
-        String cardLastFour = (String) body.get("cardLastFour");
-
-        ticketSaleService.processTicketSale(bookingId, method, cardLastFour);
-
+        // 1. Check method exists
+        if (request.getMethod() == null || request.getMethod().isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        // 2. Convert to enum FIRST
+        PaymentMethod method;
+        try {
+            method = PaymentMethod.valueOf(request.getMethod().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+        // 3. NOW you can use method safely
+        if (method == PaymentMethod.CREDIT_CARD &&
+                (request.getCardLastFour() == null || !request.getCardLastFour().matches("\\d{4}"))) {
+            return ResponseEntity.badRequest().build();
+        }
+        // 4. Call service
+        ticketSaleService.processTicketSale(
+                bookingId,
+                method,
+                request.getCardLastFour()
+        );
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 }

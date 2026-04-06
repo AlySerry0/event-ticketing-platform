@@ -130,6 +130,7 @@ public class TicketSaleService {
         sale.addSalePromotion(salePromo);
         return ticketSaleRepository.save(sale);
     }
+    @Transactional
     public void processTicketSale(Long bookingId, PaymentMethod method, String cardLastFour){
         boolean doesExist = ticketSaleRepository.bookingExists(bookingId);
         if (!doesExist){
