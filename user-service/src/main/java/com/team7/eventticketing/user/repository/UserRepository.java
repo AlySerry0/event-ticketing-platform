@@ -50,6 +50,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
             nativeQuery = true)
     boolean existsActiveBookingForUser(@Param("userId") Long userId);
 
+    //finds if a user has a specific preference
+    @Query(value = "SELECT * FROM users WHERE LOWER(preferences ->> :key) = LOWER(:value)",
+            nativeQuery = true)
+    List<User> findByPreferenceKeyValue(@Param("key") String key,
+                                        @Param("value") String value);
     @Query(value = """
         SELECT u.id AS userId, u.name AS name,
                COALESCE(SUM(b.total_amount), 0) AS totalSpent,
