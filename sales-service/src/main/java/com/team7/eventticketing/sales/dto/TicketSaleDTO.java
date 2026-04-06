@@ -49,4 +49,6 @@ public class TicketSaleDTO {
     public void setSalePromotions(List<SalePromotionDTO> salePromotions) {
         this.salePromotions = salePromotions;
     }
+
+
 }

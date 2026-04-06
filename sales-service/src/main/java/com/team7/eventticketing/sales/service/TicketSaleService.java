@@ -25,6 +25,9 @@ public class TicketSaleService {
     private PromotionRepository promotionRepository;
     @Autowired
     private SalePromotionRepository  salePromotionRepository;
+    @Autowired
+    private SalePromotionService salePromotionService;
+
     public TicketSaleDTO save(TicketSaleDTO ticketSaleDTO) {
         TicketSale ticketSale = convertToEntity(ticketSaleDTO);
         if (ticketSale.getCreatedAt() == null) {
@@ -57,21 +60,13 @@ public class TicketSaleService {
         dto.setStatus(ticketSale.getStatus());
         dto.setTransactionDetails(ticketSale.getTransactionDetails());
         dto.setCreatedAt(ticketSale.getCreatedAt());
-        dto.setSalePromotions(
-                ticketSale.getSalePromotions().stream().map(sp -> {
-                    SalePromotionDTO spDto = new SalePromotionDTO();
-                    spDto.setId(sp.getId());
-                    spDto.setTicketSaleId(ticketSale.getId());
-
-                    if (sp.getPromotion() != null) {
-                        spDto.setPromotionId(sp.getPromotion().getId());
-                    }
-
-                    spDto.setDiscountApplied(sp.getDiscountApplied());
-                    spDto.setAppliedAt(sp.getAppliedAt());
-                    return spDto;
-                }).toList()
-        );
+        if (ticketSale.getSalePromotions() != null) {
+            dto.setSalePromotions(
+                    ticketSale.getSalePromotions().stream()
+                            .map(salePromotionService::convertToDTO)
+                            .toList()
+            );
+        }
         return dto;
     }
 
