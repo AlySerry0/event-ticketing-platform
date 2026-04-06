@@ -153,6 +153,18 @@ public class UserController {
     }
 
     /**
+     * [S1-F5] Filter Users by Preference (JSONB Query)
+     * GET /api/users/preferences/search?key={key}&value={value}
+     */
+    @GetMapping("/preferences/search")
+    public ResponseEntity<List<UserDTO>> filterUsersByPreference(
+            @RequestParam String key,
+            @RequestParam String value) {
+        List<UserDTO> users = userService.filterUsersByPreference(key, value);
+        return ResponseEntity.ok(users);
+    }
+
+    /**
      * [S1-F8] Get User Profile with Favorite Venues
      * GET /api/users/{id}/profile
      */

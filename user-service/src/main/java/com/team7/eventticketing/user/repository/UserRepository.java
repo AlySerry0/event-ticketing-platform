@@ -48,4 +48,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "AND status IN ('PENDING','CONFIRMED','CHECKED_IN')",
             nativeQuery = true)
     boolean existsActiveBookingForUser(@Param("userId") Long userId);
+
+    //finds if a user has a specific preference
+    @Query(value = "SELECT * FROM users WHERE LOWER(preferences ->> :key) = LOWER(:value)",
+            nativeQuery = true)
+    List<User> findByPreferenceKeyValue(@Param("key") String key,
+                                        @Param("value") String value);
 }

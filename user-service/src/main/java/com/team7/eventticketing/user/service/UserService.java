@@ -284,6 +284,25 @@ public class UserService {
     }
 
     /**
+     * [S1-F5] Filter Users by Preference (JSONB Query)
+     */
+    public List<UserDTO> filterUsersByPreference(String key, String value) {
+        if (key == null || key.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Key must not be blank");
+        }
+        if (value == null || value.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Value must not be blank");
+        }
+
+        return userRepository.findByPreferenceKeyValue(key, value)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * [S1-F8] Get User Profile with Favorite Venues
      */
     public UserProfileDTO getUserProfileWithFavoriteVenues(Long id) {
