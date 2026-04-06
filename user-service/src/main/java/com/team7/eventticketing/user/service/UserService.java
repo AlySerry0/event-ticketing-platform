@@ -7,6 +7,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.team7.eventticketing.user.dto.TopAttendeeDTO;
+import java.time.LocalDateTime;
 
 import com.team7.eventticketing.user.model.UserRole;
 import com.team7.eventticketing.user.model.User;
@@ -281,6 +283,28 @@ public class UserService {
         dto.setAverageBookingAmount(projection.getAverageBookingAmount());
 
         return dto;
+    }
+
+    /**
+     * [S1-F6] Top Attendees by Spending (Report DTO)
+     */
+    public List<TopAttendeeDTO> getTopAttendeesBySpending(
+            LocalDateTime startDate, LocalDateTime endDate, int limit) {
+
+        if (startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Start date must not be after end date");
+        }
+
+        List<Object[]> results = userRepository
+                .findTopAttendeesBySpending(startDate, endDate, limit);
+
+        return results.stream().map(row -> new TopAttendeeDTO(
+                ((Number) row[0]).longValue(),
+                (String) row[1],
+                ((Number) row[2]).doubleValue(),
+                ((Number) row[3]).longValue()
+        )).collect(Collectors.toList());
     }
 
     /**
