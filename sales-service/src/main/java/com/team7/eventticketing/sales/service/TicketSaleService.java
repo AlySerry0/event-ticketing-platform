@@ -1,5 +1,6 @@
 package com.team7.eventticketing.sales.service;
 
+import com.team7.eventticketing.sales.dto.SalePromotionDTO;
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
 import com.team7.eventticketing.sales.model.*;
 import com.team7.eventticketing.sales.repository.PromotionRepository;
@@ -56,6 +57,21 @@ public class TicketSaleService {
         dto.setStatus(ticketSale.getStatus());
         dto.setTransactionDetails(ticketSale.getTransactionDetails());
         dto.setCreatedAt(ticketSale.getCreatedAt());
+        dto.setSalePromotions(
+                ticketSale.getSalePromotions().stream().map(sp -> {
+                    SalePromotionDTO spDto = new SalePromotionDTO();
+                    spDto.setId(sp.getId());
+                    spDto.setTicketSaleId(ticketSale.getId());
+
+                    if (sp.getPromotion() != null) {
+                        spDto.setPromotionId(sp.getPromotion().getId());
+                    }
+
+                    spDto.setDiscountApplied(sp.getDiscountApplied());
+                    spDto.setAppliedAt(sp.getAppliedAt());
+                    return spDto;
+                }).toList()
+        );
         return dto;
     }
 

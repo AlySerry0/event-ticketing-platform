@@ -4,6 +4,7 @@ import com.team7.eventticketing.sales.model.PaymentMethod;
 import com.team7.eventticketing.sales.model.TicketSaleStatus;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.List;
 
 public class TicketSaleDTO {
     private Long id;
@@ -14,6 +15,7 @@ public class TicketSaleDTO {
     private TicketSaleStatus status;
     private Map<String, Object> transactionDetails;
     private LocalDateTime createdAt;
+    private List<SalePromotionDTO> salePromotions;
 
     public TicketSaleDTO() {}
 
@@ -40,4 +42,11 @@ public class TicketSaleDTO {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public List<SalePromotionDTO> getSalePromotions() {
+        return salePromotions;
+    }
+    public void setSalePromotions(List<SalePromotionDTO> salePromotions) {
+        this.salePromotions = salePromotions;
+    }
 }
