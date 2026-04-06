@@ -218,4 +218,31 @@ public class EventController {
 
         return ResponseEntity.ok(eventService.getTopRatedEvents(limit));
     }
+
+    /**
+     * Rate an event after attendance according to S2-F7
+     * POST /api/events/{id}/rate
+     * Body: {"bookingId":1,"rating":5}
+     */
+    @PostMapping("/{id}/rate")
+    public ResponseEntity<Void> rateEventAfterAttendance(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> request) {
+
+        Object bookingIdObj = request.get("bookingId");
+        Object ratingObj = request.get("rating");
+
+        if (bookingIdObj == null || ratingObj == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "bookingId and rating are required"
+            );
+        }
+
+        Long bookingId = ((Number) bookingIdObj).longValue();
+        Integer rating = ((Number) ratingObj).intValue();
+
+        eventService.rateEventAfterAttendance(id, bookingId, rating);
+        return ResponseEntity.ok().build();
+    }
 }
