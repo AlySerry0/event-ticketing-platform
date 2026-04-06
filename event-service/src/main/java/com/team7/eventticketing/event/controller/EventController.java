@@ -2,6 +2,7 @@ package com.team7.eventticketing.event.controller;
 
 import com.team7.eventticketing.event.dto.CreateEventDTO;
 import com.team7.eventticketing.event.dto.EventDTO;
+import com.team7.eventticketing.event.dto.TopEventDTO;
 import com.team7.eventticketing.event.dto.UpdateEventDTO;
 import com.team7.eventticketing.event.service.EventService;
 import org.springframework.http.HttpStatus;
@@ -209,5 +210,12 @@ public class EventController {
 
         List<EventDTO> events = eventService.searchEventsByDetailAttribute(key, value, status);
         return ResponseEntity.ok(events);
+    }
+
+    @GetMapping("/reports/top-rated")
+    public ResponseEntity<List<TopEventDTO>> getTopRatedEvents(
+            @RequestParam(defaultValue = "5") int limit) {
+
+        return ResponseEntity.ok(eventService.getTopRatedEvents(limit));
     }
 }
