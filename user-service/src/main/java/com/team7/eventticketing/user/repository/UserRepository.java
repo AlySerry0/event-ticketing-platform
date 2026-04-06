@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import com.team7.eventticketing.user.model.UserRole;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,9 +22,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // --- S1-F1: Search Users (Clean JPQL with Enum Casting) ---
     @Query("SELECT u FROM User u WHERE " +
-            "LOWER(u.name) LIKE LOWER(CONCAT('%', :name, '%')) AND " +
-            "LOWER(u.email) LIKE LOWER(CONCAT('%', :email, '%')) AND " +
-            "(cast(:role as text) IS NULL OR u.role = :role)")
+            "(:name = '' OR LOWER(u.name) LIKE LOWER(CONCAT('%', :name, '%'))) AND " +
+            "(:email = '' OR LOWER(u.email) LIKE LOWER(CONCAT('%', :email, '%'))) AND " +
+            "(:role IS NULL OR u.role = :role)")
     List<User> searchUsers(@Param("name") String name,
                            @Param("email") String email,
                            @Param("role") UserRole role);
@@ -48,4 +49,22 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "AND status IN ('PENDING','CONFIRMED','CHECKED_IN')",
             nativeQuery = true)
     boolean existsActiveBookingForUser(@Param("userId") Long userId);
+
+    @Query(value = """
+        SELECT u.id AS userId, u.name AS name,
+               COALESCE(SUM(b.total_amount), 0) AS totalSpent,
+               COUNT(b.id) AS bookingCount
+        FROM users u
+        LEFT JOIN bookings b ON b.user_id = u.id
+            AND b.status = 'COMPLETED'
+            AND b.booking_date BETWEEN :startDate AND :endDate
+        GROUP BY u.id, u.name
+        HAVING COALESCE(SUM(b.total_amount), 0) > 0
+        ORDER BY totalSpent DESC
+        LIMIT :limit
+        """, nativeQuery = true)
+    List<Object[]> findTopAttendeesBySpending(
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            @Param("limit") int limit);
 }
