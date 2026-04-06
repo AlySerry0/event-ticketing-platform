@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 
@@ -129,5 +130,38 @@ public class TicketSaleService {
         sale.addSalePromotion(salePromo);
         return ticketSaleRepository.save(sale);
     }
+    public void processTicketSale(Long bookingId, PaymentMethod method, String cardLastFour){
+        boolean doesExist = ticketSaleRepository.bookingExists(bookingId);
+        if (!doesExist){
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");        }
+        String bookingStatus = ticketSaleRepository.getBookingStatus(bookingId);
+        if (!"COMPLETED".equalsIgnoreCase(bookingStatus)){
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking must be COMPLETED");
+        }
+        TicketSale ticketSale = ticketSaleRepository.findByBookingId(bookingId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket sale not found"));
+
+        if (ticketSale.getStatus() == TicketSaleStatus.COMPLETED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "already paid");
+        }
+        if (method == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment method is required");
+        }
+        ticketSale.setMethod(method);
+        ticketSale.setStatus( TicketSaleStatus.COMPLETED);
+        java.util.Map<String, Object> transactionDetails = ticketSale.getTransactionDetails();
+
+        if (transactionDetails == null) {
+            transactionDetails = new HashMap<>();
+        }
+        transactionDetails.put("gatewayResponse", "approved");
+        transactionDetails.put("bookingReference", bookingId);
+        if (cardLastFour != null) {
+            transactionDetails.put("cardLastFour", cardLastFour);
+        }
+        ticketSale.setTransactionDetails(transactionDetails);
+        ticketSaleRepository.save(ticketSale);
+    }
+
 
 }

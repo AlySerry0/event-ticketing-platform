@@ -1,13 +1,16 @@
 package com.team7.eventticketing.sales.controller;
 
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
+import com.team7.eventticketing.sales.model.PaymentMethod;
 import com.team7.eventticketing.sales.model.TicketSale;
 import com.team7.eventticketing.sales.service.TicketSaleService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/sales")
@@ -55,7 +58,6 @@ public class TicketSaleController {
         }
         return ResponseEntity.notFound().build();
     }
-
     @PostMapping("/{saleId}/promotions/{promotionId}")
     public ResponseEntity<TicketSaleDTO> applyPromotion(
             @PathVariable Long saleId,
@@ -63,5 +65,18 @@ public class TicketSaleController {
 
         TicketSale updatedSale = ticketSaleService.applyPromotionToSale(saleId, promotionId);
         return ResponseEntity.ok(ticketSaleService.convertToDTO(updatedSale));
+    }
+
+    @PostMapping("/booking/{bookingId}")
+    public ResponseEntity<Void> processTicketSale(
+            @PathVariable Long bookingId,
+            @RequestBody Map<String, Object> body
+    ) {
+        PaymentMethod method = PaymentMethod.valueOf((String) body.get("method"));
+        String cardLastFour = (String) body.get("cardLastFour");
+
+        ticketSaleService.processTicketSale(bookingId, method, cardLastFour);
+
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 }
