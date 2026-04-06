@@ -1,6 +1,8 @@
 package com.team7.eventticketing.booking.service;
 
+import com.team7.eventticketing.booking.dto.BookingCostEstimateDTO;
 import com.team7.eventticketing.booking.dto.BookingDTO;
+import com.team7.eventticketing.booking.dto.BookingEstimateRequestDTO;
 import com.team7.eventticketing.booking.model.Booking;
 import com.team7.eventticketing.booking.model.BookingStatus;
 import com.team7.eventticketing.booking.repository.BookingRepository;
@@ -46,13 +48,20 @@ public class BookingService {
 
 	public Optional<BookingDTO> updateBooking(Long id, BookingDTO bookingDetails) {
 		return bookingRepository.findById(id).map(booking -> {
-			if (bookingDetails.getContactEmail() != null) booking.setContactEmail(bookingDetails.getContactEmail());
-			if (bookingDetails.getStatus() != null) booking.setStatus(bookingDetails.getStatus());
-			if (bookingDetails.getTotalAmount() != null) booking.setTotalAmount(bookingDetails.getTotalAmount());
-			if (bookingDetails.getBookingDate() != null) booking.setBookingDate(bookingDetails.getBookingDate());
-			if (bookingDetails.getConfirmedAt() != null) booking.setConfirmedAt(bookingDetails.getConfirmedAt());
-			if (bookingDetails.getEventId() != null) booking.setEventId(bookingDetails.getEventId());
-			if (bookingDetails.getUserId() != null) booking.setUserId(bookingDetails.getUserId());
+			if (bookingDetails.getContactEmail() != null)
+				booking.setContactEmail(bookingDetails.getContactEmail());
+			if (bookingDetails.getStatus() != null)
+				booking.setStatus(bookingDetails.getStatus());
+			if (bookingDetails.getTotalAmount() != null)
+				booking.setTotalAmount(bookingDetails.getTotalAmount());
+			if (bookingDetails.getBookingDate() != null)
+				booking.setBookingDate(bookingDetails.getBookingDate());
+			if (bookingDetails.getConfirmedAt() != null)
+				booking.setConfirmedAt(bookingDetails.getConfirmedAt());
+			if (bookingDetails.getEventId() != null)
+				booking.setEventId(bookingDetails.getEventId());
+			if (bookingDetails.getUserId() != null)
+				booking.setUserId(bookingDetails.getUserId());
 
 			// Handle JSONB metadata merge
 			if (bookingDetails.getMetadata() != null) {
@@ -89,7 +98,8 @@ public class BookingService {
 
 		List<Booking> bookings;
 		if (status != null && startDateTime != null && endDateTime != null) {
-			bookings = bookingRepository.findByStatusAndBookingDateBetweenOrderByBookingDateDesc(status, startDateTime, endDateTime);
+			bookings = bookingRepository.findByStatusAndBookingDateBetweenOrderByBookingDateDesc(status, startDateTime,
+					endDateTime);
 		} else if (status != null) {
 			bookings = bookingRepository.findByStatusOrderByBookingDateDesc(status);
 		} else if (startDateTime != null && endDateTime != null) {
@@ -123,6 +133,41 @@ public class BookingService {
 		booking.setConfirmedAt(LocalDateTime.now());
 
 		return convertToDTO(bookingRepository.save(booking));
+	}
+
+	public BookingCostEstimateDTO getCostEstimate(BookingEstimateRequestDTO request) {
+		Double avgCapacity = bookingRepository.getAverageSessionCapacityByEventId(request.getEventId());
+
+		if (avgCapacity == null) {
+			throw new IllegalArgumentException("Event or sessions not found for ID: " + request.getEventId());
+		}
+
+		double basePrice = avgCapacity / 10.0;
+
+		double tierMultiplier = "VIP".equalsIgnoreCase(request.getTicketTier()) ? 2.5 : 1.0;
+
+		double ticketCost = basePrice * tierMultiplier * request.getTicketCount();
+
+		double serviceFee = ticketCost * 0.15;
+
+		long activeBookings = bookingRepository.countActiveBookingsForEvent(request.getEventId());
+		double demandMultiplier = 1.0;
+
+		if (activeBookings > 200) {
+			demandMultiplier = 1.5;
+		} else if (activeBookings >= 51) {
+			demandMultiplier = 1.25;
+		}
+
+		double estimatedTotal = (ticketCost + serviceFee) * demandMultiplier;
+
+		BookingCostEstimateDTO estimateDTO = new BookingCostEstimateDTO();
+		estimateDTO.setTicketCost(ticketCost);
+		estimateDTO.setServiceFee(serviceFee);
+		estimateDTO.setDemandMultiplier(demandMultiplier);
+		estimateDTO.setEstimatedTotal(estimatedTotal);
+
+		return estimateDTO;
 	}
 
 	private BookingDTO convertToDTO(Booking booking) {

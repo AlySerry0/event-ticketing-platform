@@ -1,6 +1,8 @@
 package com.team7.eventticketing.booking.controller;
 
+import com.team7.eventticketing.booking.dto.BookingCostEstimateDTO;
 import com.team7.eventticketing.booking.dto.BookingDTO;
+import com.team7.eventticketing.booking.dto.BookingEstimateRequestDTO;
 import com.team7.eventticketing.booking.service.BookingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -83,5 +85,15 @@ public class BookingController {
 			return ResponseEntity.noContent().build();
 		}
 		return ResponseEntity.notFound().build();
+	}
+
+	@PostMapping("/estimate")
+	public ResponseEntity<?> estimateCost(@RequestBody BookingEstimateRequestDTO request) {
+		try {
+			BookingCostEstimateDTO estimateDTO = bookingService.getCostEstimate(request);
+			return ResponseEntity.ok(estimateDTO);
+		} catch (IllegalArgumentException e) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+		}
 	}
 }

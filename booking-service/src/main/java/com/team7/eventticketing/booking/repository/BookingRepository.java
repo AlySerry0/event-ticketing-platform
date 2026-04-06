@@ -12,7 +12,8 @@ import java.util.List;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
-	List<Booking> findByStatusAndBookingDateBetweenOrderByBookingDateDesc(BookingStatus status, LocalDateTime startDate, LocalDateTime endDate);
+	List<Booking> findByStatusAndBookingDateBetweenOrderByBookingDateDesc(BookingStatus status, LocalDateTime startDate,
+	                                                                      LocalDateTime endDate);
 
 	List<Booking> findByStatusOrderByBookingDateDesc(BookingStatus status);
 
@@ -22,4 +23,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
 	@Query(value = "SELECT status FROM events WHERE id = :eventId", nativeQuery = true)
 	String findEventStatusById(@Param("eventId") Long eventId);
+
+	@Query(value = "SELECT AVG(capacity) FROM event_sessions WHERE event_id = :eventId", nativeQuery = true)
+	Double getAverageSessionCapacityByEventId(@Param("eventId") Long eventId);
+
+	@Query(value = "SELECT COUNT(*) FROM bookings WHERE event_id = :eventId AND status IN ('PENDING', 'CONFIRMED', 'CHECKED_IN')", nativeQuery = true)
+	long countActiveBookingsForEvent(@Param("eventId") Long eventId);
 }
