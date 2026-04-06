@@ -9,6 +9,9 @@ import com.team7.eventticketing.user.service.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.team7.eventticketing.user.dto.TopAttendeeDTO;
+import org.springframework.format.annotation.DateTimeFormat;
+import java.time.LocalDateTime;
 
 import com.team7.eventticketing.user.dto.UserBookingSummaryDTO;
 
@@ -150,6 +153,19 @@ public class UserController {
     public ResponseEntity<UserBookingSummaryDTO> getUserBookingSummary(@PathVariable Long id) {
         UserBookingSummaryDTO summary = userService.getBookingSummary(id);
         return ResponseEntity.ok(summary);
+    }
+    /**
+     * [S1-F6] Top Attendees by Spending (Report DTO)
+     * GET /api/users/reports/top-attendees?startDate={date}&endDate={date}&limit={n}
+     */
+    @GetMapping("/reports/top-attendees")
+    public ResponseEntity<List<TopAttendeeDTO>> getTopAttendees(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
+            @RequestParam int limit) {
+        List<TopAttendeeDTO> result = userService
+                .getTopAttendeesBySpending(startDate, endDate, limit);
+        return ResponseEntity.ok(result);
     }
 
     /**
