@@ -61,7 +61,7 @@ public class UserService {
         );
 
         // Added this line because prefrences was not saved befor
-        if (createUserDTO.getPreferences() != null){
+        if (createUserDTO.getPreferences() != null) {
             user.setPreferences(createUserDTO.getPreferences());
         }
 
@@ -302,78 +302,81 @@ public class UserService {
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
+    }
+
+    /**
      * [S1-F6] Top Attendees by Spending (Report DTO)
      */
     public List<TopAttendeeDTO> getTopAttendeesBySpending(
-            LocalDateTime startDate, LocalDateTime endDate, int limit) {
+                LocalDateTime startDate, LocalDateTime endDate,int limit){
 
-        if (startDate.isAfter(endDate)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Start date must not be after end date");
+            if (startDate.isAfter(endDate)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Start date must not be after end date");
+            }
+
+            List<Object[]> results = userRepository
+                    .findTopAttendeesBySpending(startDate, endDate, limit);
+
+            return results.stream().map(row -> new TopAttendeeDTO(
+                    ((Number) row[0]).longValue(),
+                    (String) row[1],
+                    ((Number) row[2]).doubleValue(),
+                    ((Number) row[3]).longValue()
+            )).collect(Collectors.toList());
         }
 
-        List<Object[]> results = userRepository
-                .findTopAttendeesBySpending(startDate, endDate, limit);
+        /**
+         * [S1-F8] Get User Profile with Favorite Venues
+         */
+        public UserProfileDTO getUserProfileWithFavoriteVenues (Long id){
+            User user = userRepository.findById(id)
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND,
+                            "User not found with ID: " + id
+                    ));
 
-        return results.stream().map(row -> new TopAttendeeDTO(
-                ((Number) row[0]).longValue(),
-                (String) row[1],
-                ((Number) row[2]).doubleValue(),
-                ((Number) row[3]).longValue()
-        )).collect(Collectors.toList());
+            UserProfileDTO userProfileDTO = new UserProfileDTO();
+            userProfileDTO.setUserId(user.getId());
+            userProfileDTO.setName(user.getName());
+            userProfileDTO.setEmail(user.getEmail());
+            userProfileDTO.setPhone(user.getPhone());
+            userProfileDTO.setPreferences(user.getPreferences());
+            userProfileDTO.setFavoriteVenues(user.getFavoriteVenues()
+                    .stream()
+                    .map(this::convertToDTO)
+                    .collect(Collectors.toList()));
+            userProfileDTO.setTotalFavoriteVenues(user.getFavoriteVenues().size());
+
+            return userProfileDTO;
+
+        }
+
+        /**
+         * Convert User entity to UserDTO
+         */
+        private UserDTO convertToDTO (User user){
+            UserDTO userDTO = new UserDTO();
+            userDTO.setId(user.getId());
+            userDTO.setName(user.getName());
+            userDTO.setEmail(user.getEmail());
+            userDTO.setPhone(user.getPhone());
+            userDTO.setRole(user.getRole());
+            userDTO.setStatus(user.getStatus());
+            userDTO.setPreferences(user.getPreferences());
+            userDTO.setCreatedAt(user.getCreatedAt());
+            return userDTO;
+        }
+
+        private FavoriteVenueDTO convertToDTO (FavoriteVenue favoriteVenue){
+            FavoriteVenueDTO dto = new FavoriteVenueDTO();
+            dto.setId(favoriteVenue.getId());
+            dto.setLabel(favoriteVenue.getLabel());
+            dto.setVenueName(favoriteVenue.getVenueName());
+            dto.setLocation(favoriteVenue.getLocation());
+            dto.setCapacity(favoriteVenue.getCapacity());
+            dto.setIsDefault(favoriteVenue.getIsDefault());
+            dto.setMetadata(favoriteVenue.getMetadata());
+            return dto;
+        }
     }
-
-    /**
-     * [S1-F8] Get User Profile with Favorite Venues
-     */
-    public UserProfileDTO getUserProfileWithFavoriteVenues(Long id) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "User not found with ID: " + id
-                ));
-
-        UserProfileDTO userProfileDTO = new UserProfileDTO();
-        userProfileDTO.setUserId(user.getId());
-        userProfileDTO.setName(user.getName());
-        userProfileDTO.setEmail(user.getEmail());
-        userProfileDTO.setPhone(user.getPhone());
-        userProfileDTO.setPreferences(user.getPreferences());
-        userProfileDTO.setFavoriteVenues(user.getFavoriteVenues()
-                .stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList()));
-        userProfileDTO.setTotalFavoriteVenues(user.getFavoriteVenues().size());
-
-        return userProfileDTO;
-
-    }
-
-    /**
-     * Convert User entity to UserDTO
-     */
-    private UserDTO convertToDTO(User user) {
-        UserDTO userDTO = new UserDTO();
-        userDTO.setId(user.getId());
-        userDTO.setName(user.getName());
-        userDTO.setEmail(user.getEmail());
-        userDTO.setPhone(user.getPhone());
-        userDTO.setRole(user.getRole());
-        userDTO.setStatus(user.getStatus());
-        userDTO.setPreferences(user.getPreferences());
-        userDTO.setCreatedAt(user.getCreatedAt());
-        return userDTO;
-    }
-
-    private FavoriteVenueDTO convertToDTO(FavoriteVenue favoriteVenue) {
-        FavoriteVenueDTO dto = new FavoriteVenueDTO();
-        dto.setId(favoriteVenue.getId());
-        dto.setLabel(favoriteVenue.getLabel());
-        dto.setVenueName(favoriteVenue.getVenueName());
-        dto.setLocation(favoriteVenue.getLocation());
-        dto.setCapacity(favoriteVenue.getCapacity());
-        dto.setIsDefault(favoriteVenue.getIsDefault());
-        dto.setMetadata(favoriteVenue.getMetadata());
-        return dto;
-    }
-}

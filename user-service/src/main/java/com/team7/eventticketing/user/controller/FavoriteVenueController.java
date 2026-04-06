@@ -5,6 +5,7 @@ import com.team7.eventticketing.user.service.FavoriteVenueService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.team7.eventticketing.user.dto.UserDTO;
 
 import java.util.List;
 
@@ -85,5 +86,17 @@ public class FavoriteVenueController {
     public ResponseEntity<FavoriteVenueDTO> getDefaultFavoriteVenue(@PathVariable Long userId) {
         FavoriteVenueDTO venue = favoriteVenueService.getDefaultFavoriteVenue(userId);
         return ResponseEntity.ok(venue);
+    }
+
+    /**
+     * [S1-F7] Set Default Favorite Venue
+     * PUT /api/users/{userId}/venues/{venueId}/default
+     */
+    @PutMapping("/{venueId}/default")
+    public ResponseEntity<UserDTO> setDefaultFavoriteVenue(
+            @PathVariable Long userId,
+            @PathVariable Long venueId) {
+        UserDTO updatedUser = favoriteVenueService.setDefaultFavoriteVenue(userId, venueId);
+        return ResponseEntity.ok(updatedUser);
     }
 }
