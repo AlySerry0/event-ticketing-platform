@@ -3,7 +3,7 @@
     "studentId": "55-0990",
     "name": "Abdelrahman Elaby",
     "githubUsername": "Aby293",
-    "service": "event-service"
+    "service": ["user-service","event-service"]
   },
   {
     "studentId": "55-5284",
@@ -27,19 +27,19 @@
     "studentId": "55-0966",
     "name": "Habiba Elsonbaty",
     "githubUsername": "habibaelsonbaty",
-    "service": "user-service"
+    "service": "event-service"
   },
   {
     "studentId": "55-5288",
     "name": "Ali Shaheen",
     "githubUsername": "Chromiks",
-    "service": "booking-service"
+    "service": "ticket-service"
   },
   {
     "studentId": "55-5618",
     "name": "Yassin Nossair",
     "githubUsername": "yassinnossair",
-    "service": "booking-service"
+    "service": "ticket-service"
   },
   {
     "studentId": "55-1895",
@@ -51,13 +51,13 @@
     "studentId": "55-5899",
     "name": "Nour Saber",
     "githubUsername": "NourSaber0",
-    "service": "ticket-service"
+    "service": "booking-service"
   },
   {
     "studentId": "55-17419",
     "name": "Donia Fathey",
     "githubUsername": "don106",
-    "service": "ticket-service"
+    "service": "booking-service"
   },
   {
     "studentId": "55-0331",
