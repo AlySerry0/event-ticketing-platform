@@ -59,4 +59,26 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * Find events by rating (greater than or equal to)
      */
     List<Event> findByRatingGreaterThanEqual(Double rating);
+
+
+    /**
+     * Find events by JSONB details key-value pair
+     */
+    @Query(value = """
+            SELECT * FROM events e
+            WHERE e.details ->> :key = :value
+            ORDER BY e.event_date ASC
+            """, nativeQuery = true)
+    List<Event> findByDetailAttribute(@Param("key") String key,
+                                      @Param("value") String value);
+
+    @Query(value = """
+        SELECT * FROM events
+        WHERE details ->> :key = :value
+          AND status::text = :status
+        ORDER BY event_date ASC
+        """, nativeQuery = true)
+    List<Event> findByDetailAttributeAndStatus(@Param("key") String key,
+                                               @Param("value") String value,
+                                               @Param("status") String status);
 }

@@ -183,4 +183,18 @@ public class EventController {
         eventService.deleteEvent(id);
         return ResponseEntity.noContent().build();
     }
+
+    /**
+     * Filter events by details key-value pair and optional status
+     * GET /api/events/details/search?key=organizer&value=LiveNation&status=UPCOMING
+     */
+    @GetMapping("/details/search")
+    public ResponseEntity<List<EventDTO>> searchEventsByDetailAttribute(
+            @RequestParam String key,
+            @RequestParam String value,
+            @RequestParam(required = false) String status) {
+
+        List<EventDTO> events = eventService.searchEventsByDetailAttribute(key, value, status);
+        return ResponseEntity.ok(events);
+    }
 }

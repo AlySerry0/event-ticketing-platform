@@ -356,4 +356,26 @@ public class EventService {
             );
         }
     }
+
+    public List<EventDTO> searchEventsByDetailAttribute(String key, String value, String status) {
+        List<Event> events;
+
+        if (status == null || status.isBlank()) {
+            events = eventRepository.findByDetailAttribute(key, value);
+        } else {
+            String normalizedStatus = status.trim().toUpperCase();
+
+            try {
+                EventStatus.valueOf(normalizedStatus);
+            } catch (IllegalArgumentException ex) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid event status: " + status);
+            }
+
+            events = eventRepository.findByDetailAttributeAndStatus(key, value, normalizedStatus);
+        }
+
+        return events.stream()
+                .map(this::convertToDTO)
+                .toList();
+    }
 }
