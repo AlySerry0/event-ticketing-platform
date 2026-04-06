@@ -22,6 +22,8 @@ import java.util.stream.Collectors;
 import com.team7.eventticketing.user.dto.UserBookingSummaryDTO;
 import com.team7.eventticketing.user.repository.BookingSummaryProjection;
 
+import java.util.Arrays;
+
 @Service
 @Transactional(readOnly = true)
 public class UserService {
@@ -218,21 +220,24 @@ public class UserService {
      */
     public List<UserDTO> searchUsers(String name, String email, String role) {
 
-        // Convert nulls to empty strings so the database doesn't crash
-        String safeName = (name != null) ? name : "";
-        String safeEmail = (email != null) ? email : "";
+        // 1. The Teammate's Trick: Use empty strings to prevent the PostgreSQL bytea crash
+        String searchName = (name != null) ? name : "";
+        String searchEmail = (email != null) ? email : "";
 
-        // Convert the role string to an Enum
-        UserRole safeRole = null;
-        if (role != null && !role.isEmpty()) {
-            safeRole = UserRole.valueOf(role.toUpperCase());
+        // 2. The List Trick: Prevent the PostgreSQL Enum crash
+        List<UserRole> rolesToSearch;
+        if (role == null || role.isBlank()) {
+            rolesToSearch = Arrays.asList(UserRole.values());
+        } else {
+            rolesToSearch = List.of(UserRole.valueOf(role.toUpperCase()));
         }
 
-        return userRepository.searchUsers(safeName, safeEmail, safeRole)
+        return userRepository.searchUsers(searchName, searchEmail, rolesToSearch)
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
+
 
     /**
      * [S1-F2] Update User Preferences (JSONB)

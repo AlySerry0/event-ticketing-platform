@@ -20,14 +20,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByEmail(String email);
     boolean existsByPhone(String phone);
 
-    // --- S1-F1: Search Users (Clean JPQL with Enum Casting) ---
     @Query("SELECT u FROM User u WHERE " +
             "(:name = '' OR LOWER(u.name) LIKE LOWER(CONCAT('%', :name, '%'))) AND " +
             "(:email = '' OR LOWER(u.email) LIKE LOWER(CONCAT('%', :email, '%'))) AND " +
-            "(:role IS NULL OR u.role = :role)")
+            "u.role IN :roles")
     List<User> searchUsers(@Param("name") String name,
                            @Param("email") String email,
-                           @Param("role") UserRole role);
+                           @Param("roles") List<UserRole> roles);
 
     @Query(value = "SELECT " +
             "u.id AS userId, " +
