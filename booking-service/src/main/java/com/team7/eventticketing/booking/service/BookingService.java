@@ -4,11 +4,14 @@ import com.team7.eventticketing.booking.dto.BookingCostEstimateDTO;
 import com.team7.eventticketing.booking.dto.BookingDTO;
 import com.team7.eventticketing.booking.dto.BookingEstimateRequestDTO;
 import com.team7.eventticketing.booking.model.Booking;
+import com.team7.eventticketing.booking.model.BookingItem;
 import com.team7.eventticketing.booking.model.BookingStatus;
 import com.team7.eventticketing.booking.repository.BookingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -133,6 +136,27 @@ public class BookingService {
 		booking.setConfirmedAt(LocalDateTime.now());
 
 		return convertToDTO(bookingRepository.save(booking));
+	}
+	@Transactional
+	public Booking completeBooking(Long id) {
+		Booking booking = bookingRepository.findById(id)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+
+		if (booking.getStatus() != BookingStatus.CHECKED_IN) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking must be CHECKED_IN to be completed");
+		}
+		booking.setStatus(BookingStatus.COMPLETED);
+		if (booking.getTotalAmount() == null) {
+			double calculatedTotal = 0.0;
+			if (booking.getBookingItems() != null) {
+				for (BookingItem item : booking.getBookingItems()) {
+					calculatedTotal += (item.getQuantity() * item.getUnitPrice());
+				}
+			}
+			booking.setTotalAmount(calculatedTotal);
+		}
+		bookingRepository.createPendingTicketSale(booking.getId(), booking.getUserId(), booking.getTotalAmount());
+		return bookingRepository.save(booking);
 	}
 
 	public BookingCostEstimateDTO getCostEstimate(BookingEstimateRequestDTO request) {

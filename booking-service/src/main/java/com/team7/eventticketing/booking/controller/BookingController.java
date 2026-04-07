@@ -3,6 +3,7 @@ package com.team7.eventticketing.booking.controller;
 import com.team7.eventticketing.booking.dto.BookingCostEstimateDTO;
 import com.team7.eventticketing.booking.dto.BookingDTO;
 import com.team7.eventticketing.booking.dto.BookingEstimateRequestDTO;
+import com.team7.eventticketing.booking.model.Booking;
 import com.team7.eventticketing.booking.service.BookingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -69,6 +70,11 @@ public class BookingController {
 			// Catches "Booking is not PENDING" and "Event is not UPCOMING"
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
 		}
+	}
+	@PutMapping("/{id}/complete")
+	public ResponseEntity<Booking> completeBooking(@PathVariable Long id) {
+		Booking updatedBooking = bookingService.completeBooking(id);
+		return ResponseEntity.ok(updatedBooking);
 	}
 
 	@PutMapping("/{id}")
