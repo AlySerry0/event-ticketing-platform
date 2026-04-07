@@ -43,8 +43,6 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 	@Query(value = "SELECT * FROM bookings WHERE metadata ->> :key = :value", nativeQuery = true)
 	List<Booking> findByMetadataKeyAndValue(@Param("key") String key, @Param("value") String value);
 
-    @Query(value = "SELECT COUNT(*) FROM tickets WHERE booking_id = :bookingId", nativeQuery = true)
-    long countTicketsByBookingId(@Param("bookingId") Long bookingId);
 
     @Modifying
     @Transactional
