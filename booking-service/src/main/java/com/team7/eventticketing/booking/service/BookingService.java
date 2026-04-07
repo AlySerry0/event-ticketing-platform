@@ -137,6 +137,7 @@ public class BookingService {
 
 		return convertToDTO(bookingRepository.save(booking));
 	}
+
 	@Transactional
 	public BookingDTO completeBooking(Long id) {
 		Booking booking = bookingRepository.findById(id)
@@ -145,26 +146,25 @@ public class BookingService {
 		if (booking.getStatus() != BookingStatus.CHECKED_IN) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking is not CHECKED_IN");
 		}
-
 		booking.setStatus(BookingStatus.COMPLETED);
-
-		double total = 0.0;
-		if (booking.getBookingItems() != null) {
-			for (var item : booking.getBookingItems()) {
-				total += (item.getQuantity() * item.getUnitPrice());
+		if (booking.getTotalAmount() == null || booking.getTotalAmount() == 0.0) {
+			double total = 0.0;
+			if (booking.getBookingItems() != null) {
+				for (BookingItem item : booking.getBookingItems()) {
+					total += (item.getQuantity() * item.getUnitPrice());
+				}
 			}
+			booking.setTotalAmount(total);
 		}
-		booking.setTotalAmount(total);
-
 		Booking savedBooking = bookingRepository.save(booking);
 		bookingRepository.createPendingTicketSale(
 				savedBooking.getId(),
 				savedBooking.getUserId(),
 				savedBooking.getTotalAmount()
 		);
-
 		return convertToDTO(savedBooking);
 	}
+
 	public BookingCostEstimateDTO getCostEstimate(BookingEstimateRequestDTO request) {
 		Double avgCapacity = bookingRepository.getAverageSessionCapacityByEventId(request.getEventId());
 
