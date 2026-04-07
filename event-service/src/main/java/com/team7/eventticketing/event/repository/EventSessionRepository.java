@@ -52,4 +52,15 @@ public interface EventSessionRepository extends JpaRepository<EventSession, Long
      */
     @Query("SELECT es FROM EventSession es WHERE es.capacity > 0 ORDER BY es.startTime ASC")
     List<EventSession> findSessionsWithAvailableCapacity();
+
+    /**
+     * Check if a user is an admin
+     */
+    @Query(value = """
+        SELECT COUNT(*) > 0
+        FROM users
+        WHERE id = :userId
+          AND role = 'ADMIN'
+        """, nativeQuery = true)
+    boolean isAdminUser(@Param("userId") Long userId);
 }
