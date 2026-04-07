@@ -7,8 +7,10 @@ import com.team7.eventticketing.booking.model.Booking;
 import com.team7.eventticketing.booking.model.BookingStatus;
 import com.team7.eventticketing.booking.repository.BookingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -196,5 +198,11 @@ public class BookingService {
 		booking.setBookingDate(dto.getBookingDate());
 		booking.setConfirmedAt(dto.getConfirmedAt());
 		return booking;
+	}
+	public List<Booking> filterBookingsByMetadata(String key, String value) {
+		if (key == null || key.trim().isEmpty() || value == null || value.trim().isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Metadata key and value cannot be blank");
+		}
+		return bookingRepository.findByMetadataKeyAndValue(key, value);
 	}
 }

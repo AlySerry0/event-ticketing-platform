@@ -3,6 +3,7 @@ package com.team7.eventticketing.booking.controller;
 import com.team7.eventticketing.booking.dto.BookingCostEstimateDTO;
 import com.team7.eventticketing.booking.dto.BookingDTO;
 import com.team7.eventticketing.booking.dto.BookingEstimateRequestDTO;
+import com.team7.eventticketing.booking.model.Booking;
 import com.team7.eventticketing.booking.service.BookingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -95,5 +96,13 @@ public class BookingController {
 		} catch (IllegalArgumentException e) {
 			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
 		}
+	}
+	@GetMapping("/metadata/search")
+	public ResponseEntity<List<Booking>> searchByMetadata(
+			@RequestParam String key,
+			@RequestParam String value) {
+
+		List<Booking> matchedBookings = bookingService.filterBookingsByMetadata(key, value);
+		return ResponseEntity.ok(matchedBookings);
 	}
 }
