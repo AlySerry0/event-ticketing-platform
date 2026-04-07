@@ -58,7 +58,10 @@ public class PromotionController {
     }
 
     @GetMapping("/top-used")
-    public List<PromotionUsageDTO> getTopUsedPromotions(@RequestParam int limit) {
+    public List<PromotionUsageDTO> getTopUsedPromotions(@RequestParam(defaultValue = "10")  int limit) {
+        if (limit <= 0) {
+            limit = 10;
+        }
         return promotionService.getTopUsedPromotions(limit);
     }
 }
