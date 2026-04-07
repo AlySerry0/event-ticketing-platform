@@ -25,7 +25,6 @@ public class EventSessionGlobalController {
      */
     @GetMapping("/{sessionId}")
     public ResponseEntity<EventSessionDTO> getEventSessionById(
-            @PathVariable Long eventId,
             @PathVariable Long sessionId) {
         EventSessionDTO session = eventSessionService.getEventSessionById(sessionId);
         return ResponseEntity.ok(session);
