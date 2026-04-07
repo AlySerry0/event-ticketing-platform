@@ -199,10 +199,12 @@ public class BookingService {
 		booking.setConfirmedAt(dto.getConfirmedAt());
 		return booking;
 	}
-	public List<Booking> filterBookingsByMetadata(String key, String value) {
+	public List<BookingDTO> filterBookingsByMetadata(String key, String value) {
 		if (key == null || key.trim().isEmpty() || value == null || value.trim().isEmpty()) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Metadata key and value cannot be blank");
 		}
-		return bookingRepository.findByMetadataKeyAndValue(key, value);
+		return bookingRepository.findByMetadataKeyAndValue(key, value).stream()
+				.map(this::convertToDTO)
+				.toList();
 	}
 }

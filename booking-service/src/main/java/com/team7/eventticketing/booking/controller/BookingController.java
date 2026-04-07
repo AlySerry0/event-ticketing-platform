@@ -98,11 +98,9 @@ public class BookingController {
 		}
 	}
 	@GetMapping("/metadata/search")
-	public ResponseEntity<List<Booking>> searchByMetadata(
+	public ResponseEntity<List<BookingDTO>> searchByMetadata(
 			@RequestParam String key,
 			@RequestParam String value) {
-
-		List<Booking> matchedBookings = bookingService.filterBookingsByMetadata(key, value);
-		return ResponseEntity.ok(matchedBookings);
+		return ResponseEntity.ok(bookingService.filterBookingsByMetadata(key, value));
 	}
 }
