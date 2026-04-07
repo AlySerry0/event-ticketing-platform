@@ -240,9 +240,17 @@ public class EventController {
         }
 
         Long bookingId = ((Number) bookingIdObj).longValue();
-        Integer rating = ((Number) ratingObj).intValue();
+        Double rating = ((Number) ratingObj).doubleValue();
 
-        eventService.rateEventAfterAttendance(id, bookingId, rating);
+        if (rating % 1 != 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Rating must be a whole number (1-5)"
+            );
+        }
+
+        Integer finalRating = rating.intValue();
+        eventService.rateEventAfterAttendance(id, bookingId, finalRating);
         return ResponseEntity.ok().build();
     }
 }
