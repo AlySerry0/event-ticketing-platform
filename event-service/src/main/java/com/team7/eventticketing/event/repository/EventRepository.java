@@ -81,4 +81,28 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findByDetailAttributeAndStatus(@Param("key") String key,
                                                @Param("value") String value,
                                                @Param("status") String status);
+
+    /**
+     * Count active bookings for an event.
+     * Active bookings are PENDING, CONFIRMED, CHECKED_IN.
+     */
+    @Query(value = """
+            SELECT COUNT(*)
+            FROM bookings b
+            WHERE b.event_id = :eventId
+              AND b.status IN ('PENDING', 'CONFIRMED', 'CHECKED_IN')
+            """, nativeQuery = true)
+    long countActiveBookingsForEvent(@Param("eventId") Long eventId);
+
+    @Query(value = """
+    SELECT e.id, e.name, e.rating,
+           COUNT(b.id) as total_bookings
+    FROM events e
+    LEFT JOIN bookings b ON b.event_id = e.id
+        AND b.status = 'COMPLETED'
+    GROUP BY e.id
+    ORDER BY e.rating DESC
+    LIMIT :limit
+    """, nativeQuery = true)
+    List<Object[]> findTopRatedEvents(@Param("limit") int limit);
 }
