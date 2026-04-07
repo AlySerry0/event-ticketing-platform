@@ -7,9 +7,11 @@ import com.team7.eventticketing.event.service.EventService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * REST Controller for Event operations
@@ -151,15 +153,26 @@ public class EventController {
     }
 
     /**
-     * Update event status
-     * PATCH /api/events/{id}/status/{status}
+     * Update event status according to S2-F4
+     * PUT /api/events/{id}/status
+     * Body: {"status":"CANCELLED"}
      */
-    @PatchMapping("/{id}/status/{status}")
-    public ResponseEntity<EventDTO> updateEventStatus(
+    @PutMapping("/{id}/status")
+    public ResponseEntity<Void> updateEventStatus(
             @PathVariable Long id,
-            @PathVariable String status) {
-        EventDTO event = eventService.updateEventStatus(id, status);
-        return ResponseEntity.ok(event);
+            @RequestBody Map<String, String> request) {
+
+        String status = request.get("status");
+
+        if (status == null || status.isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Status is required"
+            );
+        }
+
+        eventService.updateEventStatus(id, status);
+        return ResponseEntity.ok().build();
     }
 
     /**

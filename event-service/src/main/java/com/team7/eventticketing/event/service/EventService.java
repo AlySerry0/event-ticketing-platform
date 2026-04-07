@@ -231,18 +231,28 @@ public class EventService {
      * Update event status
      */
     @Transactional
-    public EventDTO updateEventStatus(Long eventId, String status) {
+    public void updateEventStatus(Long eventId, String status) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
                         "Event not found with id: " + eventId
                 ));
 
-        EventStatus eventStatus = parseEventStatus(status);
-        event.setStatus(eventStatus);
+        EventStatus newStatus = parseEventStatus(status);
 
-        Event updatedEvent = eventRepository.save(event);
-        return convertToDTO(updatedEvent);
+        if (newStatus == EventStatus.CANCELLED) {
+            long activeBookings = eventRepository.countActiveBookingsForEvent(eventId);
+
+            if (activeBookings > 0) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Cannot cancel event because it has active bookings"
+                );
+            }
+        }
+
+        event.setStatus(newStatus);
+        eventRepository.save(event);
     }
 
     /**
