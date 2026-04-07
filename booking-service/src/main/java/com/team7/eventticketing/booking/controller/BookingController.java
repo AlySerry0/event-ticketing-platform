@@ -72,6 +72,10 @@ public class BookingController {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
 		}
 	}
+	@PutMapping("/{id}/complete")
+	public ResponseEntity<BookingDTO> completeBooking(@PathVariable Long id) {
+		return ResponseEntity.ok(bookingService.completeBooking(id));
+	}
 
 	@PutMapping("/{id}")
 	public ResponseEntity<BookingDTO> update(@PathVariable Long id, @RequestBody BookingDTO bookingDetails) {

@@ -5,12 +5,14 @@ import com.team7.eventticketing.booking.dto.BookingCostEstimateDTO;
 import com.team7.eventticketing.booking.dto.BookingDTO;
 import com.team7.eventticketing.booking.dto.BookingEstimateRequestDTO;
 import com.team7.eventticketing.booking.model.Booking;
+import com.team7.eventticketing.booking.model.BookingItem;
 import com.team7.eventticketing.booking.model.BookingStatus;
 import com.team7.eventticketing.booking.repository.BookingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
@@ -136,6 +138,33 @@ public class BookingService {
 		booking.setConfirmedAt(LocalDateTime.now());
 
 		return convertToDTO(bookingRepository.save(booking));
+	}
+
+	@Transactional
+	public BookingDTO completeBooking(Long id) {
+		Booking booking = bookingRepository.findById(id)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+
+		if (booking.getStatus() != BookingStatus.CHECKED_IN) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking is not CHECKED_IN");
+		}
+		booking.setStatus(BookingStatus.COMPLETED);
+		if (booking.getTotalAmount() == null || booking.getTotalAmount() == 0.0) {
+			double total = 0.0;
+			if (booking.getBookingItems() != null) {
+				for (BookingItem item : booking.getBookingItems()) {
+					total += (item.getQuantity() * item.getUnitPrice());
+				}
+			}
+			booking.setTotalAmount(total);
+		}
+		Booking savedBooking = bookingRepository.save(booking);
+		bookingRepository.createPendingTicketSale(
+				savedBooking.getId(),
+				savedBooking.getUserId(),
+				savedBooking.getTotalAmount()
+		);
+		return convertToDTO(savedBooking);
 	}
 
 	public BookingCostEstimateDTO getCostEstimate(BookingEstimateRequestDTO request) {
