@@ -72,9 +72,8 @@ public class BookingController {
 		}
 	}
 	@PutMapping("/{id}/complete")
-	public ResponseEntity<Booking> completeBooking(@PathVariable Long id) {
-		Booking updatedBooking = bookingService.completeBooking(id);
-		return ResponseEntity.ok(updatedBooking);
+	public ResponseEntity<BookingDTO> completeBooking(@PathVariable Long id) {
+		return ResponseEntity.ok(bookingService.completeBooking(id));
 	}
 
 	@PutMapping("/{id}")
