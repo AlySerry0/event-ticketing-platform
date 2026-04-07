@@ -1,5 +1,6 @@
 package com.team7.eventticketing.booking.controller;
 
+import com.team7.eventticketing.booking.dto.BookingAnalyticsDTO;
 import com.team7.eventticketing.booking.dto.BookingCostEstimateDTO;
 import com.team7.eventticketing.booking.dto.BookingDTO;
 import com.team7.eventticketing.booking.dto.BookingEstimateRequestDTO;
@@ -97,6 +98,13 @@ public class BookingController {
 			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
 		}
 	}
+	@GetMapping("/analytics")
+	public ResponseEntity<BookingAnalyticsDTO> getAnalytics(
+			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+		BookingAnalyticsDTO report = bookingService.getAnalytics(startDate, endDate);
+		return ResponseEntity.ok(report);
 	@GetMapping("/metadata/search")
 	public ResponseEntity<List<BookingDTO>> searchByMetadata(
 			@RequestParam String key,
