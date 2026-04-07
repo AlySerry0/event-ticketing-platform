@@ -1,11 +1,14 @@
 package com.team7.eventticketing.sales.service;
 
 import com.team7.eventticketing.sales.dto.PromotionDTO;
+import com.team7.eventticketing.sales.dto.PromotionUsageDTO;
 import com.team7.eventticketing.sales.model.Promotion;
 import com.team7.eventticketing.sales.repository.PromotionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -60,5 +63,31 @@ public class PromotionService {
         promotion.setActive(dto.getActive());
         promotion.setMetadata(dto.getMetadata());
         return promotion;
+    }
+
+    public List<PromotionUsageDTO> getTopUsedPromotions(int limit) {
+        List<Object[]> results = promotionRepository.getTopUsedPromotions(limit);
+
+        List<PromotionUsageDTO> dtoList = new ArrayList<>();
+
+        for (Object[] row : results) {
+
+            Long id = ((Number) row[0]).longValue();
+            String code = (String) row[1];
+            String discountType = (String) row[2];
+            Double discountValue = ((Number) row[3]).doubleValue();
+            Integer timesUsed = ((Number) row[4]).intValue();
+            Double totalDiscountGiven = ((Number) row[5]).doubleValue();
+            Boolean active = (Boolean) row[6];
+            LocalDateTime expiryDate = (LocalDateTime) row[7];
+            Boolean expired = expiryDate.isBefore(LocalDateTime.now());
+
+            dtoList.add(new PromotionUsageDTO(
+                    id, code, discountType, discountValue,
+                    timesUsed, totalDiscountGiven, active, expired
+            ));
+        }
+
+        return dtoList;
     }
 }
