@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.team7.eventticketing.booking.dto.BookingItemDTO;
 import com.team7.eventticketing.booking.model.BookingItemStatus;
-import com.team7.eventticketing.booking.repository.BookingItemRepository;
+
 import java.util.Comparator;
 
 import java.time.LocalDate;
@@ -30,8 +30,9 @@ public class BookingService {
 
 	@Autowired
 	private BookingRepository bookingRepository;
+
     @Autowired
-    private BookingItemRepository bookingItemRepository;
+    private BookingItemService bookingItemService;
 
 	public BookingDTO save(BookingDTO bookingDTO) {
 		Booking booking = convertToEntity(bookingDTO);
@@ -206,20 +207,9 @@ public class BookingService {
 		return estimateDTO;
 	}
 
-    private BookingItemDTO convertItemToDTO(BookingItem item) {
-        BookingItemDTO dto = new BookingItemDTO();
-        dto.setId(item.getId());
-        dto.setEventOrder(item.getEventOrder());
-        dto.setSessionId(item.getSessionId());
-        dto.setSessionTitle(item.getSessionTitle());
-        dto.setQuantity(item.getQuantity());
-        dto.setUnitPrice(item.getUnitPrice());
-        dto.setStatus(item.getStatus());
-        dto.setMetadata(item.getMetadata());
-        return dto;
-    }
 
-    private BookingDTO convertToDTO(Booking booking) {
+
+    public BookingDTO convertToDTO(Booking booking) {
         BookingDTO dto = new BookingDTO();
         dto.setId(booking.getId());
         dto.setUserId(booking.getUserId());
@@ -235,7 +225,7 @@ public class BookingService {
             dto.setBookingItems(
                     booking.getBookingItems().stream()
                             .sorted(Comparator.comparing(BookingItem::getEventOrder))
-                            .map(this::convertItemToDTO)
+                            .map(bookingItemService::convertToDTO)
                             .toList()
             );
         }
@@ -316,7 +306,11 @@ public class BookingService {
             throw new IllegalArgumentException("At least one item must be provided");
         }
 
-        int currentMaxOrder = bookingItemRepository.findMaxEventOrderByBookingId(bookingId);
+        int currentMaxOrder = booking.getBookingItems() == null ? 0 :
+                booking.getBookingItems().stream()
+                        .mapToInt(BookingItem::getEventOrder)
+                        .max()
+                        .orElse(0);
 
         for (BookingItemDTO itemDTO : itemDTOs) {
             if (itemDTO.getSessionId() == null ||
