@@ -358,6 +358,20 @@ public class UserService {
         }
 
         /**
+         * [S1-F9] Find Users by Favorite Category with Minimum Bookings
+         */
+        public List<UserDTO> findUsersByFavoriteCategoryWithMinBookings(String category, int minBookings) {
+            if (category == null || category.trim().isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category must not be blank");
+            }
+
+            return userRepository.findUsersByFavoriteCategoryWithMinBookings(category, minBookings)
+                    .stream()
+                    .map(this::convertToDTO)
+                    .collect(Collectors.toList());
+        }
+
+        /**
          * Convert User entity to UserDTO
          */
         private UserDTO convertToDTO (User user){

@@ -71,4 +71,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate,
             @Param("limit") int limit);
+
+    // --- S1-F9: Find Users by Favorite Category with Minimum Bookings
+    @Query(value = "SELECT u.* FROM users u JOIN bookings b ON u.id = b.user_id " +
+            "WHERE u.preferences ->> 'favoriteCategory' = :category " +
+            "AND b.status = 'COMPLETED' GROUP BY u.id " +
+            "HAVING COUNT(b.id) >= :minBookings",
+            nativeQuery = true)
+    List<User> findUsersByFavoriteCategoryWithMinBookings(@Param("category") String category,
+                                                          @Param("minBookings") int minBookings);
 }
