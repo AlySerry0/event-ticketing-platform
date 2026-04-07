@@ -93,4 +93,16 @@ public interface EventRepository extends JpaRepository<Event, Long> {
               AND b.status IN ('PENDING', 'CONFIRMED', 'CHECKED_IN')
             """, nativeQuery = true)
     long countActiveBookingsForEvent(@Param("eventId") Long eventId);
+
+    @Query(value = """
+    SELECT e.id, e.name, e.rating,
+           COUNT(b.id) as total_bookings
+    FROM events e
+    LEFT JOIN bookings b ON b.event_id = e.id
+        AND b.status = 'COMPLETED'
+    GROUP BY e.id
+    ORDER BY e.rating DESC
+    LIMIT :limit
+    """, nativeQuery = true)
+    List<Object[]> findTopRatedEvents(@Param("limit") int limit);
 }
