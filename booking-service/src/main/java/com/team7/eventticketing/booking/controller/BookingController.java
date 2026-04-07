@@ -72,6 +72,7 @@ public class BookingController {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
 		}
 	}
+	
 	@PutMapping("/{id}/complete")
 	public ResponseEntity<BookingDTO> completeBooking(@PathVariable Long id) {
 		return ResponseEntity.ok(bookingService.completeBooking(id));
@@ -102,6 +103,7 @@ public class BookingController {
 			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
 		}
 	}
+
 	@GetMapping("/analytics")
 	public ResponseEntity<BookingAnalyticsDTO> getAnalytics(
 			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -109,6 +111,8 @@ public class BookingController {
 
 		BookingAnalyticsDTO report = bookingService.getAnalytics(startDate, endDate);
 		return ResponseEntity.ok(report);
+	}
+
 	@GetMapping("/metadata/search")
 	public ResponseEntity<List<BookingDTO>> searchByMetadata(
 			@RequestParam String key,
