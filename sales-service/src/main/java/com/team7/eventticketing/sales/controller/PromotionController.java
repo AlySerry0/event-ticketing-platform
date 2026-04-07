@@ -1,6 +1,7 @@
 package com.team7.eventticketing.sales.controller;
 
 import com.team7.eventticketing.sales.dto.PromotionDTO;
+import com.team7.eventticketing.sales.dto.PromotionUsageDTO;
 import com.team7.eventticketing.sales.service.PromotionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +21,7 @@ public class PromotionController {
         return promotionService.save(promotionDTO);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:\\d+}")
     public ResponseEntity<PromotionDTO> getById(@PathVariable Long id) {
         return promotionService.findById(id)
                 .map(ResponseEntity::ok)
@@ -54,5 +55,13 @@ public class PromotionController {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.notFound().build();
+    }
+
+    @GetMapping("/top-used")
+    public List<PromotionUsageDTO> getTopUsedPromotions(@RequestParam(defaultValue = "10")  int limit) {
+        if (limit <= 0) {
+            limit = 10;
+        }
+        return promotionService.getTopUsedPromotions(limit);
     }
 }

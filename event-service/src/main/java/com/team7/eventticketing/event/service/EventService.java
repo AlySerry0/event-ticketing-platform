@@ -1,9 +1,6 @@
 package com.team7.eventticketing.event.service;
 
-import com.team7.eventticketing.event.dto.CreateEventDTO;
-import com.team7.eventticketing.event.dto.EventDTO;
-import com.team7.eventticketing.event.dto.EventSessionDTO;
-import com.team7.eventticketing.event.dto.UpdateEventDTO;
+import com.team7.eventticketing.event.dto.*;
 import com.team7.eventticketing.event.model.Event;
 import com.team7.eventticketing.event.model.EventCategory;
 import com.team7.eventticketing.event.model.EventStatus;
@@ -231,18 +228,28 @@ public class EventService {
      * Update event status
      */
     @Transactional
-    public EventDTO updateEventStatus(Long eventId, String status) {
+    public void updateEventStatus(Long eventId, String status) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
                         "Event not found with id: " + eventId
                 ));
 
-        EventStatus eventStatus = parseEventStatus(status);
-        event.setStatus(eventStatus);
+        EventStatus newStatus = parseEventStatus(status);
 
-        Event updatedEvent = eventRepository.save(event);
-        return convertToDTO(updatedEvent);
+        if (newStatus == EventStatus.CANCELLED) {
+            long activeBookings = eventRepository.countActiveBookingsForEvent(eventId);
+
+            if (activeBookings > 0) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Cannot cancel event because it has active bookings"
+                );
+            }
+        }
+
+        event.setStatus(newStatus);
+        eventRepository.save(event);
     }
 
     /**
@@ -377,5 +384,79 @@ public class EventService {
         return events.stream()
                 .map(this::convertToDTO)
                 .toList();
+    }
+
+    public List<TopEventDTO> getTopRatedEvents(int limit) {
+
+        List<Object[]> results = eventRepository.findTopRatedEvents(limit);
+
+        return results.stream()
+                .map(row -> new TopEventDTO(
+                        ((Number) row[0]).longValue(),
+                        (String) row[1],
+                        row[2] != null ? ((Number) row[2]).doubleValue() : 0.0,
+                        ((Number) row[3]).longValue()
+                ))
+                .toList();
+    }
+
+    /**
+     * Rate an event after attendance according to S2-F7
+     */
+    @Transactional
+    public void rateEventAfterAttendance(Long eventId, Long bookingId, Integer rating) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Event not found with id: " + eventId
+                ));
+
+        if (bookingId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Booking ID is required"
+            );
+        }
+
+        if (rating == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Rating is required"
+            );
+        }
+
+        if (rating < 1 || rating > 5) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Rating must be between 1 and 5"
+            );
+        }
+
+        long bookingExists = eventRepository.countBookingById(bookingId);
+        if (bookingExists == 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Booking not found with id: " + bookingId
+            );
+        }
+
+        long validCompletedBooking = eventRepository.countCompletedBookingForEvent(bookingId, eventId);
+        if (validCompletedBooking == 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Booking must belong to this event and be COMPLETED"
+            );
+        }
+
+        int currentTotalRatings = event.getTotalRatings() == null ? 0 : event.getTotalRatings();
+        double currentAverageRating = event.getRating() == null ? 0.0 : event.getRating();
+
+        double newAverageRating =
+                (currentAverageRating * currentTotalRatings + rating) / (currentTotalRatings + 1);
+
+        event.setRating(newAverageRating);
+        event.setTotalRatings(currentTotalRatings + 1);
+
+        eventRepository.save(event);
     }
 }

@@ -2,14 +2,17 @@ package com.team7.eventticketing.event.controller;
 
 import com.team7.eventticketing.event.dto.CreateEventDTO;
 import com.team7.eventticketing.event.dto.EventDTO;
+import com.team7.eventticketing.event.dto.TopEventDTO;
 import com.team7.eventticketing.event.dto.UpdateEventDTO;
 import com.team7.eventticketing.event.service.EventService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * REST Controller for Event operations
@@ -151,15 +154,26 @@ public class EventController {
     }
 
     /**
-     * Update event status
-     * PATCH /api/events/{id}/status/{status}
+     * Update event status according to S2-F4
+     * PUT /api/events/{id}/status
+     * Body: {"status":"CANCELLED"}
      */
-    @PatchMapping("/{id}/status/{status}")
-    public ResponseEntity<EventDTO> updateEventStatus(
+    @PutMapping("/{id}/status")
+    public ResponseEntity<Void> updateEventStatus(
             @PathVariable Long id,
-            @PathVariable String status) {
-        EventDTO event = eventService.updateEventStatus(id, status);
-        return ResponseEntity.ok(event);
+            @RequestBody Map<String, String> request) {
+
+        String status = request.get("status");
+
+        if (status == null || status.isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Status is required"
+            );
+        }
+
+        eventService.updateEventStatus(id, status);
+        return ResponseEntity.ok().build();
     }
 
     /**
@@ -196,5 +210,47 @@ public class EventController {
 
         List<EventDTO> events = eventService.searchEventsByDetailAttribute(key, value, status);
         return ResponseEntity.ok(events);
+    }
+
+    @GetMapping("/reports/top-rated")
+    public ResponseEntity<List<TopEventDTO>> getTopRatedEvents(
+            @RequestParam(defaultValue = "5") int limit) {
+
+        return ResponseEntity.ok(eventService.getTopRatedEvents(limit));
+    }
+
+    /**
+     * Rate an event after attendance according to S2-F7
+     * POST /api/events/{id}/rate
+     * Body: {"bookingId":1,"rating":5}
+     */
+    @PostMapping("/{id}/rate")
+    public ResponseEntity<Void> rateEventAfterAttendance(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> request) {
+
+        Object bookingIdObj = request.get("bookingId");
+        Object ratingObj = request.get("rating");
+
+        if (bookingIdObj == null || ratingObj == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "bookingId and rating are required"
+            );
+        }
+
+        Long bookingId = ((Number) bookingIdObj).longValue();
+        Double rating = ((Number) ratingObj).doubleValue();
+
+        if (rating % 1 != 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Rating must be a whole number (1-5)"
+            );
+        }
+
+        Integer finalRating = rating.intValue();
+        eventService.rateEventAfterAttendance(id, bookingId, finalRating);
+        return ResponseEntity.ok().build();
     }
 }

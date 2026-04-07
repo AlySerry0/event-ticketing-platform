@@ -1,14 +1,18 @@
 package com.team7.eventticketing.booking.service;
 
+import com.team7.eventticketing.booking.dto.BookingAnalyticsDTO;
 import com.team7.eventticketing.booking.dto.BookingCostEstimateDTO;
 import com.team7.eventticketing.booking.dto.BookingDTO;
 import com.team7.eventticketing.booking.dto.BookingEstimateRequestDTO;
 import com.team7.eventticketing.booking.model.Booking;
+import com.team7.eventticketing.booking.model.BookingItem;
 import com.team7.eventticketing.booking.model.BookingStatus;
 import com.team7.eventticketing.booking.repository.BookingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -135,6 +139,32 @@ public class BookingService {
 		return convertToDTO(bookingRepository.save(booking));
 	}
 
+	@Transactional
+	public BookingDTO completeBooking(Long id) {
+		Booking booking = bookingRepository.findById(id)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+
+		if (booking.getStatus() != BookingStatus.CHECKED_IN) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking is not CHECKED_IN");
+		}
+		booking.setStatus(BookingStatus.COMPLETED);
+		if (booking.getTotalAmount() == null || booking.getTotalAmount() == 0.0) {
+			double total = 0.0;
+			if (booking.getBookingItems() != null) {
+				for (BookingItem item : booking.getBookingItems()) {
+					total += (item.getQuantity() * item.getUnitPrice());
+				}
+			}
+			booking.setTotalAmount(total);
+		}
+		Booking savedBooking = bookingRepository.save(booking);
+		bookingRepository.createPendingTicketSale(
+				savedBooking.getId(),
+				savedBooking.getUserId(),
+				savedBooking.getTotalAmount());
+		return convertToDTO(savedBooking);
+	}
+
 	public BookingCostEstimateDTO getCostEstimate(BookingEstimateRequestDTO request) {
 		Double avgCapacity = bookingRepository.getAverageSessionCapacityByEventId(request.getEventId());
 
@@ -196,5 +226,50 @@ public class BookingService {
 		booking.setBookingDate(dto.getBookingDate());
 		booking.setConfirmedAt(dto.getConfirmedAt());
 		return booking;
+	}
+
+	public BookingAnalyticsDTO getAnalytics(LocalDate startDate, LocalDate endDate) {
+		if (startDate.isAfter(endDate)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be after end date");
+		}
+
+		LocalDateTime start = startDate.atStartOfDay(); // 2026-03-01 00:00:00
+		LocalDateTime end = endDate.atTime(23, 59, 59); // 2026-03-31 23:59:59
+		List<Object[]> results = bookingRepository.getBookingAnalytics(start, end);
+		Object[] row = results.get(0);
+
+		Long total = ((Number) row[0]).longValue();
+		Long completed = ((Number) row[1]).longValue();
+		Long cancelled = ((Number) row[2]).longValue();
+		Double revenue = ((Number) row[3]).doubleValue();
+
+		Double average = 0.0;
+		if (completed > 0) {
+			average = revenue / completed;
+		}
+
+		Double completionRate = 0.0;
+		if (total > 0) {
+			completionRate = ((double) completed / total) * 100.0;
+		}
+
+		BookingAnalyticsDTO dto = new BookingAnalyticsDTO();
+		dto.setTotalBookings(total);
+		dto.setCompletedBookings(completed);
+		dto.setCancelledBookings(cancelled);
+		dto.setTotalRevenue(revenue);
+		dto.setAverageBookingAmount(average);
+		dto.setCompletionRate(completionRate);
+
+		return dto;
+	}
+
+	public List<BookingDTO> filterBookingsByMetadata(String key, String value) {
+		if (key == null || key.trim().isEmpty() || value == null || value.trim().isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Metadata key and value cannot be blank");
+		}
+		return bookingRepository.findByMetadataKeyAndValue(key, value).stream()
+				.map(this::convertToDTO)
+				.toList();
 	}
 }

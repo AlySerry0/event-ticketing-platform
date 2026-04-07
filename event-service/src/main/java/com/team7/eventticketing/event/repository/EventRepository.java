@@ -83,6 +83,53 @@ public interface EventRepository extends JpaRepository<Event, Long> {
                                                @Param("status") String status);
 
     /**
+     * Count active bookings for an event.
+     * Active bookings are PENDING, CONFIRMED, CHECKED_IN.
+     */
+    @Query(value = """
+            SELECT COUNT(*)
+            FROM bookings b
+            WHERE b.event_id = :eventId
+              AND b.status IN ('PENDING', 'CONFIRMED', 'CHECKED_IN')
+            """, nativeQuery = true)
+    long countActiveBookingsForEvent(@Param("eventId") Long eventId);
+
+    @Query(value = """
+    SELECT e.id, e.name, e.rating,
+           COUNT(b.id) as total_bookings
+    FROM events e
+    LEFT JOIN bookings b ON b.event_id = e.id
+        AND b.status = 'COMPLETED'
+    GROUP BY e.id
+    ORDER BY e.rating DESC
+    LIMIT :limit
+    """, nativeQuery = true)
+    List<Object[]> findTopRatedEvents(@Param("limit") int limit);
+
+    /**
+     * Check whether a booking exists by ID
+     */
+    @Query(value = """
+            SELECT COUNT(*)
+            FROM bookings b
+            WHERE b.id = :bookingId
+            """, nativeQuery = true)
+    long countBookingById(@Param("bookingId") Long bookingId);
+
+    /**
+     * Check whether the booking belongs to the event and is COMPLETED
+     */
+    @Query(value = """
+            SELECT COUNT(*)
+            FROM bookings b
+            WHERE b.id = :bookingId
+              AND b.event_id = :eventId
+              AND b.status = 'COMPLETED'
+            """, nativeQuery = true)
+    long countCompletedBookingForEvent(@Param("bookingId") Long bookingId,
+                                       @Param("eventId") Long eventId);
+
+    /**
      * Find all events that have at least one unverified session
      */
     @Query("""
