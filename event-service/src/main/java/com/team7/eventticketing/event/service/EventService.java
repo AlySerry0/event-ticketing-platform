@@ -399,4 +399,64 @@ public class EventService {
                 ))
                 .toList();
     }
+
+    /**
+     * Rate an event after attendance according to S2-F7
+     */
+    @Transactional
+    public void rateEventAfterAttendance(Long eventId, Long bookingId, Integer rating) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Event not found with id: " + eventId
+                ));
+
+        if (bookingId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Booking ID is required"
+            );
+        }
+
+        if (rating == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Rating is required"
+            );
+        }
+
+        if (rating < 1 || rating > 5) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Rating must be between 1 and 5"
+            );
+        }
+
+        long bookingExists = eventRepository.countBookingById(bookingId);
+        if (bookingExists == 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Booking not found with id: " + bookingId
+            );
+        }
+
+        long validCompletedBooking = eventRepository.countCompletedBookingForEvent(bookingId, eventId);
+        if (validCompletedBooking == 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Booking must belong to this event and be COMPLETED"
+            );
+        }
+
+        int currentTotalRatings = event.getTotalRatings() == null ? 0 : event.getTotalRatings();
+        double currentAverageRating = event.getRating() == null ? 0.0 : event.getRating();
+
+        double newAverageRating =
+                (currentAverageRating * currentTotalRatings + rating) / (currentTotalRatings + 1);
+
+        event.setRating(newAverageRating);
+        event.setTotalRatings(currentTotalRatings + 1);
+
+        eventRepository.save(event);
+    }
 }
