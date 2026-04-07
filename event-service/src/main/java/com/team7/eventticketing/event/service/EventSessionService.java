@@ -1,8 +1,10 @@
 package com.team7.eventticketing.event.service;
 
 import com.team7.eventticketing.event.dto.CreateEventSessionDTO;
+import com.team7.eventticketing.event.dto.EventDTO;
 import com.team7.eventticketing.event.dto.EventSessionDTO;
 import com.team7.eventticketing.event.dto.UpdateEventSessionDTO;
+import com.team7.eventticketing.event.dto.VerifyEventSessionDTO;
 import com.team7.eventticketing.event.model.Event;
 import com.team7.eventticketing.event.model.EventSession;
 import com.team7.eventticketing.event.repository.EventRepository;
@@ -15,6 +17,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Service for EventSession operations
@@ -25,11 +29,14 @@ public class EventSessionService {
 
     private final EventSessionRepository eventSessionRepository;
     private final EventRepository eventRepository;
+    private final EventService eventService;
 
     public EventSessionService(EventSessionRepository eventSessionRepository,
-                               EventRepository eventRepository) {
+                               EventRepository eventRepository,
+                               EventService eventService) {
         this.eventSessionRepository = eventSessionRepository;
         this.eventRepository = eventRepository;
+        this.eventService = eventService;
     }
 
     /**
@@ -271,10 +278,6 @@ public class EventSessionService {
             session.setCapacity(request.getCapacity());
         }
 
-        if (request.getVerified() != null) {
-            session.setVerified(request.getVerified());
-        }
-
         if (request.getMetadata() != null) {
             session.setMetadata(request.getMetadata());
         }
@@ -286,8 +289,12 @@ public class EventSessionService {
      * Verify an event session
      */
     @Transactional
-    public EventSessionDTO verifyEventSession(Long eventId, Long sessionId) {
-        ensureEventExists(eventId);
+    public EventDTO verifyEventSession(Long eventId, Long sessionId, VerifyEventSessionDTO request) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Event not found with id: " + eventId
+                ));
 
         EventSession session = eventSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -295,16 +302,54 @@ public class EventSessionService {
                         "Event session not found with id: " + sessionId
                 ));
 
-        if (!session.getEvent().getId().equals(eventId)) {
+        if (!session.getEvent().getId().equals(event.getId())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Session does not belong to event with id: " + eventId
             );
         }
 
+        if (request == null || request.getVerifiedBy() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "verifiedBy is required"
+            );
+        }
+
+        if (!session.getStartTime().isAfter(LocalDateTime.now())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Cannot verify a session that already happened"
+            );
+        }
+
+        Long verifiedBy = request.getVerifiedBy();
+
+        if (!eventSessionRepository.isAdminUser(verifiedBy)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Verifier must be an admin user"
+            );
+        }
+
         session.setVerified(true);
-        EventSession updatedSession = eventSessionRepository.save(session);
-        return convertToDTO(updatedSession);
+
+        Map<String, Object> metadata = session.getMetadata() != null
+                ? new HashMap<>(session.getMetadata())
+                : new HashMap<>();
+
+        metadata.put("verifiedAt", LocalDateTime.now().toString());
+        metadata.put("verifiedBy", verifiedBy);
+
+        session.setMetadata(metadata);
+
+        eventSessionRepository.save(session);
+
+        return eventService.convertToDTO(eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Event not found with id: " + eventId
+                )));
     }
 
     /**
