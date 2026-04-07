@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
@@ -162,8 +161,7 @@ public class BookingService {
 		bookingRepository.createPendingTicketSale(
 				savedBooking.getId(),
 				savedBooking.getUserId(),
-				savedBooking.getTotalAmount()
-		);
+				savedBooking.getTotalAmount());
 		return convertToDTO(savedBooking);
 	}
 
@@ -229,6 +227,7 @@ public class BookingService {
 		booking.setConfirmedAt(dto.getConfirmedAt());
 		return booking;
 	}
+
 	public BookingAnalyticsDTO getAnalytics(LocalDate startDate, LocalDate endDate) {
 		if (startDate.isAfter(endDate)) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be after end date");
@@ -263,6 +262,8 @@ public class BookingService {
 		dto.setCompletionRate(completionRate);
 
 		return dto;
+	}
+
 	public List<BookingDTO> filterBookingsByMetadata(String key, String value) {
 		if (key == null || key.trim().isEmpty() || value == null || value.trim().isEmpty()) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Metadata key and value cannot be blank");
