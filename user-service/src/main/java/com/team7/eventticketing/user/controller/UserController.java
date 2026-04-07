@@ -197,7 +197,7 @@ public class UserController {
     @GetMapping("/preferences/category")
     public ResponseEntity<List<UserDTO>> findUsersByFavoriteCategoryWithMinBookings(
             @RequestParam String category,
-            @RequestParam int minBookings) {
+            @RequestParam(defaultValue = "0") Integer minBookings) {
         List<UserDTO> users = userService.findUsersByFavoriteCategoryWithMinBookings(category, minBookings);
         return ResponseEntity.ok(users);
     }

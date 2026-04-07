@@ -360,7 +360,7 @@ public class UserService {
         /**
          * [S1-F9] Find Users by Favorite Category with Minimum Bookings
          */
-        public List<UserDTO> findUsersByFavoriteCategoryWithMinBookings(String category, int minBookings) {
+        public List<UserDTO> findUsersByFavoriteCategoryWithMinBookings(String category, Integer minBookings) {
             if (category == null || category.trim().isEmpty()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category must not be blank");
             }
