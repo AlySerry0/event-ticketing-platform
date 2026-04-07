@@ -29,4 +29,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
 	@Query(value = "SELECT COUNT(*) FROM bookings WHERE event_id = :eventId AND status IN ('PENDING', 'CONFIRMED', 'CHECKED_IN')", nativeQuery = true)
 	long countActiveBookingsForEvent(@Param("eventId") Long eventId);
+
+	@Query(value = "SELECT * FROM bookings WHERE metadata ->> :key = :value", nativeQuery = true)
+	List<Booking> findByMetadataKeyAndValue(@Param("key") String key, @Param("value") String value);
 }
