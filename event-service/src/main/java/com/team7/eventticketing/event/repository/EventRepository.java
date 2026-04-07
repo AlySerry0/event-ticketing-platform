@@ -56,6 +56,20 @@ public interface EventRepository extends JpaRepository<Event, Long> {
                                        @Param("endDate") LocalDateTime endDate);
 
     /**
+     * Search events by optional category within a date range.
+     */
+    @Query("""
+            SELECT e
+            FROM Event e
+            WHERE e.eventDate BETWEEN :startDate AND :endDate
+              AND (:category IS NULL OR e.category = :category)
+            ORDER BY e.eventDate ASC
+            """)
+    List<Event> searchByCategoryAndDateRange(@Param("category") EventCategory category,
+                                             @Param("startDate") LocalDateTime startDate,
+                                             @Param("endDate") LocalDateTime endDate);
+
+    /**
      * Find events by rating (greater than or equal to)
      */
     List<Event> findByRatingGreaterThanEqual(Double rating);

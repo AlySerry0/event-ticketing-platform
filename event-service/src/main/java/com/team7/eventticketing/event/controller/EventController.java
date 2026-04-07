@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -96,6 +97,19 @@ public class EventController {
     @GetMapping("/search/name")
     public ResponseEntity<List<EventDTO>> searchEventsByName(@RequestParam String query) {
         List<EventDTO> events = eventService.searchEventsByName(query);
+        return ResponseEntity.ok(events);
+    }
+
+    /**
+     * Search events by optional category within a required date range according to S2-F1
+     * GET /api/events/search?category=CONCERT&startDate=2026-03-01&endDate=2026-03-31
+     */
+    @GetMapping("/search")
+    public ResponseEntity<List<EventDTO>> searchEvents(
+            @RequestParam(required = false) String category,
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate) {
+        List<EventDTO> events = eventService.searchEvents(category, startDate, endDate);
         return ResponseEntity.ok(events);
     }
 

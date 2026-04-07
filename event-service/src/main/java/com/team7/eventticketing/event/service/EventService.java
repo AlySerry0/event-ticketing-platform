@@ -10,7 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -123,6 +125,38 @@ public class EventService {
      */
     public List<EventDTO> searchEventsByVenue(String venue) {
         return eventRepository.findByVenueContainingIgnoreCase(venue)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Search events by optional category and required date range according to S2-F1.
+     */
+    public List<EventDTO> searchEvents(String category, LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Start date and end date are required"
+            );
+        }
+
+        if (startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Start date must be before or equal to end date"
+            );
+        }
+
+        EventCategory eventCategory = null;
+        if (category != null && !category.isBlank()) {
+            eventCategory = parseEventCategory(category.trim());
+        }
+
+        LocalDateTime rangeStart = startDate.atStartOfDay();
+        LocalDateTime rangeEnd = endDate.atTime(LocalTime.MAX);
+
+        return eventRepository.searchByCategoryAndDateRange(eventCategory, rangeStart, rangeEnd)
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
