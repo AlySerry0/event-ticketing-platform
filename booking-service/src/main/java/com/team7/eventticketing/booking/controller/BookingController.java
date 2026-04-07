@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -119,4 +120,13 @@ public class BookingController {
 			@RequestParam String value) {
 		return ResponseEntity.ok(bookingService.filterBookingsByMetadata(key, value));
 	}
+
+    @GetMapping("/{bookingId}/details")
+    public ResponseEntity<BookingDetailsDTO> getBookingDetails(@PathVariable Long bookingId) {
+        try {
+            return ResponseEntity.ok(bookingService.getBookingDetails(bookingId));
+        } catch (NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
+    }
 }

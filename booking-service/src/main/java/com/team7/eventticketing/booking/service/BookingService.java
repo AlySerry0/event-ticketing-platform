@@ -13,6 +13,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
+import com.team7.eventticketing.booking.dto.BookingItemDTO;
+import com.team7.eventticketing.booking.model.BookingItemStatus;
+import java.util.Comparator;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -272,4 +276,46 @@ public class BookingService {
 				.map(this::convertToDTO)
 				.toList();
 	}
+
+    private BookingItemDTO convertItemToDTO(BookingItem item) {
+        BookingItemDTO dto = new BookingItemDTO();
+        dto.setId(item.getId());
+        dto.setEventOrder(item.getEventOrder());
+        dto.setSessionId(item.getSessionId());
+        dto.setSessionTitle(item.getSessionTitle());
+        dto.setQuantity(item.getQuantity());
+        dto.setUnitPrice(item.getUnitPrice());
+        dto.setStatus(item.getStatus());
+        dto.setMetadata(item.getMetadata());
+        return dto;
+    }
+
+    public BookingDetailsDTO getBookingDetails(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new NoSuchElementException("Booking not found"));
+
+        BookingDetailsDTO dto = new BookingDetailsDTO();
+        dto.setBookingId(booking.getId());
+        dto.setUserId(booking.getUserId());
+        dto.setEventId(booking.getEventId());
+        dto.setStatus(booking.getStatus());
+        dto.setTotalAmount(booking.getTotalAmount());
+        dto.setMetadata(booking.getMetadata());
+
+        List<BookingItemDTO> itemDTOs = booking.getBookingItems().stream()
+                .sorted(Comparator.comparing(BookingItem::getEventOrder))
+                .map(this::convertItemToDTO)
+                .toList();
+
+        dto.setItems(itemDTOs);
+        dto.setTotalItems(itemDTOs.size());
+
+        int confirmedItems = (int) booking.getBookingItems().stream()
+                .filter(item -> item.getStatus() == BookingItemStatus.CONFIRMED)
+                .count();
+
+        dto.setConfirmedItems(confirmedItems);
+
+        return dto;
+    }
 }
