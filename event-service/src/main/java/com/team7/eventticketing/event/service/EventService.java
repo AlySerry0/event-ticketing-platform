@@ -253,7 +253,8 @@ public class EventService {
         LocalDateTime rangeStart = startDate.atStartOfDay();
         LocalDateTime rangeEnd = endDate.atTime(LocalTime.MAX);
 
-        Object[] result = eventRepository.findEventRevenueSummary(eventId, rangeStart, rangeEnd);
+        List<Object[]> results = eventRepository.findEventRevenueSummary(eventId, rangeStart, rangeEnd);
+        Object[] result = results.isEmpty() ? new Object[]{0L, 0.0, 0.0} : results.get(0);
 
         Long totalBookings = ((Number) result[0]).longValue();
         Double totalRevenue = result[1] != null ? ((Number) result[1]).doubleValue() : 0.0;
