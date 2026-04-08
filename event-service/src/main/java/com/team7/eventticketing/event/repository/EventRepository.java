@@ -119,6 +119,21 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Object[]> findTopRatedEvents(@Param("limit") int limit);
 
     /**
+     * Aggregate completed booking revenue for an event within a date range.
+     */
+    @Query(value = """
+            SELECT COUNT(*) AS total_bookings,
+                   COALESCE(SUM(b.total_amount), 0),
+                   COALESCE(AVG(b.total_amount), 0)
+            FROM bookings b
+            WHERE b.event_id = :eventId
+              AND b.status = 'COMPLETED'
+              AND b.booking_date BETWEEN :startDate AND :endDate
+            """, nativeQuery = true)
+    Object[] findEventRevenueSummary(@Param("eventId") Long eventId,
+                                     @Param("startDate") LocalDateTime startDate,
+                                     @Param("endDate") LocalDateTime endDate);
+    /**
      * Check whether a booking exists by ID
      */
     @Query(value = """
@@ -140,4 +155,15 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             """, nativeQuery = true)
     long countCompletedBookingForEvent(@Param("bookingId") Long bookingId,
                                        @Param("eventId") Long eventId);
+
+    /**
+     * Find all events that have at least one unverified session
+     */
+    @Query("""
+       SELECT DISTINCT e
+       FROM Event e
+       JOIN FETCH e.eventSessions s
+       WHERE s.verified = false
+       """)
+    List<Event> findEventsWithUnverifiedSessions();
 }

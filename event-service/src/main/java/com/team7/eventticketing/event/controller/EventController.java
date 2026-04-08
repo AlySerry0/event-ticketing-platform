@@ -2,6 +2,7 @@ package com.team7.eventticketing.event.controller;
 
 import com.team7.eventticketing.event.dto.CreateEventDTO;
 import com.team7.eventticketing.event.dto.EventDTO;
+import com.team7.eventticketing.event.dto.EventRevenueDTO;
 import com.team7.eventticketing.event.dto.TopEventDTO;
 import com.team7.eventticketing.event.dto.UpdateEventDTO;
 import com.team7.eventticketing.event.service.EventService;
@@ -165,6 +166,31 @@ public class EventController {
             @RequestBody UpdateEventDTO request) {
         EventDTO event = eventService.updateEvent(id, request);
         return ResponseEntity.ok(event);
+    }
+
+    /**
+     * Update event details according to S2-F2
+     * PUT /api/events/{id}/details
+     */
+    @PutMapping("/{id}/details")
+    public ResponseEntity<EventDTO> updateEventDetails(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> request) {
+        EventDTO event = eventService.updateEventDetails(id, request);
+        return ResponseEntity.ok(event);
+    }
+
+    /**
+     * Get event booking revenue summary according to S2-F3
+     * GET /api/events/{id}/revenue?startDate=2026-03-01&endDate=2026-03-31
+     */
+    @GetMapping("/{id}/revenue")
+    public ResponseEntity<EventRevenueDTO> getEventRevenueSummary(
+            @PathVariable Long id,
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate) {
+        EventRevenueDTO summary = eventService.getEventRevenueSummary(id, startDate, endDate);
+        return ResponseEntity.ok(summary);
     }
 
     /**

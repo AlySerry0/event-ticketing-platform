@@ -55,7 +55,7 @@ public class BookingItemService {
 		});
 	}
 
-	private BookingItemDTO convertToDTO(BookingItem item) {
+	public BookingItemDTO convertToDTO(BookingItem item) {
 		BookingItemDTO dto = new BookingItemDTO();
 		dto.setId(item.getId());
 		dto.setEventOrder(item.getEventOrder());
