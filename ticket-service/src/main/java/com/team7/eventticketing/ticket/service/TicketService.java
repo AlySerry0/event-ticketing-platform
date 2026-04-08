@@ -1,7 +1,9 @@
 package com.team7.eventticketing.ticket.service;
 
+import com.team7.eventticketing.ticket.dto.IssueTicketDTO;
 import com.team7.eventticketing.ticket.dto.TicketDTO;
 import com.team7.eventticketing.ticket.model.Ticket;
+import com.team7.eventticketing.ticket.model.TicketStatus;
 import com.team7.eventticketing.ticket.repository.TicketRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -16,8 +18,8 @@ import java.util.Optional;
 @Service
 public class TicketService {
 
-    @Autowired
-    private TicketRepository ticketRepository;
+	@Autowired
+	private TicketRepository ticketRepository;
 
 	public TicketDTO save(TicketDTO ticketDTO) {
 		Ticket ticket = convertToEntity(ticketDTO);
@@ -61,6 +63,7 @@ public class TicketService {
 		ticket.setMetadata(dto.getMetadata());
 		return ticket;
 	}
+
 	@Transactional
 	public int purgeOldTickets(int olderThanDays) {
 		if (olderThanDays <= 0) {
@@ -68,5 +71,22 @@ public class TicketService {
 		}
 		LocalDateTime cutoff = LocalDateTime.now().minusDays(olderThanDays);
 		return ticketRepository.deleteOldExpiredOrCancelled(cutoff);
+	}
+
+	@Transactional
+	public TicketDTO issueTicket(Long bookingId, IssueTicketDTO request) {
+		if (!ticketRepository.existsBookingById(bookingId)) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
+		}
+
+		Ticket ticket = new Ticket();
+		ticket.setBookingId(bookingId);
+		ticket.setAttendeeName(request.getAttendeeName());
+		ticket.setTicketCode(request.getTicketCode());
+		ticket.setMetadata(request.getMetadata());
+		ticket.setStatus(TicketStatus.VALID);
+		ticket.setIssuedAt(LocalDateTime.now());
+
+		return convertToDTO(ticketRepository.save(ticket));
 	}
 }

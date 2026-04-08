@@ -18,4 +18,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
         AND status IN ('EXPIRED', 'CANCELLED')
         """, nativeQuery = true)
     int deleteOldExpiredOrCancelled(@Param("cutoff") LocalDateTime cutoff);
+
+    @Query(value = "SELECT EXISTS(SELECT 1 FROM bookings WHERE id = :bookingId)", nativeQuery = true)
+    boolean existsBookingById(@Param("bookingId") Long bookingId);
 }
