@@ -3,6 +3,7 @@ package com.team7.eventticketing.ticket.service;
 import com.team7.eventticketing.ticket.dto.IssueTicketDTO;
 import com.team7.eventticketing.ticket.dto.EventAttendanceSummaryDTO;
 import com.team7.eventticketing.ticket.dto.TicketDTO;
+import com.team7.eventticketing.ticket.dto.UnusedTicketDTO;
 import com.team7.eventticketing.ticket.model.Ticket;
 import com.team7.eventticketing.ticket.model.TicketStatus;
 import com.team7.eventticketing.ticket.repository.TicketRepository;
@@ -131,4 +132,9 @@ public class TicketService {
                 .map(this::convertToDTO)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No tickets found for booking"));
     }
+
+    @Transactional(readOnly = true)
+    public List<UnusedTicketDTO> getUnusedTicketsForUpcomingEvents() {
+        return ticketRepository.findUnusedTicketsForUpcomingEvents();
+    } 
 }

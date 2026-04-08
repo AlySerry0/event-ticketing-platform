@@ -3,6 +3,7 @@ package com.team7.eventticketing.ticket.controller;
 import com.team7.eventticketing.ticket.dto.IssueTicketDTO;
 import com.team7.eventticketing.ticket.dto.EventAttendanceSummaryDTO;
 import com.team7.eventticketing.ticket.dto.TicketDTO;
+import com.team7.eventticketing.ticket.dto.UnusedTicketDTO;
 import com.team7.eventticketing.ticket.service.TicketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -58,6 +59,10 @@ public class TicketController {
         return ResponseEntity.notFound().build();
     }
 
+    @GetMapping("/unused-upcoming")
+    public List<UnusedTicketDTO> getUnusedUpcomingTickets() {
+        return ticketService.getUnusedTicketsForUpcomingEvents();
+    }
     @GetMapping("/event/{eventId}/summary")
     public ResponseEntity<Object> getEventSummary(@PathVariable Long eventId) {
         try {
