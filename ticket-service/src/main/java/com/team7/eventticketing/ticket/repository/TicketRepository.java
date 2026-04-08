@@ -55,4 +55,22 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     @Query(value = "SELECT EXISTS(SELECT 1 FROM bookings WHERE id = :bookingId)", nativeQuery = true)
     boolean existsBookingById(@Param("bookingId") Long bookingId);
+
+    @Query(value = """
+        SELECT 
+            t.id, 
+            t.attendee_name, 
+            t.booking_id, 
+            e.name, 
+            CAST(e.details->>'venueLat' AS DOUBLE PRECISION), 
+            CAST(e.details->>'venueLon' AS DOUBLE PRECISION),
+            (SQRT(POWER(CAST(e.details->>'venueLat' AS DOUBLE PRECISION) - :lat, 2) + POWER(CAST(e.details->>'venueLon' AS DOUBLE PRECISION) - :lon, 2)) * 111) as distance
+        FROM tickets t
+        JOIN bookings b ON t.booking_id = b.id
+        JOIN events e ON b.event_id = e.id
+        WHERE t.status = 'VALID'
+        AND (SQRT(POWER(CAST(e.details->>'venueLat' AS DOUBLE PRECISION) - :lat, 2) + POWER(CAST(e.details->>'venueLon' AS DOUBLE PRECISION) - :lon, 2)) * 111) <= :radiusKm
+        ORDER BY distance ASC
+        """, nativeQuery = true)
+    List<Object[]> findNearbyTicketsNative(@Param("lat") double lat, @Param("lon") double lon, @Param("radiusKm") double radiusKm);
 }

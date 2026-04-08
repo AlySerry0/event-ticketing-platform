@@ -1,5 +1,6 @@
 package com.team7.eventticketing.ticket.controller;
 
+import com.team7.eventticketing.ticket.dto.NearbyTicketDTO;
 import com.team7.eventticketing.ticket.dto.IssueTicketDTO;
 import com.team7.eventticketing.ticket.dto.EventAttendanceSummaryDTO;
 import com.team7.eventticketing.ticket.dto.TicketDTO;
@@ -63,6 +64,7 @@ public class TicketController {
     public List<UnusedTicketDTO> getUnusedUpcomingTickets() {
         return ticketService.getUnusedTicketsForUpcomingEvents();
     }
+
     @GetMapping("/event/{eventId}/summary")
     public ResponseEntity<Object> getEventSummary(@PathVariable Long eventId) {
         try {
@@ -108,6 +110,21 @@ public class TicketController {
             return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
         } catch (Exception e) {
             return ResponseEntity.status(500).body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/nearby")
+    public ResponseEntity<List<NearbyTicketDTO>> getNearbyTickets(@RequestParam double lat, @RequestParam double lon,
+            @RequestParam double radiusKm) {
+        try {
+            List<NearbyTicketDTO> tickets = ticketService.getNearbyTickets(lat, lon, radiusKm);
+            return ResponseEntity.ok(tickets);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, e.getMessage());
+        } catch (Exception e) {
+            throw new ResponseStatusException(
+                    org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
         }
     }
 }
