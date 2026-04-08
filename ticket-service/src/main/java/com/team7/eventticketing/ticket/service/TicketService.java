@@ -1,5 +1,6 @@
 package com.team7.eventticketing.ticket.service;
 
+import com.team7.eventticketing.ticket.dto.EventAttendanceSummaryDTO;
 import com.team7.eventticketing.ticket.dto.TicketDTO;
 import com.team7.eventticketing.ticket.model.Ticket;
 import com.team7.eventticketing.ticket.repository.TicketRepository;
@@ -10,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -61,6 +63,38 @@ public class TicketService {
 		ticket.setMetadata(dto.getMetadata());
 		return ticket;
 	}
+
+	public EventAttendanceSummaryDTO getEventSummary(Long eventId) {
+
+		List<Object[]> results = ticketRepository.getEventAttendanceSummary(eventId);
+		if (results == null || results.isEmpty()) {
+			throw new RuntimeException("No tickets found");
+		}
+		Object[] row = results.get(0);
+		long total = row[0] != null ? ((Number) row[0]).longValue() : 0;
+		if (total == 0) {
+			throw new RuntimeException("No tickets found");
+		}
+		long used = row[1] != null ? ((Number) row[1]).longValue() : 0;
+		long valid = row[2] != null ? ((Number) row[2]).longValue() : 0;
+		double attendanceRate = (used * 100.0) / total;
+		LocalDateTime lastCheckIn = null;
+		if (row[3] != null) {
+			if (row[3] instanceof java.sql.Timestamp ts) {
+				lastCheckIn = ts.toLocalDateTime();
+			} else if (row[3] instanceof LocalDateTime ldt) {
+				lastCheckIn = ldt;
+			}
+		}
+		return new EventAttendanceSummaryDTO(
+				eventId,
+				total,
+				used,
+				valid,
+				attendanceRate,
+				lastCheckIn
+		);
+  }
 	@Transactional
 	public int purgeOldTickets(int olderThanDays) {
 		if (olderThanDays <= 0) {
