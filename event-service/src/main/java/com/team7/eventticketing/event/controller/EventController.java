@@ -154,6 +154,18 @@ public class EventController {
     }
 
     /**
+     * Update event details according to S2-F2
+     * PUT /api/events/{id}/details
+     */
+    @PutMapping("/{id}/details")
+    public ResponseEntity<EventDTO> updateEventDetails(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> request) {
+        EventDTO event = eventService.updateEventDetails(id, request);
+        return ResponseEntity.ok(event);
+    }
+
+    /**
      * Update event status according to S2-F4
      * PUT /api/events/{id}/status
      * Body: {"status":"CANCELLED"}
