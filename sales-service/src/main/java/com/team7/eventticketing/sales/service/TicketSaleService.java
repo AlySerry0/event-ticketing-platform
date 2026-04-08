@@ -11,6 +11,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -82,6 +85,61 @@ public class TicketSaleService {
         ticketSale.setTransactionDetails(dto.getTransactionDetails());
         ticketSale.setCreatedAt(dto.getCreatedAt());
         return ticketSale;
+    }
+
+    public List<TicketSaleDTO> searchTicketSales(TicketSaleStatus status,
+                                                  LocalDate startDate,
+                                                  LocalDate endDate) {
+
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "startDate must be before or equal to endDate"
+            );
+        }
+
+        LocalDateTime startDateTime = (startDate != null) ? startDate.atStartOfDay() : null;
+        LocalDateTime endDateTime = (endDate != null) ? endDate.atTime(LocalTime.of(23, 59, 59)) : null;
+
+        List<TicketSale> results;
+
+        if (status != null) {
+            if (startDateTime != null && endDateTime != null) {
+                results = ticketSaleRepository.findByStatusAndCreatedAtBetweenOrderByCreatedAtDesc(
+                        status, startDateTime, endDateTime
+                );
+            } else if (startDateTime != null) {
+                results = ticketSaleRepository.findByStatusAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                        status, startDateTime
+                );
+            } else if (endDateTime != null) {
+                results = ticketSaleRepository.findByStatusAndCreatedAtLessThanEqualOrderByCreatedAtDesc(
+                        status, endDateTime
+                );
+            } else {
+                results = ticketSaleRepository.findByStatusOrderByCreatedAtDesc(status);
+            }
+        } else {
+            if (startDateTime != null && endDateTime != null) {
+                results = ticketSaleRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(
+                        startDateTime, endDateTime
+                );
+            } else if (startDateTime != null) {
+                results = ticketSaleRepository.findByCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                        startDateTime
+                );
+            } else if (endDateTime != null) {
+                results = ticketSaleRepository.findByCreatedAtLessThanEqualOrderByCreatedAtDesc(
+                        endDateTime
+                );
+            } else {
+                results = ticketSaleRepository.findAllByOrderByCreatedAtDesc();
+            }
+        }
+
+        return results.stream()
+                .map(this::convertToDTO)
+                .toList();
     }
 
     @Transactional
