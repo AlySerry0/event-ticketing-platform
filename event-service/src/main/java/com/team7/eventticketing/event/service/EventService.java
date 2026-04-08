@@ -12,6 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -153,15 +154,22 @@ public class EventService {
         }
 
         List<Event> events;
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+
         if (eventCategory == null) {
-            events = eventRepository.findByEventDateBetweenOrderByEventDateAsc(startDate, endDate);
+            events = eventRepository.findByEventDateBetweenOrderByEventDateAsc(
+                    startDateTime,
+                    endDateTime
+            );
         } else {
             events = eventRepository.findByCategoryAndEventDateBetweenOrderByEventDateAsc(
                     eventCategory,
-                    startDate,
-                    endDate
+                    startDateTime,
+                    endDateTime
             );
         }
+
 
         return events
                 .stream()

@@ -56,12 +56,15 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findEventsBetweenDates(@Param("startDate") LocalDateTime startDate,
                                        @Param("endDate") LocalDateTime endDate);
 
-    List<Event> findByEventDateBetweenOrderByEventDateAsc(LocalDate startDate, LocalDate endDate);
+    List<Event> findByEventDateBetweenOrderByEventDateAsc(
+            LocalDateTime startDate,
+            LocalDateTime endDate
+    );
 
     List<Event> findByCategoryAndEventDateBetweenOrderByEventDateAsc(
             EventCategory category,
-            LocalDate startDate,
-            LocalDate endDate
+            LocalDateTime startDate,
+            LocalDateTime endDate
     );
 
     /**
