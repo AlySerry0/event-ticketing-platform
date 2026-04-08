@@ -69,4 +69,13 @@ public class TicketService {
 		LocalDateTime cutoff = LocalDateTime.now().minusDays(olderThanDays);
 		return ticketRepository.deleteOldExpiredOrCancelled(cutoff);
 	}
+
+	public TicketDTO getLatestTicketForBooking(Long bookingId) {
+		if (!ticketRepository.existsBookingById(bookingId)) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
+		}
+		return ticketRepository.findFirstByBookingIdOrderByIssuedAtDesc(bookingId)
+				.map(this::convertToDTO)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No tickets found for booking"));
+	}
 }
