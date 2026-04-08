@@ -1,10 +1,12 @@
 package com.team7.eventticketing.ticket.controller;
 
+import com.team7.eventticketing.ticket.dto.NearbyTicketDTO;
 import com.team7.eventticketing.ticket.dto.TicketDTO;
 import com.team7.eventticketing.ticket.service.TicketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -58,5 +60,20 @@ public class TicketController {
     public ResponseEntity<Integer> purgeOldTickets(@RequestParam int olderThanDays) {
         int deletedCount = ticketService.purgeOldTickets(olderThanDays);
         return ResponseEntity.ok(deletedCount);
+    }
+
+    @GetMapping("/nearby")
+    public ResponseEntity<List<NearbyTicketDTO>> getNearbyTickets(@RequestParam double lat, @RequestParam double lon,
+            @RequestParam double radiusKm) {
+        try {
+            List<NearbyTicketDTO> tickets = ticketService.getNearbyTickets(lat, lon, radiusKm);
+            return ResponseEntity.ok(tickets);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, e.getMessage());
+        } catch (Exception e) {
+            throw new ResponseStatusException(
+                    org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
+        }
     }
 }
