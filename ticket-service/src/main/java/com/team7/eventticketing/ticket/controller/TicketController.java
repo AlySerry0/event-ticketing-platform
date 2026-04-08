@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/tickets")
@@ -56,11 +57,22 @@ public class TicketController {
     }
 
     @GetMapping("/event/{eventId}/summary")
-    public ResponseEntity<EventAttendanceSummaryDTO> getEventSummary(@PathVariable Long eventId) {
+    public ResponseEntity<Object> getEventSummary(@PathVariable Long eventId) {
         try {
-            return ResponseEntity.ok(ticketService.getEventSummary(eventId));
+            EventAttendanceSummaryDTO dto = ticketService.getEventSummary(eventId);
+            return ResponseEntity.ok(dto);
+
         } catch (RuntimeException ex) {
-            return ResponseEntity.notFound().build();
+            if ("No tickets found".equals(ex.getMessage())) {
+                return ResponseEntity.status(404).body(
+                        Map.of(
+                                "status", 404,
+                                "error", "Not Found",
+                                "message", "No tickets found for eventId " + eventId
+                        )
+                );
+            }
+            throw ex;
         }
     }
 }
