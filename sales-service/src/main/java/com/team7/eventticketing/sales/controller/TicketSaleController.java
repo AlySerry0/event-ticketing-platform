@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import com.team7.eventticketing.sales.dto.RefundRequestDTO;
 
 @RestController
 @RequestMapping("/api/sales")
@@ -94,5 +95,14 @@ public class TicketSaleController {
                 request.getCardLastFour()
         );
         return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @PutMapping("/{id}/refund")
+    public ResponseEntity<TicketSaleDTO> processRefund(
+            @PathVariable Long id,
+            @RequestBody RefundRequestDTO request
+    ) {
+        TicketSaleDTO refundedSale = ticketSaleService.processRefund(id, request.getReason());
+        return ResponseEntity.ok(refundedSale);
     }
 }

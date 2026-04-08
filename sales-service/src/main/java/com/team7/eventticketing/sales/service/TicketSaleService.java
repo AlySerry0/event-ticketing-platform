@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import java.util.Map;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -164,5 +165,33 @@ public class TicketSaleService {
         ticketSaleRepository.save(ticketSale);
     }
 
+    @Transactional
+    public TicketSaleDTO processRefund(Long saleId, String reason) {
+        TicketSale ticketSale = ticketSaleRepository.findById(saleId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Ticket sale not found"));
+
+        if (ticketSale.getStatus() != TicketSaleStatus.COMPLETED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Only COMPLETED ticket sales can be refunded"
+            );
+        }
+
+        ticketSale.setStatus(TicketSaleStatus.REFUNDED);
+
+        Map<String, Object> transactionDetails = ticketSale.getTransactionDetails();
+        if (transactionDetails == null) {
+            transactionDetails = new HashMap<>();
+        }
+
+        transactionDetails.put("refundReason", reason);
+        transactionDetails.put("refundedAt", LocalDateTime.now().toString());
+
+        ticketSale.setTransactionDetails(transactionDetails);
+
+        TicketSale saved = ticketSaleRepository.save(ticketSale);
+        return convertToDTO(saved);
+    }
 
 }
