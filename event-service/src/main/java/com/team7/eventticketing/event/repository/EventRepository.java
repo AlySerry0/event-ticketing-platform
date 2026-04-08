@@ -135,7 +135,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     @Query("""
        SELECT DISTINCT e
        FROM Event e
-       JOIN e.eventSessions s
+       JOIN FETCH e.eventSessions s
        WHERE s.verified = false
        """)
     List<Event> findEventsWithUnverifiedSessions();

@@ -95,9 +95,9 @@ public class EventSessionController {
 
     /**
      * Unverify an event session
-     * PATCH /api/events/{eventId}/sessions/{sessionId}/unverify
+     * PUT /api/events/{eventId}/sessions/{sessionId}/unverify
      */
-    @PatchMapping("/{sessionId}/unverify")
+    @PutMapping("/{sessionId}/unverify")
     public ResponseEntity<EventSessionDTO> unverifyEventSession(
             @PathVariable Long eventId,
             @PathVariable Long sessionId,

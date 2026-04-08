@@ -399,6 +399,7 @@ public class EventSessionService {
 
         metadata.remove("verifiedAt");
         metadata.remove("verifiedBy");
+        session.setMetadata(metadata);
 
         EventSession updatedSession = eventSessionRepository.save(session);
         return convertToDTO(updatedSession);
@@ -433,7 +434,6 @@ public class EventSessionService {
                 .map(event -> {
                     List<EventSessionDTO> unverifiedSessions = event.getEventSessions()
                             .stream()
-                            .filter(session -> Boolean.FALSE.equals(session.getVerified()))
                             .map(this::convertToDTO)
                             .collect(Collectors.toList());
 
@@ -445,7 +445,6 @@ public class EventSessionService {
                             unverifiedSessions.size()
                     );
                 })
-                .filter(alert -> alert.getUnverifiedCount() > 0)
                 .collect(Collectors.toList());
     }
 
