@@ -1,5 +1,6 @@
 package com.team7.eventticketing.ticket.controller;
 
+import com.team7.eventticketing.ticket.dto.EventAttendanceSummaryDTO;
 import com.team7.eventticketing.ticket.dto.TicketDTO;
 import com.team7.eventticketing.ticket.service.TicketService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,5 +53,14 @@ public class TicketController {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.notFound().build();
+    }
+
+    @GetMapping("/event/{eventId}/summary")
+    public ResponseEntity<EventAttendanceSummaryDTO> getEventSummary(@PathVariable Long eventId) {
+        try {
+            return ResponseEntity.ok(ticketService.getEventSummary(eventId));
+        } catch (RuntimeException ex) {
+            return ResponseEntity.notFound().build();
+        }
     }
 }
