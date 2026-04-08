@@ -118,10 +118,9 @@ public interface EventRepository extends JpaRepository<Event, Long> {
               AND b.status = 'COMPLETED'
               AND b.booking_date BETWEEN :startDate AND :endDate
             """, nativeQuery = true)
-    List<Object[]> findEventRevenueSummary(@Param("eventId") Long eventId,
-                                           @Param("startDate") LocalDateTime startDate,
-                                           @Param("endDate") LocalDateTime endDate);
-
+    Object[] findEventRevenueSummary(@Param("eventId") Long eventId,
+                                     @Param("startDate") LocalDateTime startDate,
+                                     @Param("endDate") LocalDateTime endDate);
     /**
      * Check whether a booking exists by ID
      */
