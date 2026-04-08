@@ -13,7 +13,6 @@ public class UpdateEventSessionDTO {
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private Integer capacity;
-    private Boolean verified;
     private Map<String, Object> metadata;
 
     public UpdateEventSessionDTO() {
@@ -31,7 +30,6 @@ public class UpdateEventSessionDTO {
         this.startTime = startTime;
         this.endTime = endTime;
         this.capacity = capacity;
-        this.verified = verified;
         this.metadata = metadata;
     }
 
@@ -73,14 +71,6 @@ public class UpdateEventSessionDTO {
 
     public void setCapacity(Integer capacity) {
         this.capacity = capacity;
-    }
-
-    public Boolean getVerified() {
-        return verified;
-    }
-
-    public void setVerified(Boolean verified) {
-        this.verified = verified;
     }
 
     public Map<String, Object> getMetadata() {

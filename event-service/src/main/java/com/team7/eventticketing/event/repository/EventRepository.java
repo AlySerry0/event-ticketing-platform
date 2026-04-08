@@ -128,4 +128,15 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             """, nativeQuery = true)
     long countCompletedBookingForEvent(@Param("bookingId") Long bookingId,
                                        @Param("eventId") Long eventId);
+
+    /**
+     * Find all events that have at least one unverified session
+     */
+    @Query("""
+       SELECT DISTINCT e
+       FROM Event e
+       JOIN FETCH e.eventSessions s
+       WHERE s.verified = false
+       """)
+    List<Event> findEventsWithUnverifiedSessions();
 }

@@ -4,6 +4,7 @@ import com.team7.eventticketing.booking.model.BookingStatus;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.List;
 
 public class BookingDTO {
 	private Long id;
@@ -15,6 +16,7 @@ public class BookingDTO {
 	private Map<String, Object> metadata;
 	private LocalDateTime bookingDate;
 	private LocalDateTime confirmedAt;
+    private List<BookingItemDTO> bookingItems;
 
 	public Long getId() {
 		return id;
@@ -87,4 +89,12 @@ public class BookingDTO {
 	public void setConfirmedAt(LocalDateTime confirmedAt) {
 		this.confirmedAt = confirmedAt;
 	}
+
+    public List<BookingItemDTO> getBookingItems() {
+        return bookingItems;
+    }
+
+    public void setBookingItems(List<BookingItemDTO> bookingItems) {
+        this.bookingItems = bookingItems;
+    }
 }
