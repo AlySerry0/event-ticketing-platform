@@ -1,5 +1,6 @@
 package com.team7.eventticketing.ticket.controller;
 
+import com.team7.eventticketing.ticket.dto.IssueTicketDTO;
 import com.team7.eventticketing.ticket.dto.EventAttendanceSummaryDTO;
 import com.team7.eventticketing.ticket.dto.TicketDTO;
 import com.team7.eventticketing.ticket.service.TicketService;
@@ -81,6 +82,17 @@ public class TicketController {
     public ResponseEntity<Integer> purgeOldTickets(@RequestParam int olderThanDays) {
         int deletedCount = ticketService.purgeOldTickets(olderThanDays);
         return ResponseEntity.ok(deletedCount);
+    }
+
+    @PostMapping("/booking/{bookingId}")
+    public ResponseEntity<?> issueTicket(@PathVariable Long bookingId, @RequestBody IssueTicketDTO request) {
+        try {
+            return ResponseEntity.status(201).body(ticketService.issueTicket(bookingId, request));
+        } catch (ResponseStatusException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(e.getMessage());
+        }
     }
 
     @GetMapping("/booking/{bookingId}/latest")
