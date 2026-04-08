@@ -1,7 +1,10 @@
 package com.team7.eventticketing.ticket.controller;
 
 import com.team7.eventticketing.ticket.dto.NearbyTicketDTO;
+import com.team7.eventticketing.ticket.dto.IssueTicketDTO;
+import com.team7.eventticketing.ticket.dto.EventAttendanceSummaryDTO;
 import com.team7.eventticketing.ticket.dto.TicketDTO;
+import com.team7.eventticketing.ticket.dto.UnusedTicketDTO;
 import com.team7.eventticketing.ticket.service.TicketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/tickets")
@@ -56,10 +60,57 @@ public class TicketController {
         return ResponseEntity.notFound().build();
     }
 
+    @GetMapping("/unused-upcoming")
+    public List<UnusedTicketDTO> getUnusedUpcomingTickets() {
+        return ticketService.getUnusedTicketsForUpcomingEvents();
+    }
+
+    @GetMapping("/event/{eventId}/summary")
+    public ResponseEntity<Object> getEventSummary(@PathVariable Long eventId) {
+        try {
+            EventAttendanceSummaryDTO dto = ticketService.getEventSummary(eventId);
+            return ResponseEntity.ok(dto);
+
+        } catch (RuntimeException ex) {
+            if ("No tickets found".equals(ex.getMessage())) {
+                return ResponseEntity.status(404).body(
+                        Map.of(
+                                "status", 404,
+                                "error", "Not Found",
+                                "message", "No tickets found for eventId " + eventId
+                        )
+                );
+            }
+            throw ex;
+        }
+    }
+  
     @DeleteMapping("/purge")
     public ResponseEntity<Integer> purgeOldTickets(@RequestParam int olderThanDays) {
         int deletedCount = ticketService.purgeOldTickets(olderThanDays);
         return ResponseEntity.ok(deletedCount);
+    }
+
+    @PostMapping("/booking/{bookingId}")
+    public ResponseEntity<?> issueTicket(@PathVariable Long bookingId, @RequestBody IssueTicketDTO request) {
+        try {
+            return ResponseEntity.status(201).body(ticketService.issueTicket(bookingId, request));
+        } catch (ResponseStatusException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/booking/{bookingId}/latest")
+    public ResponseEntity<?> getLatestTicket(@PathVariable Long bookingId) {
+        try {
+            return ResponseEntity.ok(ticketService.getLatestTicketForBooking(bookingId));
+        } catch (ResponseStatusException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(e.getMessage());
+        }
     }
 
     @GetMapping("/nearby")
