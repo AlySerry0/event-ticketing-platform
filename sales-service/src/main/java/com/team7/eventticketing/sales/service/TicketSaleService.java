@@ -11,10 +11,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-
+import com.team7.eventticketing.sales.dto.UserSaleSummaryDTO;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -163,6 +164,38 @@ public class TicketSaleService {
         ticketSale.setTransactionDetails(transactionDetails);
         ticketSaleRepository.save(ticketSale);
     }
+    public UserSaleSummaryDTO getUserSaleSummary(Long userId) {
+       boolean userExists = ticketSaleRepository.userExists(userId);
 
+       if (!userExists) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+        }
+
+        List<Object[]> rows = ticketSaleRepository.getUserSalesSummaryByMethod(
+                userId,
+                TicketSaleStatus.COMPLETED
+        );
+
+        Map<String, Double> methodBreakdown = new HashMap<>();
+        int totalSales = 0;
+        double totalAmount = 0.0;
+
+        for (Object[] row : rows) {
+            PaymentMethod method = (PaymentMethod) row[0];
+            Long count = (Long) row[1];
+            Double amount = ((Number) row[2]).doubleValue();
+
+            methodBreakdown.put(method.name(), amount);
+            totalSales += count.intValue();
+            totalAmount += amount;
+        }
+
+        return new UserSaleSummaryDTO(
+                userId,
+                totalSales,
+                totalAmount,
+                methodBreakdown
+        );
+    }
 
 }

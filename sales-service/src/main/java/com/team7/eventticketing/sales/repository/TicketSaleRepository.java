@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -17,4 +18,16 @@ public interface TicketSaleRepository extends JpaRepository<TicketSale, Long> {
     String getBookingStatus(@Param("bookingId") Long bookingId);
 
     Optional<TicketSale> findByBookingId(Long bookingId);
+
+    @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE id = :userId", nativeQuery = true)
+    boolean userExists(@Param("userId") Long userId);
+
+    @Query("""
+       SELECT ts.method, COUNT(ts), COALESCE(SUM(ts.amount), 0)
+       FROM TicketSale ts
+       WHERE ts.userId = :userId AND ts.status = :status
+       GROUP BY ts.method
+       """)
+    List<Object[]> getUserSalesSummaryByMethod(@Param("userId") Long userId,
+                                               @Param("status") com.team7.eventticketing.sales.model.TicketSaleStatus status);
 }

@@ -5,6 +5,7 @@ import com.team7.eventticketing.sales.dto.TicketSaleDTO;
 import com.team7.eventticketing.sales.model.PaymentMethod;
 import com.team7.eventticketing.sales.model.TicketSale;
 import com.team7.eventticketing.sales.service.TicketSaleService;
+import com.team7.eventticketing.sales.dto.UserSaleSummaryDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -94,5 +95,9 @@ public class TicketSaleController {
                 request.getCardLastFour()
         );
         return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+    @GetMapping("/user/{userId}/summary")
+    public ResponseEntity<UserSaleSummaryDTO> getUserSaleSummary(@PathVariable Long userId) {
+        return ResponseEntity.ok(ticketSaleService.getUserSaleSummary(userId));
     }
 }
