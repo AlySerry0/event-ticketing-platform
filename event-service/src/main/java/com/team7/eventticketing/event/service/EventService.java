@@ -12,7 +12,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -153,10 +152,18 @@ public class EventService {
             eventCategory = parseEventCategory(category.trim());
         }
 
-        LocalDateTime rangeStart = startDate.atStartOfDay();
-        LocalDateTime rangeEnd = endDate.atTime(LocalTime.MAX);
+        List<Event> events;
+        if (eventCategory == null) {
+            events = eventRepository.findByEventDateBetweenOrderByEventDateAsc(startDate, endDate);
+        } else {
+            events = eventRepository.findByCategoryAndEventDateBetweenOrderByEventDateAsc(
+                    eventCategory,
+                    startDate,
+                    endDate
+            );
+        }
 
-        return eventRepository.searchByCategoryAndDateRange(eventCategory, rangeStart, rangeEnd)
+        return events
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
