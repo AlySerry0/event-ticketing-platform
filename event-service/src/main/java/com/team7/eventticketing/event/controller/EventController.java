@@ -2,6 +2,7 @@ package com.team7.eventticketing.event.controller;
 
 import com.team7.eventticketing.event.dto.CreateEventDTO;
 import com.team7.eventticketing.event.dto.EventDTO;
+import com.team7.eventticketing.event.dto.EventRevenueDTO;
 import com.team7.eventticketing.event.dto.TopEventDTO;
 import com.team7.eventticketing.event.dto.UpdateEventDTO;
 import com.team7.eventticketing.event.service.EventService;
@@ -10,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -163,6 +165,19 @@ public class EventController {
             @RequestBody Map<String, Object> request) {
         EventDTO event = eventService.updateEventDetails(id, request);
         return ResponseEntity.ok(event);
+    }
+
+    /**
+     * Get event booking revenue summary according to S2-F3
+     * GET /api/events/{id}/revenue?startDate=2026-03-01&endDate=2026-03-31
+     */
+    @GetMapping("/{id}/revenue")
+    public ResponseEntity<EventRevenueDTO> getEventRevenueSummary(
+            @PathVariable Long id,
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate) {
+        EventRevenueDTO summary = eventService.getEventRevenueSummary(id, startDate, endDate);
+        return ResponseEntity.ok(summary);
     }
 
     /**

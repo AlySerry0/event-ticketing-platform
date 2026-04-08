@@ -10,8 +10,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -254,6 +256,65 @@ public class EventService {
 
         Event updatedEvent = eventRepository.save(event);
         return convertToDTO(updatedEvent);
+    }
+
+    /**
+     * Get event booking revenue summary according to S2-F3.
+     */
+    public EventRevenueDTO getEventRevenueSummary(Long eventId, LocalDate startDate, LocalDate endDate) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Event not found with id: " + eventId
+                ));
+
+        if (startDate == null || endDate == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Start date and end date are required"
+            );
+        }
+
+        if (startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Start date must be before or equal to end date"
+            );
+        }
+
+        LocalDateTime rangeStart = startDate.atStartOfDay();
+        LocalDateTime rangeEnd = endDate.atTime(LocalTime.MAX);
+
+        Object rawResult = eventRepository.findEventRevenueSummary(eventId, rangeStart, rangeEnd);
+
+        Object[] result;
+
+        if (rawResult == null) {
+            result = new Object[]{0L, 0.0, 0.0};
+        } else if (rawResult instanceof Object[] arr) {
+            if (arr.length > 0 && arr[0] instanceof Object[]) {
+                result = (Object[]) arr[0];
+            } else {
+                result = arr;
+            }
+        } else {
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Unexpected revenue query result format"
+            );
+        }
+
+        Long totalBookings = result[0] != null ? ((Number) result[0]).longValue() : 0L;
+        Double totalRevenue = result[1] != null ? ((Number) result[1]).doubleValue() : 0.0;
+        Double averageBookingAmount = result[2] != null ? ((Number) result[2]).doubleValue() : 0.0;
+
+        return new EventRevenueDTO(
+                event.getId(),
+                event.getName(),
+                totalBookings,
+                totalRevenue,
+                averageBookingAmount
+        );
     }
 
     /**
