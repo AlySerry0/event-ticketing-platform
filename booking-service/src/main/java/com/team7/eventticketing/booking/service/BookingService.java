@@ -207,19 +207,31 @@ public class BookingService {
 		return estimateDTO;
 	}
 
-	private BookingDTO convertToDTO(Booking booking) {
-		BookingDTO dto = new BookingDTO();
-		dto.setId(booking.getId());
-		dto.setUserId(booking.getUserId());
-		dto.setEventId(booking.getEventId());
-		dto.setContactEmail(booking.getContactEmail());
-		dto.setStatus(booking.getStatus());
-		dto.setTotalAmount(booking.getTotalAmount());
-		dto.setMetadata(booking.getMetadata());
-		dto.setBookingDate(booking.getBookingDate());
-		dto.setConfirmedAt(booking.getConfirmedAt());
-		return dto;
-	}
+
+
+    public BookingDTO convertToDTO(Booking booking) {
+        BookingDTO dto = new BookingDTO();
+        dto.setId(booking.getId());
+        dto.setUserId(booking.getUserId());
+        dto.setEventId(booking.getEventId());
+        dto.setContactEmail(booking.getContactEmail());
+        dto.setStatus(booking.getStatus());
+        dto.setTotalAmount(booking.getTotalAmount());
+        dto.setMetadata(booking.getMetadata());
+        dto.setBookingDate(booking.getBookingDate());
+        dto.setConfirmedAt(booking.getConfirmedAt());
+
+        if (booking.getBookingItems() != null) {
+            dto.setBookingItems(
+                    booking.getBookingItems().stream()
+                            .sorted(Comparator.comparing(BookingItem::getEventOrder))
+                            .map(bookingItemService::convertToDTO)
+                            .toList()
+            );
+        }
+
+        return dto;
+    }
 
 	private Booking convertToEntity(BookingDTO dto) {
 		Booking booking = new Booking();
@@ -310,4 +322,64 @@ public class BookingService {
 
         return dto;
     }
+
+    @Transactional
+    public BookingDTO addItemsToBooking(Long bookingId, List<BookingItemDTO> itemDTOs) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new NoSuchElementException("Booking not found"));
+
+        if (booking.getStatus() != BookingStatus.PENDING &&
+                booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new IllegalArgumentException("Items can only be added to PENDING or CONFIRMED bookings");
+        }
+
+        if (itemDTOs == null || itemDTOs.isEmpty()) {
+            throw new IllegalArgumentException("At least one item must be provided");
+        }
+
+        int currentMaxOrder = booking.getBookingItems() == null ? 0 :
+                booking.getBookingItems().stream()
+                        .mapToInt(BookingItem::getEventOrder)
+                        .max()
+                        .orElse(0);
+
+        for (BookingItemDTO itemDTO : itemDTOs) {
+            if (itemDTO.getSessionId() == null ||
+                    itemDTO.getSessionTitle() == null || itemDTO.getSessionTitle().trim().isEmpty() ||
+                    itemDTO.getQuantity() == null ||
+                    itemDTO.getUnitPrice() == null) {
+                throw new IllegalArgumentException("Each item must have sessionId, sessionTitle, quantity, and unitPrice");
+            }
+
+            BookingItem item = new BookingItem();
+            item.setEventOrder(++currentMaxOrder);
+            item.setSessionId(itemDTO.getSessionId());
+            item.setSessionTitle(itemDTO.getSessionTitle());
+            item.setQuantity(itemDTO.getQuantity());
+            item.setUnitPrice(itemDTO.getUnitPrice());
+            item.setStatus(BookingItemStatus.RESERVED);
+            item.setMetadata(itemDTO.getMetadata());
+
+            booking.addBookingItem(item);
+        }
+
+        Booking savedBooking = bookingRepository.save(booking);
+        return convertToDTO(savedBooking);
+    }
+
+    @Transactional
+    public void cancelBooking(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new NoSuchElementException("Booking not found"));
+
+        if (booking.getStatus() != BookingStatus.PENDING &&
+                booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new IllegalArgumentException("Only PENDING or CONFIRMED bookings can be cancelled");
+        }
+
+        booking.setStatus(BookingStatus.CANCELLED);
+        bookingRepository.cancelValidTicketsByBookingId(bookingId);
+        bookingRepository.save(booking);
+    }
 }
+
