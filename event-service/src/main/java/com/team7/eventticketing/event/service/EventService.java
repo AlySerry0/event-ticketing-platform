@@ -253,10 +253,26 @@ public class EventService {
         LocalDateTime rangeStart = startDate.atStartOfDay();
         LocalDateTime rangeEnd = endDate.atTime(LocalTime.MAX);
 
-        List<Object[]> results = eventRepository.findEventRevenueSummary(eventId, rangeStart, rangeEnd);
-        Object[] result = results.isEmpty() ? new Object[]{0L, 0.0, 0.0} : results.get(0);
+        Object rawResult = eventRepository.findEventRevenueSummary(eventId, rangeStart, rangeEnd);
 
-        Long totalBookings = ((Number) result[0]).longValue();
+        Object[] result;
+
+        if (rawResult == null) {
+            result = new Object[]{0L, 0.0, 0.0};
+        } else if (rawResult instanceof Object[] arr) {
+            if (arr.length > 0 && arr[0] instanceof Object[]) {
+                result = (Object[]) arr[0];
+            } else {
+                result = arr;
+            }
+        } else {
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Unexpected revenue query result format"
+            );
+        }
+
+        Long totalBookings = result[0] != null ? ((Number) result[0]).longValue() : 0L;
         Double totalRevenue = result[1] != null ? ((Number) result[1]).doubleValue() : 0.0;
         Double averageBookingAmount = result[2] != null ? ((Number) result[2]).doubleValue() : 0.0;
 
