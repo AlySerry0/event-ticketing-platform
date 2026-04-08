@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -40,4 +42,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
   
 	@Query(value = "SELECT * FROM bookings WHERE metadata ->> :key = :value", nativeQuery = true)
 	List<Booking> findByMetadataKeyAndValue(@Param("key") String key, @Param("value") String value);
+
+
+    @Modifying
+    @Transactional
+    @Query(value = "UPDATE tickets SET status = 'CANCELLED' WHERE booking_id = :bookingId AND status = 'VALID'", nativeQuery = true)
+    int cancelValidTicketsByBookingId(@Param("bookingId") Long bookingId);
 }

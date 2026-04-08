@@ -1,6 +1,7 @@
 package com.team7.eventticketing.sales.controller;
 
 import com.team7.eventticketing.sales.dto.ProcessTicketDTO;
+import com.team7.eventticketing.sales.dto.RevenueReportDTO;
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
 import com.team7.eventticketing.sales.model.PaymentMethod;
 import com.team7.eventticketing.sales.model.TicketSale;
@@ -9,6 +10,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -94,5 +99,20 @@ public class TicketSaleController {
                 request.getCardLastFour()
         );
         return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+    @GetMapping("/reports/revenue")
+    public RevenueReportDTO getRevenueReport(
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate) {
+
+        if (startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "startDate cannot be after endDate");
+        }
+
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.atTime(23, 59, 59);
+
+        return ticketSaleService.getRevenueReport(start, end);
     }
 }

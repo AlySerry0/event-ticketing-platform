@@ -11,7 +11,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -225,6 +227,36 @@ public class EventService {
     }
 
     /**
+     * Update event details according to S2-F2 by merging incoming JSONB fields.
+     */
+    @Transactional
+    public EventDTO updateEventDetails(Long eventId, Map<String, Object> detailsUpdate) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Event not found with id: " + eventId
+                ));
+
+        if (detailsUpdate == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Details update body is required"
+            );
+        }
+
+        Map<String, Object> mergedDetails = new LinkedHashMap<>();
+        if (event.getDetails() != null) {
+            mergedDetails.putAll(event.getDetails());
+        }
+        mergedDetails.putAll(detailsUpdate);
+
+        event.setDetails(mergedDetails);
+
+        Event updatedEvent = eventRepository.save(event);
+        return convertToDTO(updatedEvent);
+    }
+
+    /**
      * Update event status
      */
     @Transactional
@@ -306,7 +338,7 @@ public class EventService {
     /**
      * Convert Event entity to EventDTO
      */
-    private EventDTO convertToDTO(Event event) {
+    public EventDTO convertToDTO(Event event) {
         List<EventSessionDTO> sessions = event.getEventSessions() == null ? null :
                 event.getEventSessions().stream()
                         .map(session -> new EventSessionDTO(

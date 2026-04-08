@@ -5,7 +5,10 @@ import com.team7.eventticketing.ticket.dto.TicketDTO;
 import com.team7.eventticketing.ticket.model.Ticket;
 import com.team7.eventticketing.ticket.repository.TicketRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -91,5 +94,22 @@ public class TicketService {
 				attendanceRate,
 				lastCheckIn
 		);
+  }
+	@Transactional
+	public int purgeOldTickets(int olderThanDays) {
+		if (olderThanDays <= 0) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "olderThanDays must be greater than 0");
+		}
+		LocalDateTime cutoff = LocalDateTime.now().minusDays(olderThanDays);
+		return ticketRepository.deleteOldExpiredOrCancelled(cutoff);
+	}
+
+	public TicketDTO getLatestTicketForBooking(Long bookingId) {
+		if (!ticketRepository.existsBookingById(bookingId)) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
+		}
+		return ticketRepository.findFirstByBookingIdOrderByIssuedAtDesc(bookingId)
+				.map(this::convertToDTO)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No tickets found for booking"));
 	}
 }

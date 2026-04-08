@@ -6,6 +6,7 @@ import com.team7.eventticketing.ticket.service.TicketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -73,6 +74,23 @@ public class TicketController {
                 );
             }
             throw ex;
+        }
+    }
+  
+    @DeleteMapping("/purge")
+    public ResponseEntity<Integer> purgeOldTickets(@RequestParam int olderThanDays) {
+        int deletedCount = ticketService.purgeOldTickets(olderThanDays);
+        return ResponseEntity.ok(deletedCount);
+    }
+
+    @GetMapping("/booking/{bookingId}/latest")
+    public ResponseEntity<?> getLatestTicket(@PathVariable Long bookingId) {
+        try {
+            return ResponseEntity.ok(ticketService.getLatestTicketForBooking(bookingId));
+        } catch (ResponseStatusException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(e.getMessage());
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.team7.eventticketing.sales.service;
 
+import com.team7.eventticketing.sales.dto.RevenueReportDTO;
 import com.team7.eventticketing.sales.dto.SalePromotionDTO;
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
 import com.team7.eventticketing.sales.model.*;
@@ -164,5 +165,24 @@ public class TicketSaleService {
         ticketSaleRepository.save(ticketSale);
     }
 
+    public RevenueReportDTO getRevenueReport(LocalDateTime start, LocalDateTime end) {
+
+        Double totalRevenue = ticketSaleRepository.getTotalRevenue(start, end);
+        Long totalTransactions = ticketSaleRepository.getTotalTransactions(start, end);
+        Double refundedAmount = ticketSaleRepository.getRefundedAmount(start, end);
+        Long refundCount = ticketSaleRepository.getRefundCount(start, end);
+
+        Double averageSale = (totalTransactions != 0)
+                ? totalRevenue / totalTransactions
+                : 0.0;
+
+        return new RevenueReportDTO(
+                totalRevenue,
+                totalTransactions,
+                averageSale,
+                refundedAmount,
+                refundCount
+        );
+    }
 
 }
