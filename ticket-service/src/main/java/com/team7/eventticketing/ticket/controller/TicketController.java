@@ -53,4 +53,10 @@ public class TicketController {
         }
         return ResponseEntity.notFound().build();
     }
+
+    @DeleteMapping("/purge")
+    public ResponseEntity<Integer> purgeOldTickets(@RequestParam int olderThanDays) {
+        int deletedCount = ticketService.purgeOldTickets(olderThanDays);
+        return ResponseEntity.ok(deletedCount);
+    }
 }
