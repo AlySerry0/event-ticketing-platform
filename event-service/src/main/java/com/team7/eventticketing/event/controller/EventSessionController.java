@@ -1,8 +1,6 @@
 package com.team7.eventticketing.event.controller;
 
-import com.team7.eventticketing.event.dto.CreateEventSessionDTO;
-import com.team7.eventticketing.event.dto.EventSessionDTO;
-import com.team7.eventticketing.event.dto.UpdateEventSessionDTO;
+import com.team7.eventticketing.event.dto.*;
 import com.team7.eventticketing.event.service.EventSessionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -10,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * REST Controller for EventSession operations
@@ -83,14 +82,15 @@ public class EventSessionController {
 
     /**
      * Verify an event session
-     * PATCH /api/events/{eventId}/sessions/{sessionId}/verify
+     * PUT /api/events/{eventId}/sessions/{sessionId}/verify
      */
-    @PatchMapping("/{sessionId}/verify")
-    public ResponseEntity<EventSessionDTO> verifyEventSession(
+    @PutMapping("/{sessionId}/verify")
+    public ResponseEntity<EventDTO> verifyEventSession(
             @PathVariable Long eventId,
-            @PathVariable Long sessionId) {
-        EventSessionDTO session = eventSessionService.verifyEventSession(eventId, sessionId);
-        return ResponseEntity.ok(session);
+            @PathVariable Long sessionId,
+            @RequestBody VerifyEventSessionDTO request) {
+        EventDTO event = eventSessionService.verifyEventSession(eventId, sessionId, request);
+        return ResponseEntity.ok(event);
     }
 
     /**

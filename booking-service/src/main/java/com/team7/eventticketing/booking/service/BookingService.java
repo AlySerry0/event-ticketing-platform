@@ -335,4 +335,19 @@ public class BookingService {
         Booking savedBooking = bookingRepository.save(booking);
         return convertToDTO(savedBooking);
     }
+
+    @Transactional
+    public void cancelBooking(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new NoSuchElementException("Booking not found"));
+
+        if (booking.getStatus() != BookingStatus.PENDING &&
+                booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new IllegalArgumentException("Only PENDING or CONFIRMED bookings can be cancelled");
+        }
+
+        booking.setStatus(BookingStatus.CANCELLED);
+        bookingRepository.cancelValidTicketsByBookingId(bookingId);
+        bookingRepository.save(booking);
+    }
 }

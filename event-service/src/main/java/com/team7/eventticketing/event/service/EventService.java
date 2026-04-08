@@ -306,7 +306,7 @@ public class EventService {
     /**
      * Convert Event entity to EventDTO
      */
-    private EventDTO convertToDTO(Event event) {
+    public EventDTO convertToDTO(Event event) {
         List<EventSessionDTO> sessions = event.getEventSessions() == null ? null :
                 event.getEventSessions().stream()
                         .map(session -> new EventSessionDTO(

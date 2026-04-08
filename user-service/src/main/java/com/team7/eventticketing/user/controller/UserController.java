@@ -189,4 +189,16 @@ public class UserController {
         UserProfileDTO userProfile = userService.getUserProfileWithFavoriteVenues(id);
         return ResponseEntity.ok(userProfile);
     }
+
+    /**
+     * [S1-F9] Find Users by Favorite Category with Minimum Bookings
+     * GET /api/users/preferences/category?category={cat}&minBookings={n}
+     */
+    @GetMapping("/preferences/category")
+    public ResponseEntity<List<UserDTO>> findUsersByFavoriteCategoryWithMinBookings(
+            @RequestParam String category,
+            @RequestParam(defaultValue = "0") Integer minBookings) {
+        List<UserDTO> users = userService.findUsersByFavoriteCategoryWithMinBookings(category, minBookings);
+        return ResponseEntity.ok(users);
+    }
 }
