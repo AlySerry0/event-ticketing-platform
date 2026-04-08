@@ -31,6 +31,9 @@ public class BookingService {
 	@Autowired
 	private BookingRepository bookingRepository;
 
+    @Autowired
+    private BookingItemService bookingItemService;
+
 	public BookingDTO save(BookingDTO bookingDTO) {
 		Booking booking = convertToEntity(bookingDTO);
 		booking.setBookingDate(LocalDateTime.now());
@@ -277,18 +280,6 @@ public class BookingService {
 				.toList();
 	}
 
-    private BookingItemDTO convertItemToDTO(BookingItem item) {
-        BookingItemDTO dto = new BookingItemDTO();
-        dto.setId(item.getId());
-        dto.setEventOrder(item.getEventOrder());
-        dto.setSessionId(item.getSessionId());
-        dto.setSessionTitle(item.getSessionTitle());
-        dto.setQuantity(item.getQuantity());
-        dto.setUnitPrice(item.getUnitPrice());
-        dto.setStatus(item.getStatus());
-        dto.setMetadata(item.getMetadata());
-        return dto;
-    }
 
     public BookingDetailsDTO getBookingDetails(Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
@@ -302,18 +293,19 @@ public class BookingService {
         dto.setTotalAmount(booking.getTotalAmount());
         dto.setMetadata(booking.getMetadata());
 
-        List<BookingItemDTO> itemDTOs = booking.getBookingItems().stream()
+        List<BookingItem> bookingItems = booking.getBookingItems() == null ? List.of() : booking.getBookingItems();
+
+        List<BookingItemDTO> itemDTOs = bookingItems.stream()
                 .sorted(Comparator.comparing(BookingItem::getEventOrder))
-                .map(this::convertItemToDTO)
+                .map(bookingItemService::convertToDTO)
                 .toList();
 
-        dto.setItems(itemDTOs);
-        dto.setTotalItems(itemDTOs.size());
-
-        int confirmedItems = (int) booking.getBookingItems().stream()
+        int confirmedItems = (int) bookingItems.stream()
                 .filter(item -> item.getStatus() == BookingItemStatus.CONFIRMED)
                 .count();
 
+        dto.setItems(itemDTOs);
+        dto.setTotalItems(itemDTOs.size());
         dto.setConfirmedItems(confirmedItems);
 
         return dto;
