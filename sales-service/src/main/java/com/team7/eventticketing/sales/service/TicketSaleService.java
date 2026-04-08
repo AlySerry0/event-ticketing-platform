@@ -1,6 +1,7 @@
 package com.team7.eventticketing.sales.service;
 
 import com.team7.eventticketing.sales.dto.RevenueReportDTO;
+import com.team7.eventticketing.sales.dto.SaleDetailsDTO;
 import com.team7.eventticketing.sales.dto.SalePromotionDTO;
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
 import com.team7.eventticketing.sales.model.*;
@@ -213,6 +214,39 @@ public class TicketSaleService {
         sale.setTransactionDetails(details);
 
         return ticketSaleRepository.save(sale);
+    }
+    public SaleDetailsDTO getSaleDetails(Long saleId) {
+        TicketSale sale = ticketSaleRepository.findById(saleId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Ticket sale not found"));
+
+        List<SaleDetailsDTO.AppliedPromotionDTO> appliedPromotions = sale.getSalePromotions()
+                .stream()
+                .map(sp -> new SaleDetailsDTO.AppliedPromotionDTO(
+                        sp.getPromotion().getCode(),
+                        sp.getPromotion().getDiscountType().name(),
+                        sp.getDiscountApplied(),
+                        sp.getAppliedAt()
+                ))
+                .toList();
+
+        double totalDiscount = appliedPromotions.stream()
+                .mapToDouble(SaleDetailsDTO.AppliedPromotionDTO::getDiscountApplied)
+                .sum();
+
+        SaleDetailsDTO dto = new SaleDetailsDTO();
+        dto.setSaleId(sale.getId());
+        dto.setBookingId(sale.getBookingId());
+        dto.setUserId(sale.getUserId());
+        dto.setOriginalAmount(sale.getAmount());
+        dto.setMethod(sale.getMethod());
+        dto.setStatus(sale.getStatus());
+        dto.setTransactionDetails(sale.getTransactionDetails());
+        dto.setAppliedPromotions(appliedPromotions);
+        dto.setTotalDiscount(totalDiscount);
+        dto.setFinalAmount(sale.getAmount() - totalDiscount);
+
+        return dto;
     }
 
 }
