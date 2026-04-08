@@ -1,10 +1,12 @@
 package com.team7.eventticketing.ticket.service;
 
 import com.team7.eventticketing.ticket.dto.TicketDTO;
+import com.team7.eventticketing.ticket.dto.UnusedTicketDTO;
 import com.team7.eventticketing.ticket.model.Ticket;
 import com.team7.eventticketing.ticket.repository.TicketRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -56,5 +58,10 @@ public class TicketService {
 		ticket.setIssuedAt(dto.getIssuedAt());
 		ticket.setMetadata(dto.getMetadata());
 		return ticket;
+	}
+
+	@Transactional(readOnly = true)
+	public List<UnusedTicketDTO> getUnusedTicketsForUpcomingEvents() {
+		return ticketRepository.findUnusedTicketsForUpcomingEvents();
 	}
 }
