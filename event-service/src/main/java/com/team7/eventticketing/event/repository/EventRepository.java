@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -54,6 +55,17 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     @Query("SELECT e FROM Event e WHERE e.eventDate BETWEEN :startDate AND :endDate ORDER BY e.eventDate ASC")
     List<Event> findEventsBetweenDates(@Param("startDate") LocalDateTime startDate,
                                        @Param("endDate") LocalDateTime endDate);
+
+    List<Event> findByEventDateBetweenOrderByEventDateAsc(
+            LocalDateTime startDate,
+            LocalDateTime endDate
+    );
+
+    List<Event> findByCategoryAndEventDateBetweenOrderByEventDateAsc(
+            EventCategory category,
+            LocalDateTime startDate,
+            LocalDateTime endDate
+    );
 
     /**
      * Find events by rating (greater than or equal to)

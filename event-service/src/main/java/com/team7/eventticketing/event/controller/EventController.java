@@ -102,6 +102,19 @@ public class EventController {
     }
 
     /**
+     * Search events by optional category within a required date range according to S2-F1
+     * GET /api/events/search?category=CONCERT&startDate=2026-03-01&endDate=2026-03-31
+     */
+    @GetMapping("/search")
+    public ResponseEntity<List<EventDTO>> searchEvents(
+            @RequestParam(required = false) String category,
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate) {
+        List<EventDTO> events = eventService.searchEvents(category, startDate, endDate);
+        return ResponseEntity.ok(events);
+    }
+
+    /**
      * Search events by venue
      * GET /api/events/search/venue?query=xyz
      */

@@ -133,6 +133,53 @@ public class EventService {
     }
 
     /**
+     * Search events by optional category and required date range according to S2-F1.
+     */
+    public List<EventDTO> searchEvents(String category, LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Start date and end date are required"
+            );
+        }
+
+        if (startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Start date must be before or equal to end date"
+            );
+        }
+
+        EventCategory eventCategory = null;
+        if (category != null && !category.isBlank()) {
+            eventCategory = parseEventCategory(category.trim());
+        }
+
+        List<Event> events;
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+
+        if (eventCategory == null) {
+            events = eventRepository.findByEventDateBetweenOrderByEventDateAsc(
+                    startDateTime,
+                    endDateTime
+            );
+        } else {
+            events = eventRepository.findByCategoryAndEventDateBetweenOrderByEventDateAsc(
+                    eventCategory,
+                    startDateTime,
+                    endDateTime
+            );
+        }
+
+
+        return events
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Get upcoming events
      */
     public List<EventDTO> getUpcomingEvents() {
