@@ -291,11 +291,7 @@ public class EventSessionService {
      */
     @Transactional
     public EventDTO verifyEventSession(Long eventId, Long sessionId, VerifyEventSessionDTO request) {
-        Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Event not found with id: " + eventId
-                ));
+        ensureEventExists(eventId);
 
         EventSession session = eventSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -303,7 +299,7 @@ public class EventSessionService {
                         "Event session not found with id: " + sessionId
                 ));
 
-        if (!session.getEvent().getId().equals(event.getId())) {
+        if (!session.getEvent().getId().equals(eventId)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Session does not belong to event with id: " + eventId
@@ -357,7 +353,7 @@ public class EventSessionService {
      * Unverify an event session
      */
     @Transactional
-    public EventSessionDTO unverifyEventSession(Long eventId, Long sessionId) {
+    public EventSessionDTO unverifyEventSession(Long eventId, Long sessionId, Map<String, Object> request) {
         ensureEventExists(eventId);
 
         EventSession session = eventSessionRepository.findById(sessionId)
@@ -373,7 +369,37 @@ public class EventSessionService {
             );
         }
 
+        Long unverifiedBy = null;
+        if (request != null) {
+            Object unverifiedByObj = request.get("unverifiedBy");
+            if (unverifiedByObj instanceof Number) {
+                unverifiedBy = ((Number) unverifiedByObj).longValue();
+            }
+        }
+
+        if (unverifiedBy == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "unverifiedBy is required"
+            );
+        }
+
+        if (!eventSessionRepository.isAdminUser(unverifiedBy)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Unverifier must be an admin user"
+            );
+        }
+
         session.setVerified(false);
+
+        Map<String, Object> metadata = session.getMetadata() != null
+                ? new HashMap<>(session.getMetadata())
+                : new HashMap<>();
+
+        metadata.remove("verifiedAt");
+        metadata.remove("verifiedBy");
+
         EventSession updatedSession = eventSessionRepository.save(session);
         return convertToDTO(updatedSession);
     }
