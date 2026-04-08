@@ -13,9 +13,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
 import com.team7.eventticketing.booking.dto.BookingItemDTO;
 import com.team7.eventticketing.booking.model.BookingItemStatus;
-
 import java.util.Comparator;
 
 import java.time.LocalDate;
@@ -292,6 +292,37 @@ public class BookingService {
 				.toList();
 	}
 
+
+    public BookingDetailsDTO getBookingDetails(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new NoSuchElementException("Booking not found"));
+
+        BookingDetailsDTO dto = new BookingDetailsDTO();
+        dto.setBookingId(booking.getId());
+        dto.setUserId(booking.getUserId());
+        dto.setEventId(booking.getEventId());
+        dto.setStatus(booking.getStatus());
+        dto.setTotalAmount(booking.getTotalAmount());
+        dto.setMetadata(booking.getMetadata());
+
+        List<BookingItem> bookingItems = booking.getBookingItems() == null ? List.of() : booking.getBookingItems();
+
+        List<BookingItemDTO> itemDTOs = bookingItems.stream()
+                .sorted(Comparator.comparing(BookingItem::getEventOrder))
+                .map(bookingItemService::convertToDTO)
+                .toList();
+
+        int confirmedItems = (int) bookingItems.stream()
+                .filter(item -> item.getStatus() == BookingItemStatus.CONFIRMED)
+                .count();
+
+        dto.setItems(itemDTOs);
+        dto.setTotalItems(itemDTOs.size());
+        dto.setConfirmedItems(confirmedItems);
+
+        return dto;
+    }
+
     @Transactional
     public BookingDTO addItemsToBooking(Long bookingId, List<BookingItemDTO> itemDTOs) {
         Booking booking = bookingRepository.findById(bookingId)
@@ -351,3 +382,4 @@ public class BookingService {
         bookingRepository.save(booking);
     }
 }
+
