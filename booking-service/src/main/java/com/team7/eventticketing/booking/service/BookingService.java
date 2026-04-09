@@ -31,15 +31,20 @@ public class BookingService {
 	@Autowired
 	private BookingRepository bookingRepository;
 
-    @Autowired
-    private BookingItemService bookingItemService;
+	@Autowired
+	private BookingItemService bookingItemService;
 
 	public BookingDTO save(BookingDTO bookingDTO) {
 		Booking booking = convertToEntity(bookingDTO);
-		booking.setBookingDate(LocalDateTime.now());
+
+		if (booking.getBookingDate() == null) {
+			booking.setBookingDate(LocalDateTime.now());
+		}
+
 		if (booking.getStatus() == null) {
 			booking.setStatus(BookingStatus.PENDING);
 		}
+
 		return convertToDTO(bookingRepository.save(booking));
 	}
 
