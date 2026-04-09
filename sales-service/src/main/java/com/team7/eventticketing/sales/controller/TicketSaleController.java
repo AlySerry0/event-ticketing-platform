@@ -2,6 +2,7 @@ package com.team7.eventticketing.sales.controller;
 
 import com.team7.eventticketing.sales.dto.ProcessTicketDTO;
 import com.team7.eventticketing.sales.dto.RevenueReportDTO;
+import com.team7.eventticketing.sales.dto.SaleDetailsDTO;
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
 import com.team7.eventticketing.sales.model.PaymentMethod;
 import com.team7.eventticketing.sales.model.TicketSale;
@@ -26,6 +27,10 @@ public class TicketSaleController {
     @PostMapping
     public TicketSaleDTO create(@RequestBody TicketSaleDTO ticketSaleDTO) {
         return ticketSaleService.save(ticketSaleDTO);
+    }
+    @GetMapping("/{saleId}/details")
+    public ResponseEntity<SaleDetailsDTO> getSaleDetails(@PathVariable Long saleId) {
+        return ResponseEntity.ok(ticketSaleService.getSaleDetails(saleId));
     }
 
     @GetMapping("/{id}")
@@ -114,5 +119,11 @@ public class TicketSaleController {
         LocalDateTime end = endDate.atTime(23, 59, 59);
 
         return ticketSaleService.getRevenueReport(start, end);
+
+    }
+    @PutMapping("/{id}/retry")
+    public ResponseEntity<TicketSaleDTO> retryFailedSale(@PathVariable Long id) {
+        TicketSale updatedSale = ticketSaleService.retryFailedSale(id);
+        return ResponseEntity.ok(ticketSaleService.convertToDTO(updatedSale));
     }
 }
