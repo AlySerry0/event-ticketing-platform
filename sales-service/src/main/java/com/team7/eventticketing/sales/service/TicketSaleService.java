@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -183,6 +184,35 @@ public class TicketSaleService {
                 refundedAmount,
                 refundCount
         );
+    }
+    @Transactional
+    public TicketSale retryFailedSale(Long id) {
+        TicketSale sale = ticketSaleRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Ticket sale not found"));
+
+        if (sale.getStatus() != TicketSaleStatus.FAILED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Only FAILED ticket sales can be retried");
+        }
+
+        sale.setStatus(TicketSaleStatus.COMPLETED);
+
+        Map<String, Object> details = sale.getTransactionDetails();
+        if (details == null) {
+            details = new HashMap<>();
+        }
+
+        int retryAttempt = 0;
+        if (details.get("retryAttempt") instanceof Number n) {
+            retryAttempt = n.intValue();
+        }
+        details.put("retryAttempt", retryAttempt + 1);
+        details.put("gatewayResponse", "approved");
+
+        sale.setTransactionDetails(details);
+
+        return ticketSaleRepository.save(sale);
     }
 
 }

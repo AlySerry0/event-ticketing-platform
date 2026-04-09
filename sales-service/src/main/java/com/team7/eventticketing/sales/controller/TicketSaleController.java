@@ -114,5 +114,11 @@ public class TicketSaleController {
         LocalDateTime end = endDate.atTime(23, 59, 59);
 
         return ticketSaleService.getRevenueReport(start, end);
+
+    }
+    @PutMapping("/{id}/retry")
+    public ResponseEntity<TicketSaleDTO> retryFailedSale(@PathVariable Long id) {
+        TicketSale updatedSale = ticketSaleService.retryFailedSale(id);
+        return ResponseEntity.ok(ticketSaleService.convertToDTO(updatedSale));
     }
 }
