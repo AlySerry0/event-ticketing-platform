@@ -2,6 +2,7 @@ package com.team7.eventticketing.event.service;
 
 import com.team7.eventticketing.event.dto.CreateEventSessionDTO;
 import com.team7.eventticketing.event.dto.EventDTO;
+import com.team7.eventticketing.event.dto.EventSessionAlertDTO;
 import com.team7.eventticketing.event.dto.EventSessionDTO;
 import com.team7.eventticketing.event.dto.UpdateEventSessionDTO;
 import com.team7.eventticketing.event.dto.VerifyEventSessionDTO;
@@ -290,11 +291,7 @@ public class EventSessionService {
      */
     @Transactional
     public EventDTO verifyEventSession(Long eventId, Long sessionId, VerifyEventSessionDTO request) {
-        Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Event not found with id: " + eventId
-                ));
+        ensureEventExists(eventId);
 
         EventSession session = eventSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -302,7 +299,7 @@ public class EventSessionService {
                         "Event session not found with id: " + sessionId
                 ));
 
-        if (!session.getEvent().getId().equals(event.getId())) {
+        if (!session.getEvent().getId().equals(eventId)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Session does not belong to event with id: " + eventId
@@ -356,7 +353,7 @@ public class EventSessionService {
      * Unverify an event session
      */
     @Transactional
-    public EventSessionDTO unverifyEventSession(Long eventId, Long sessionId) {
+    public EventSessionDTO unverifyEventSession(Long eventId, Long sessionId, Map<String, Object> request) {
         ensureEventExists(eventId);
 
         EventSession session = eventSessionRepository.findById(sessionId)
@@ -372,7 +369,38 @@ public class EventSessionService {
             );
         }
 
+        Long unverifiedBy = null;
+        if (request != null) {
+            Object unverifiedByObj = request.get("unverifiedBy");
+            if (unverifiedByObj instanceof Number) {
+                unverifiedBy = ((Number) unverifiedByObj).longValue();
+            }
+        }
+
+        if (unverifiedBy == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "unverifiedBy is required"
+            );
+        }
+
+        if (!eventSessionRepository.isAdminUser(unverifiedBy)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Unverifier must be an admin user"
+            );
+        }
+
         session.setVerified(false);
+
+        Map<String, Object> metadata = session.getMetadata() != null
+                ? new HashMap<>(session.getMetadata())
+                : new HashMap<>();
+
+        metadata.remove("verifiedAt");
+        metadata.remove("verifiedBy");
+        session.setMetadata(metadata);
+
         EventSession updatedSession = eventSessionRepository.save(session);
         return convertToDTO(updatedSession);
     }
@@ -398,6 +426,26 @@ public class EventSessionService {
         }
 
         eventSessionRepository.delete(session);
+    }
+
+    public List<EventSessionAlertDTO> getEventsWithUnverifiedSessions() {
+        return eventRepository.findEventsWithUnverifiedSessions()
+                .stream()
+                .map(event -> {
+                    List<EventSessionDTO> unverifiedSessions = event.getEventSessions()
+                            .stream()
+                            .map(this::convertToDTO)
+                            .collect(Collectors.toList());
+
+                    return new EventSessionAlertDTO(
+                            event.getId(),
+                            event.getName(),
+                            event.getStatus().name(),
+                            unverifiedSessions,
+                            unverifiedSessions.size()
+                    );
+                })
+                .collect(Collectors.toList());
     }
 
     /**

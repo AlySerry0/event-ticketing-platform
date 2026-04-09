@@ -95,13 +95,14 @@ public class EventSessionController {
 
     /**
      * Unverify an event session
-     * PATCH /api/events/{eventId}/sessions/{sessionId}/unverify
+     * PUT /api/events/{eventId}/sessions/{sessionId}/unverify
      */
-    @PatchMapping("/{sessionId}/unverify")
+    @PutMapping("/{sessionId}/unverify")
     public ResponseEntity<EventSessionDTO> unverifyEventSession(
             @PathVariable Long eventId,
-            @PathVariable Long sessionId) {
-        EventSessionDTO session = eventSessionService.unverifyEventSession(eventId, sessionId);
+            @PathVariable Long sessionId,
+            @RequestBody Map<String, Object> request) {
+        EventSessionDTO session = eventSessionService.unverifyEventSession(eventId, sessionId, request);
         return ResponseEntity.ok(session);
     }
 

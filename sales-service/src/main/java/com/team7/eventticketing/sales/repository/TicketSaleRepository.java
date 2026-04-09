@@ -36,4 +36,40 @@ public interface TicketSaleRepository extends JpaRepository<TicketSale, Long> {
             @Param("ignoreEndDate") boolean ignoreEndDate,
             @Param("endDate") LocalDateTime endDate
     );
+
+    @Query("""
+        SELECT COALESCE(SUM(t.amount), 0)
+        FROM TicketSale t
+        WHERE t.status = com.team7.eventticketing.sales.model.TicketSaleStatus.COMPLETED
+        AND t.createdAt BETWEEN :start AND :end
+    """)
+    Double getTotalRevenue(@Param("start") LocalDateTime start,
+                           @Param("end") LocalDateTime end);
+
+    @Query("""
+        SELECT COUNT(t)
+        FROM TicketSale t
+        WHERE t.status = com.team7.eventticketing.sales.model.TicketSaleStatus.COMPLETED
+        AND t.createdAt BETWEEN :start AND :end
+    """)
+    Long getTotalTransactions(@Param("start") LocalDateTime start,
+                              @Param("end") LocalDateTime end);
+
+    @Query("""
+        SELECT COALESCE(SUM(t.amount), 0)
+        FROM TicketSale t
+        WHERE t.status = com.team7.eventticketing.sales.model.TicketSaleStatus.REFUNDED
+        AND t.createdAt BETWEEN :start AND :end
+    """)
+    Double getRefundedAmount(@Param("start") LocalDateTime start,
+                             @Param("end") LocalDateTime end);
+
+    @Query("""
+        SELECT COUNT(t)
+        FROM TicketSale t
+        WHERE t.status = com.team7.eventticketing.sales.model.TicketSaleStatus.REFUNDED
+        AND t.createdAt BETWEEN :start AND :end
+    """)
+    Long getRefundCount(@Param("start") LocalDateTime start,
+                        @Param("end") LocalDateTime end);
 }
