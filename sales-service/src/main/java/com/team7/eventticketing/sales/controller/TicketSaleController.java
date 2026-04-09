@@ -1,15 +1,23 @@
 package com.team7.eventticketing.sales.controller;
 
+import com.team7.eventticketing.sales.dto.ProcessTicketDTO;
+import com.team7.eventticketing.sales.dto.RevenueReportDTO;
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
+import com.team7.eventticketing.sales.model.PaymentMethod;
+import com.team7.eventticketing.sales.model.TicketSale;
 import com.team7.eventticketing.sales.service.TicketSaleService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/ticket-sales")
+@RequestMapping("/api/sales")
 public class TicketSaleController {
 
     @Autowired
@@ -53,5 +61,58 @@ public class TicketSaleController {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.notFound().build();
+    }
+    @PostMapping("/{saleId}/promotions/{promotionId}")
+    public ResponseEntity<TicketSaleDTO> applyPromotion(
+            @PathVariable Long saleId,
+            @PathVariable Long promotionId) {
+
+        TicketSale updatedSale = ticketSaleService.applyPromotionToSale(saleId, promotionId);
+        return ResponseEntity.ok(ticketSaleService.convertToDTO(updatedSale));
+    }
+
+    @PostMapping("/booking/{bookingId}")
+    public ResponseEntity<Void> processTicketSale(
+            @PathVariable Long bookingId,
+            @RequestBody ProcessTicketDTO request
+    ) {
+        // 1. Check method exists
+        if (request.getMethod() == null || request.getMethod().isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        // 2. Convert to enum FIRST
+        PaymentMethod method;
+        try {
+            method = PaymentMethod.valueOf(request.getMethod().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+        // 3. NOW you can use method safely
+        if (method == PaymentMethod.CREDIT_CARD &&
+                (request.getCardLastFour() == null || !request.getCardLastFour().matches("\\d{4}"))) {
+            return ResponseEntity.badRequest().build();
+        }
+        // 4. Call service
+        ticketSaleService.processTicketSale(
+                bookingId,
+                method,
+                request.getCardLastFour()
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+    @GetMapping("/reports/revenue")
+    public RevenueReportDTO getRevenueReport(
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate) {
+
+        if (startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "startDate cannot be after endDate");
+        }
+
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.atTime(23, 59, 59);
+
+        return ticketSaleService.getRevenueReport(start, end);
     }
 }
