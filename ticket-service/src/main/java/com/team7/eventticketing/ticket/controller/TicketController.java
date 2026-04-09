@@ -137,7 +137,7 @@ public class TicketController {
     public ResponseEntity<?> issueBatchTickets(@RequestBody BatchTicketRequestDTO batchRequest) {
         try {
             int count = ticketService.issueBatchTickets(batchRequest);
-            return ResponseEntity.status(201).body(Map.of("issuedCount", count));
+            return ResponseEntity.status(201).body(Map.of("count", count));
         } catch (ResponseStatusException e) {
             return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
         } catch (Exception e) {
