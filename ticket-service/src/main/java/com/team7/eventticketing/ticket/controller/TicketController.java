@@ -11,9 +11,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.format.annotation.DateTimeFormat;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+
+
 
 @RestController
 @RequestMapping("/api/tickets")
@@ -129,7 +133,7 @@ public class TicketController {
         }
     }
 
-    @PostMapping("/batch")
+@PostMapping("/batch")
     public ResponseEntity<?> issueBatchTickets(@RequestBody BatchTicketRequestDTO batchRequest) {
         try {
             int count = ticketService.issueBatchTickets(batchRequest);
@@ -140,4 +144,13 @@ public class TicketController {
             return ResponseEntity.status(500).body(e.getMessage());
         }
     }
+
+    @GetMapping("/history")
+    public ResponseEntity<List<TicketDTO>> getTicketsInDateRange(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(ticketService.getTicketsInDateRange(startDate, endDate, status));
+    }
 }
+
