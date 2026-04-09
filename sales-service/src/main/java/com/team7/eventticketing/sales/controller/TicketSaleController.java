@@ -2,6 +2,7 @@ package com.team7.eventticketing.sales.controller;
 
 import com.team7.eventticketing.sales.dto.ProcessTicketDTO;
 import com.team7.eventticketing.sales.dto.RevenueReportDTO;
+import com.team7.eventticketing.sales.dto.SaleDetailsDTO;
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
 import com.team7.eventticketing.sales.model.PaymentMethod;
 import com.team7.eventticketing.sales.model.TicketSale;
@@ -26,6 +27,10 @@ public class TicketSaleController {
     @PostMapping
     public TicketSaleDTO create(@RequestBody TicketSaleDTO ticketSaleDTO) {
         return ticketSaleService.save(ticketSaleDTO);
+    }
+    @GetMapping("/{saleId}/details")
+    public ResponseEntity<SaleDetailsDTO> getSaleDetails(@PathVariable Long saleId) {
+        return ResponseEntity.ok(ticketSaleService.getSaleDetails(saleId));
     }
 
     @GetMapping("/{id}")
