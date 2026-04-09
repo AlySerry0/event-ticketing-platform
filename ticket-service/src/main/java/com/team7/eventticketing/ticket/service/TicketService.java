@@ -158,6 +158,22 @@ public class TicketService {
       return ticketRepository.findUnusedTicketsForUpcomingEvents();
   } 
 
+  public List<TicketDTO> filterTicketsByMetadata(String key, String operator, String value) {
+    List<String> validOperators = List.of("eq", "gt", "lt");
+    if (!validOperators.contains(operator)) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid operator. Must be eq, gt, or lt");
+    }
+
+    List<Ticket> matchingTickets = switch (operator) {
+        case "eq" -> ticketRepository.findByMetadataEquals(key, value);
+        case "gt" -> ticketRepository.findByMetadataGreaterThan(key, value);
+        case "lt" -> ticketRepository.findByMetadataLessThan(key, value);
+        default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid operator");
+    };
+
+    return matchingTickets.stream().map(this::convertToDTO).toList();
+  }
+
   @Transactional
         public int issueBatchTickets(BatchTicketRequestDTO batchRequest) {
                 if (!ticketRepository.existsBookingById(batchRequest.getBookingId())) {
@@ -214,3 +230,4 @@ public class TicketService {
             .stream().map(this::convertToDTO).toList();
   }
 }
+  
