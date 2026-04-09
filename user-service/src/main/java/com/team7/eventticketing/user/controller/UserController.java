@@ -11,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.team7.eventticketing.user.dto.TopAttendeeDTO;
 import org.springframework.format.annotation.DateTimeFormat;
+
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.team7.eventticketing.user.dto.UserBookingSummaryDTO;
@@ -160,9 +162,10 @@ public class UserController {
      */
     @GetMapping("/reports/top-attendees")
     public ResponseEntity<List<TopAttendeeDTO>> getTopAttendees(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
-            @RequestParam int limit) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(defaultValue = "5") int limit) {
+
         List<TopAttendeeDTO> result = userService
                 .getTopAttendeesBySpending(startDate, endDate, limit);
         return ResponseEntity.ok(result);
