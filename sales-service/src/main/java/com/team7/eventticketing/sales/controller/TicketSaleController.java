@@ -6,6 +6,7 @@ import com.team7.eventticketing.sales.dto.SaleDetailsDTO;
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
 import com.team7.eventticketing.sales.model.PaymentMethod;
 import com.team7.eventticketing.sales.model.TicketSale;
+import com.team7.eventticketing.sales.model.TicketSaleStatus;
 import com.team7.eventticketing.sales.service.TicketSaleService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -16,6 +17,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
 
 @RestController
 @RequestMapping("/api/sales")
@@ -43,6 +46,19 @@ public class TicketSaleController {
     @GetMapping
     public List<TicketSaleDTO> getAll() {
         return ticketSaleService.findAll();
+    }
+
+    @GetMapping("/search")
+    public List<TicketSaleDTO> searchTicketSales(
+            @RequestParam(required = false) TicketSaleStatus status,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate startDate,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate endDate
+    ) {
+        return ticketSaleService.searchTicketSales(status, startDate, endDate);
     }
 
     @PutMapping("/{id}")

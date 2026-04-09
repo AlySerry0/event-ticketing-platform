@@ -13,6 +13,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -85,6 +88,42 @@ public class TicketSaleService {
         ticketSale.setTransactionDetails(dto.getTransactionDetails());
         ticketSale.setCreatedAt(dto.getCreatedAt());
         return ticketSale;
+    }
+
+    public List<TicketSaleDTO> searchTicketSales(TicketSaleStatus status,
+                                                 LocalDate startDate,
+                                                 LocalDate endDate) {
+
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "startDate must be before or equal to endDate"
+            );
+        }
+
+        LocalDateTime startDateTime = (startDate != null)
+                ? startDate.atStartOfDay()
+                : LocalDateTime.of(1970, 1, 1, 0, 0);
+
+        LocalDateTime endDateTime = (endDate != null)
+                ? endDate.atTime(23, 59, 59)
+                : LocalDateTime.of(9999, 12, 31, 23, 59, 59);
+
+        TicketSaleStatus effectiveStatus = (status != null)
+                ? status
+                : TicketSaleStatus.PENDING;
+
+        return ticketSaleRepository.searchTicketSales(
+                        status == null,
+                        effectiveStatus,
+                        startDate == null,
+                        startDateTime,
+                        endDate == null,
+                        endDateTime
+                )
+                .stream()
+                .map(this::convertToDTO)
+                .toList();
     }
 
     @Transactional
