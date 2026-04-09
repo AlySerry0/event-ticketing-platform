@@ -73,4 +73,13 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
         ORDER BY distance ASC
         """, nativeQuery = true)
     List<Object[]> findNearbyTicketsNative(@Param("lat") double lat, @Param("lon") double lon, @Param("radiusKm") double radiusKm);
+
+    @Query(value = "SELECT * FROM tickets WHERE metadata ->> :key = :value", nativeQuery = true)
+    List<Ticket> findByMetadataEquals(@Param("key") String key, @Param("value") String value);
+
+    @Query(value = "SELECT * FROM tickets WHERE CAST(metadata ->> :key AS NUMERIC) > CAST(:value AS NUMERIC)", nativeQuery = true)
+    List<Ticket> findByMetadataGreaterThan(@Param("key") String key, @Param("value") String value);
+
+    @Query(value = "SELECT * FROM tickets WHERE CAST(metadata ->> :key AS NUMERIC) < CAST(:value AS NUMERIC)", nativeQuery = true)
+    List<Ticket> findByMetadataLessThan(@Param("key") String key, @Param("value") String value);
 }
