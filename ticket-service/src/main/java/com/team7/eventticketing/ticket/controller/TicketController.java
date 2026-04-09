@@ -1,4 +1,5 @@
 package com.team7.eventticketing.ticket.controller;
+import com.team7.eventticketing.ticket.dto.BatchTicketRequestDTO;
 
 import com.team7.eventticketing.ticket.dto.NearbyTicketDTO;
 import com.team7.eventticketing.ticket.dto.IssueTicketDTO;
@@ -10,9 +11,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.format.annotation.DateTimeFormat;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+
+
 
 @RestController
 @RequestMapping("/api/tickets")
@@ -127,7 +132,7 @@ public class TicketController {
                     org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
         }
     }
-
+    
     @GetMapping("/metadata/search")
     public ResponseEntity<?> filterTicketsByMetadata(
             @RequestParam String key,
@@ -141,4 +146,26 @@ public class TicketController {
             return ResponseEntity.status(500).body(e.getMessage());
         }
     }
+
+    @PostMapping("/batch")
+    public ResponseEntity<?> issueBatchTickets(@RequestBody BatchTicketRequestDTO batchRequest) {
+        try {
+            int count = ticketService.issueBatchTickets(batchRequest);
+            return ResponseEntity.status(201).body(Map.of("issuedCount", count));
+        } catch (ResponseStatusException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/history")
+    public ResponseEntity<List<TicketDTO>> getTicketsInDateRange(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(ticketService.getTicketsInDateRange(startDate, endDate, status));
+    }
 }
+
+

@@ -1,4 +1,5 @@
 package com.team7.eventticketing.ticket.service;
+import com.team7.eventticketing.ticket.dto.BatchTicketRequestDTO;
 
 import com.team7.eventticketing.ticket.dto.NearbyTicketDTO;
 import com.team7.eventticketing.ticket.dto.IssueTicketDTO;
@@ -14,7 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -170,4 +173,61 @@ public class TicketService {
 
     return matchingTickets.stream().map(this::convertToDTO).toList();
   }
+
+  @Transactional
+        public int issueBatchTickets(BatchTicketRequestDTO batchRequest) {
+                if (!ticketRepository.existsBookingById(batchRequest.getBookingId())) {
+                        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
+                }
+
+                List<IssueTicketDTO> ticketRequests = batchRequest.getTickets();
+
+                List<String> incomingTicketCodes = ticketRequests.stream()
+                                .map(IssueTicketDTO::getTicketCode)
+                                .toList();
+
+                long uniqueCount = incomingTicketCodes.stream().distinct().count();
+                if (uniqueCount < incomingTicketCodes.size()) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicate ticket codes found in batch");
+                }
+
+                List<Ticket> existingTickets = ticketRepository.findByTicketCodeIn(incomingTicketCodes);
+                if (!existingTickets.isEmpty()) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicate ticket codes found in database");
+                }
+
+                List<Ticket> ticketsToSave = ticketRequests.stream().map(ticketRequest -> {
+                        Ticket newTicket = new Ticket();
+                        newTicket.setBookingId(batchRequest.getBookingId());
+                        newTicket.setAttendeeName(ticketRequest.getAttendeeName());
+                        newTicket.setTicketCode(ticketRequest.getTicketCode());
+                        newTicket.setMetadata(ticketRequest.getMetadata());
+                        newTicket.setStatus(TicketStatus.VALID);
+                        newTicket.setIssuedAt(LocalDateTime.now());
+                        return newTicket;
+                }).toList();
+
+                ticketRepository.saveAll(ticketsToSave);
+                return ticketsToSave.size();
+        }
+
+  public List<TicketDTO> getTicketsInDateRange(LocalDate startDate, LocalDate endDate, String ticketStatusInput) {
+    LocalDateTime startDateTime = startDate.atStartOfDay();
+    LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+
+    if (ticketStatusInput != null && !ticketStatusInput.trim().isEmpty()) {
+        TicketStatus ticketStatus;
+        try {
+            ticketStatus = TicketStatus.valueOf(ticketStatusInput.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid ticket status: " + ticketStatusInput);
+        }
+        return ticketRepository.findByStatusAndIssuedAtBetweenOrderByIssuedAtAsc(ticketStatus, startDateTime, endDateTime)
+                .stream().map(this::convertToDTO).toList();
+    }
+
+    return ticketRepository.findByIssuedAtBetweenOrderByIssuedAtAsc(startDateTime, endDateTime)
+            .stream().map(this::convertToDTO).toList();
+  }
 }
+  
