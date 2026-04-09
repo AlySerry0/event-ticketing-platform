@@ -1,4 +1,5 @@
 package com.team7.eventticketing.ticket.controller;
+import com.team7.eventticketing.ticket.dto.BatchTicketRequestDTO;
 
 import com.team7.eventticketing.ticket.dto.NearbyTicketDTO;
 import com.team7.eventticketing.ticket.dto.IssueTicketDTO;
@@ -132,6 +133,18 @@ public class TicketController {
         }
     }
 
+@PostMapping("/batch")
+    public ResponseEntity<?> issueBatchTickets(@RequestBody BatchTicketRequestDTO batchRequest) {
+        try {
+            int count = ticketService.issueBatchTickets(batchRequest);
+            return ResponseEntity.status(201).body(Map.of("issuedCount", count));
+        } catch (ResponseStatusException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(e.getMessage());
+        }
+    }
+
     @GetMapping("/history")
     public ResponseEntity<List<TicketDTO>> getTicketsInDateRange(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -140,3 +153,4 @@ public class TicketController {
         return ResponseEntity.ok(ticketService.getTicketsInDateRange(startDate, endDate, status));
     }
 }
+

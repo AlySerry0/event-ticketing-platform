@@ -76,7 +76,8 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
         """, nativeQuery = true)
     List<Object[]> findNearbyTicketsNative(@Param("lat") double lat, @Param("lon") double lon, @Param("radiusKm") double radiusKm);
     
-    List<Ticket> findByIssuedAtBetweenOrderByIssuedAtAsc(LocalDateTime start, LocalDateTime end);
+    List<Ticket> findByTicketCodeIn(List<String> ticketCodes);
 
+    List<Ticket> findByIssuedAtBetweenOrderByIssuedAtAsc(LocalDateTime start, LocalDateTime end);
     List<Ticket> findByStatusAndIssuedAtBetweenOrderByIssuedAtAsc(TicketStatus status, LocalDateTime start, LocalDateTime end);
 }
