@@ -133,7 +133,13 @@ public class BookingController {
 			@RequestParam String value) {
 		return ResponseEntity.ok(bookingService.filterBookingsByMetadata(key, value));
 	}
-
+	@GetMapping("/{id}/items")
+	public ResponseEntity<List<BookingItemDTO>> getBookingItems(@PathVariable Long id) {
+		return bookingService.findById(id)
+				.map(BookingDTO::getBookingItems)
+				.map(ResponseEntity::ok)
+				.orElse(ResponseEntity.notFound().build());
+	}
     @PostMapping("/{bookingId}/items")
     public ResponseEntity<BookingDTO> addItemsToBooking(
             @PathVariable Long bookingId,
