@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/tickets")
@@ -55,8 +56,8 @@ public class TicketController {
     }
 
     @DeleteMapping("/purge")
-    public ResponseEntity<Integer> purgeOldTickets(@RequestParam int olderThanDays) {
+    public ResponseEntity<Map<String, Integer>> purgeOldTickets(@RequestParam int olderThanDays) {
         int deletedCount = ticketService.purgeOldTickets(olderThanDays);
-        return ResponseEntity.ok(deletedCount);
+        return ResponseEntity.ok(Map.of("deletedCount", deletedCount));
     }
 }
