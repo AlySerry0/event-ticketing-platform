@@ -1,5 +1,7 @@
 package com.team7.eventticketing.sales.service;
 
+import com.team7.eventticketing.sales.dto.RevenueReportDTO;
+import com.team7.eventticketing.sales.dto.SaleDetailsDTO;
 import com.team7.eventticketing.sales.dto.SalePromotionDTO;
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
 import com.team7.eventticketing.sales.model.*;
@@ -13,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -164,5 +167,86 @@ public class TicketSaleService {
         ticketSaleRepository.save(ticketSale);
     }
 
+    public RevenueReportDTO getRevenueReport(LocalDateTime start, LocalDateTime end) {
+
+        Double totalRevenue = ticketSaleRepository.getTotalRevenue(start, end);
+        Long totalTransactions = ticketSaleRepository.getTotalTransactions(start, end);
+        Double refundedAmount = ticketSaleRepository.getRefundedAmount(start, end);
+        Long refundCount = ticketSaleRepository.getRefundCount(start, end);
+
+        Double averageSale = (totalTransactions != 0)
+                ? totalRevenue / totalTransactions
+                : 0.0;
+
+        return new RevenueReportDTO(
+                totalRevenue,
+                totalTransactions,
+                averageSale,
+                refundedAmount,
+                refundCount
+        );
+    }
+    @Transactional
+    public TicketSale retryFailedSale(Long id) {
+        TicketSale sale = ticketSaleRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Ticket sale not found"));
+
+        if (sale.getStatus() != TicketSaleStatus.FAILED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Only FAILED ticket sales can be retried");
+        }
+
+        sale.setStatus(TicketSaleStatus.COMPLETED);
+
+        Map<String, Object> details = sale.getTransactionDetails();
+        if (details == null) {
+            details = new HashMap<>();
+        }
+
+        int retryAttempt = 0;
+        if (details.get("retryAttempt") instanceof Number n) {
+            retryAttempt = n.intValue();
+        }
+        details.put("retryAttempt", retryAttempt + 1);
+        details.put("gatewayResponse", "approved");
+
+        sale.setTransactionDetails(details);
+
+        return ticketSaleRepository.save(sale);
+    }
+    public SaleDetailsDTO getSaleDetails(Long saleId) {
+        TicketSale sale = ticketSaleRepository.findById(saleId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Ticket sale not found"));
+
+        List<SaleDetailsDTO.AppliedPromotionDTO> appliedPromotions = sale.getSalePromotions()
+                .stream()
+                .map(sp -> new SaleDetailsDTO.AppliedPromotionDTO(
+                        sp.getPromotion().getCode(),
+                        sp.getPromotion().getDiscountType().name(),
+                        sp.getDiscountApplied(),
+                        sp.getAppliedAt()
+                ))
+                .toList();
+
+        double totalDiscount = appliedPromotions.stream()
+                .mapToDouble(SaleDetailsDTO.AppliedPromotionDTO::getDiscountApplied)
+                .sum();
+
+        SaleDetailsDTO dto = new SaleDetailsDTO();
+        dto.setSaleId(sale.getId());
+        dto.setBookingId(sale.getBookingId());
+        dto.setUserId(sale.getUserId());
+        dto.setOriginalAmount(sale.getAmount());
+        dto.setMethod(sale.getMethod());
+        dto.setStatus(sale.getStatus());
+        dto.setTransactionDetails(sale.getTransactionDetails());
+        dto.setAppliedPromotions(appliedPromotions);
+        dto.setTotalDiscount(totalDiscount);
+        dto.setFinalAmount(sale.getAmount() - totalDiscount);
+
+        return dto;
+    }
 
 }
