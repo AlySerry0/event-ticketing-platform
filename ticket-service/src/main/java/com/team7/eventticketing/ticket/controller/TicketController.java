@@ -1,4 +1,5 @@
 package com.team7.eventticketing.ticket.controller;
+import com.team7.eventticketing.ticket.dto.BatchTicketRequestDTO;
 
 import com.team7.eventticketing.ticket.dto.NearbyTicketDTO;
 import com.team7.eventticketing.ticket.dto.IssueTicketDTO;
@@ -125,6 +126,18 @@ public class TicketController {
         } catch (Exception e) {
             throw new ResponseStatusException(
                     org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
+        }
+    }
+
+    @PostMapping("/batch")
+    public ResponseEntity<?> issueBatchTickets(@RequestBody BatchTicketRequestDTO batchRequest) {
+        try {
+            int count = ticketService.issueBatchTickets(batchRequest);
+            return ResponseEntity.status(201).body(Map.of("issuedCount", count));
+        } catch (ResponseStatusException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(e.getMessage());
         }
     }
 }

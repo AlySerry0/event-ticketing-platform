@@ -73,4 +73,6 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
         ORDER BY distance ASC
         """, nativeQuery = true)
     List<Object[]> findNearbyTicketsNative(@Param("lat") double lat, @Param("lon") double lon, @Param("radiusKm") double radiusKm);
+    
+    List<Ticket> findByTicketCodeIn(List<String> ticketCodes);
 }

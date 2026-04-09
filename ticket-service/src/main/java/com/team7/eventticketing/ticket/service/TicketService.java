@@ -1,4 +1,5 @@
 package com.team7.eventticketing.ticket.service;
+import com.team7.eventticketing.ticket.dto.BatchTicketRequestDTO;
 
 import com.team7.eventticketing.ticket.dto.NearbyTicketDTO;
 import com.team7.eventticketing.ticket.dto.IssueTicketDTO;
@@ -154,4 +155,41 @@ public class TicketService {
   public List<UnusedTicketDTO> getUnusedTicketsForUpcomingEvents() {
       return ticketRepository.findUnusedTicketsForUpcomingEvents();
   } 
+
+  @Transactional
+	public int issueBatchTickets(BatchTicketRequestDTO batchRequest) {
+		if (!ticketRepository.existsBookingById(batchRequest.getBookingId())) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
+		}
+
+		List<IssueTicketDTO> ticketRequests = batchRequest.getTickets();
+
+		List<String> incomingTicketCodes = ticketRequests.stream()
+				.map(IssueTicketDTO::getTicketCode)
+				.toList();
+
+		long uniqueCount = incomingTicketCodes.stream().distinct().count();
+		if (uniqueCount < incomingTicketCodes.size()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicate ticket codes found in batch");
+		}
+
+		List<Ticket> existingTickets = ticketRepository.findByTicketCodeIn(incomingTicketCodes);
+		if (!existingTickets.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicate ticket codes found in database");
+		}
+
+		List<Ticket> ticketsToSave = ticketRequests.stream().map(ticketRequest -> {
+			Ticket newTicket = new Ticket();
+			newTicket.setBookingId(batchRequest.getBookingId());
+			newTicket.setAttendeeName(ticketRequest.getAttendeeName());
+			newTicket.setTicketCode(ticketRequest.getTicketCode());
+			newTicket.setMetadata(ticketRequest.getMetadata());
+			newTicket.setStatus(TicketStatus.VALID);
+			newTicket.setIssuedAt(LocalDateTime.now());
+			return newTicket;
+		}).toList();
+
+		ticketRepository.saveAll(ticketsToSave);
+		return ticketsToSave.size();
+	}
 }
