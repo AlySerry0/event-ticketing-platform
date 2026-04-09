@@ -14,7 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -154,4 +156,23 @@ public class TicketService {
   public List<UnusedTicketDTO> getUnusedTicketsForUpcomingEvents() {
       return ticketRepository.findUnusedTicketsForUpcomingEvents();
   } 
+
+  public List<TicketDTO> getTicketsInDateRange(LocalDate startDate, LocalDate endDate, String ticketStatusInput) {
+    LocalDateTime startDateTime = startDate.atStartOfDay();
+    LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+
+    if (ticketStatusInput != null && !ticketStatusInput.trim().isEmpty()) {
+        TicketStatus ticketStatus;
+        try {
+            ticketStatus = TicketStatus.valueOf(ticketStatusInput.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid ticket status: " + ticketStatusInput);
+        }
+        return ticketRepository.findByStatusAndIssuedAtBetweenOrderByIssuedAtAsc(ticketStatus, startDateTime, endDateTime)
+                .stream().map(this::convertToDTO).toList();
+    }
+
+    return ticketRepository.findByIssuedAtBetweenOrderByIssuedAtAsc(startDateTime, endDateTime)
+            .stream().map(this::convertToDTO).toList();
+  }
 }

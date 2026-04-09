@@ -1,16 +1,18 @@
 package com.team7.eventticketing.ticket.repository;
 
-import com.team7.eventticketing.ticket.dto.UnusedTicketDTO;
-import com.team7.eventticketing.ticket.model.Ticket;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
-import java.util.Optional;
-import java.util.List;
+import com.team7.eventticketing.ticket.dto.UnusedTicketDTO;
+import com.team7.eventticketing.ticket.model.Ticket;
+import com.team7.eventticketing.ticket.model.TicketStatus;
 
 @Repository
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
@@ -73,4 +75,8 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
         ORDER BY distance ASC
         """, nativeQuery = true)
     List<Object[]> findNearbyTicketsNative(@Param("lat") double lat, @Param("lon") double lon, @Param("radiusKm") double radiusKm);
+    
+    List<Ticket> findByIssuedAtBetweenOrderByIssuedAtAsc(LocalDateTime start, LocalDateTime end);
+
+    List<Ticket> findByStatusAndIssuedAtBetweenOrderByIssuedAtAsc(TicketStatus status, LocalDateTime start, LocalDateTime end);
 }
