@@ -21,29 +21,19 @@ public interface TicketSaleRepository extends JpaRepository<TicketSale, Long> {
 
     Optional<TicketSale> findByBookingId(Long bookingId);
 
-    List<TicketSale> findAllByOrderByCreatedAtDesc();
-
-    List<TicketSale> findByStatusOrderByCreatedAtDesc(TicketSaleStatus status);
-
-    List<TicketSale> findByCreatedAtBetweenOrderByCreatedAtDesc(LocalDateTime startDate, LocalDateTime endDate);
-
-    List<TicketSale> findByCreatedAtGreaterThanEqualOrderByCreatedAtDesc(LocalDateTime startDate);
-
-    List<TicketSale> findByCreatedAtLessThanEqualOrderByCreatedAtDesc(LocalDateTime endDate);
-
-    List<TicketSale> findByStatusAndCreatedAtBetweenOrderByCreatedAtDesc(
-            TicketSaleStatus status,
-            LocalDateTime startDate,
-            LocalDateTime endDate
-    );
-
-    List<TicketSale> findByStatusAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
-            TicketSaleStatus status,
-            LocalDateTime startDate
-    );
-
-    List<TicketSale> findByStatusAndCreatedAtLessThanEqualOrderByCreatedAtDesc(
-            TicketSaleStatus status,
-            LocalDateTime endDate
+    @Query("""
+        SELECT t FROM TicketSale t
+        WHERE (:ignoreStatus = true OR t.status = :status)
+        AND (:ignoreStartDate = true OR t.createdAt >= :startDate)
+        AND (:ignoreEndDate = true OR t.createdAt <= :endDate)
+        ORDER BY t.createdAt DESC
+    """)
+    List<TicketSale> searchTicketSales(
+            @Param("ignoreStatus") boolean ignoreStatus,
+            @Param("status") TicketSaleStatus status,
+            @Param("ignoreStartDate") boolean ignoreStartDate,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("ignoreEndDate") boolean ignoreEndDate,
+            @Param("endDate") LocalDateTime endDate
     );
 }

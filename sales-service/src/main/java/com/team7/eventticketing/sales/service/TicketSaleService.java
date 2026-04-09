@@ -88,8 +88,8 @@ public class TicketSaleService {
     }
 
     public List<TicketSaleDTO> searchTicketSales(TicketSaleStatus status,
-                                                  LocalDate startDate,
-                                                  LocalDate endDate) {
+                                                 LocalDate startDate,
+                                                 LocalDate endDate) {
 
         if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
             throw new ResponseStatusException(
@@ -98,46 +98,27 @@ public class TicketSaleService {
             );
         }
 
-        LocalDateTime startDateTime = (startDate != null) ? startDate.atStartOfDay() : null;
-        LocalDateTime endDateTime = (endDate != null) ? endDate.atTime(LocalTime.of(23, 59, 59)) : null;
+        LocalDateTime startDateTime = (startDate != null)
+                ? startDate.atStartOfDay()
+                : LocalDateTime.of(1970, 1, 1, 0, 0);
 
-        List<TicketSale> results;
+        LocalDateTime endDateTime = (endDate != null)
+                ? endDate.atTime(23, 59, 59)
+                : LocalDateTime.of(9999, 12, 31, 23, 59, 59);
 
-        if (status != null) {
-            if (startDateTime != null && endDateTime != null) {
-                results = ticketSaleRepository.findByStatusAndCreatedAtBetweenOrderByCreatedAtDesc(
-                        status, startDateTime, endDateTime
-                );
-            } else if (startDateTime != null) {
-                results = ticketSaleRepository.findByStatusAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
-                        status, startDateTime
-                );
-            } else if (endDateTime != null) {
-                results = ticketSaleRepository.findByStatusAndCreatedAtLessThanEqualOrderByCreatedAtDesc(
-                        status, endDateTime
-                );
-            } else {
-                results = ticketSaleRepository.findByStatusOrderByCreatedAtDesc(status);
-            }
-        } else {
-            if (startDateTime != null && endDateTime != null) {
-                results = ticketSaleRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(
-                        startDateTime, endDateTime
-                );
-            } else if (startDateTime != null) {
-                results = ticketSaleRepository.findByCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
-                        startDateTime
-                );
-            } else if (endDateTime != null) {
-                results = ticketSaleRepository.findByCreatedAtLessThanEqualOrderByCreatedAtDesc(
+        TicketSaleStatus effectiveStatus = (status != null)
+                ? status
+                : TicketSaleStatus.PENDING;
+
+        return ticketSaleRepository.searchTicketSales(
+                        status == null,
+                        effectiveStatus,
+                        startDate == null,
+                        startDateTime,
+                        endDate == null,
                         endDateTime
-                );
-            } else {
-                results = ticketSaleRepository.findAllByOrderByCreatedAtDesc();
-            }
-        }
-
-        return results.stream()
+                )
+                .stream()
                 .map(this::convertToDTO)
                 .toList();
     }
