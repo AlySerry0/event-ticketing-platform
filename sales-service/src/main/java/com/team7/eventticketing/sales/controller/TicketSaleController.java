@@ -1,6 +1,7 @@
 package com.team7.eventticketing.sales.controller;
 
 import com.team7.eventticketing.sales.dto.ProcessTicketDTO;
+import com.team7.eventticketing.sales.dto.RefundRequestDTO;
 import com.team7.eventticketing.sales.dto.RevenueReportDTO;
 import com.team7.eventticketing.sales.dto.SaleDetailsDTO;
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
@@ -9,6 +10,7 @@ import com.team7.eventticketing.sales.model.TicketSale;
 import com.team7.eventticketing.sales.model.TicketSaleStatus;
 import com.team7.eventticketing.sales.service.TicketSaleService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,8 +19,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.time.LocalDate;
-import org.springframework.format.annotation.DateTimeFormat;
 
 @RestController
 @RequestMapping("/api/sales")
@@ -121,6 +121,15 @@ public class TicketSaleController {
         );
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
+    @PutMapping("/{id}/refund")
+    public ResponseEntity<TicketSaleDTO> processRefund(
+            @PathVariable Long id,
+            @RequestBody RefundRequestDTO request
+    ) {
+        TicketSaleDTO refundedSale = ticketSaleService.processRefund(id, request.getReason());
+        return ResponseEntity.ok(refundedSale);
+    }
+
     @GetMapping("/reports/revenue")
     public RevenueReportDTO getRevenueReport(
             @RequestParam LocalDate startDate,
@@ -143,3 +152,4 @@ public class TicketSaleController {
         return ResponseEntity.ok(ticketSaleService.convertToDTO(updatedSale));
     }
 }
+

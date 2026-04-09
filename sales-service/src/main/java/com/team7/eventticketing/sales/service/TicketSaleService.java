@@ -15,12 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-
-import java.time.LocalDateTime;
-import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -204,6 +201,35 @@ public class TicketSaleService {
         }
         ticketSale.setTransactionDetails(transactionDetails);
         ticketSaleRepository.save(ticketSale);
+    }
+
+    @Transactional
+    public TicketSaleDTO processRefund(Long saleId, String reason) {
+        TicketSale ticketSale = ticketSaleRepository.findById(saleId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Ticket sale not found"));
+
+        if (ticketSale.getStatus() != TicketSaleStatus.COMPLETED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Only COMPLETED ticket sales can be refunded"
+            );
+        }
+
+        ticketSale.setStatus(TicketSaleStatus.REFUNDED);
+
+        Map<String, Object> transactionDetails = ticketSale.getTransactionDetails();
+        if (transactionDetails == null) {
+            transactionDetails = new HashMap<>();
+        }
+
+        transactionDetails.put("refundReason", reason);
+        transactionDetails.put("refundedAt", LocalDateTime.now().toString());
+
+        ticketSale.setTransactionDetails(transactionDetails);
+
+        TicketSale saved = ticketSaleRepository.save(ticketSale);
+        return convertToDTO(saved);
     }
 
     public RevenueReportDTO getRevenueReport(LocalDateTime start, LocalDateTime end) {
