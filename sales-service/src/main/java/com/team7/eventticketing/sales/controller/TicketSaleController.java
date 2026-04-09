@@ -9,6 +9,7 @@ import com.team7.eventticketing.sales.model.PaymentMethod;
 import com.team7.eventticketing.sales.model.TicketSale;
 import com.team7.eventticketing.sales.model.TicketSaleStatus;
 import com.team7.eventticketing.sales.service.TicketSaleService;
+import com.team7.eventticketing.sales.dto.UserSaleSummaryDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -121,6 +122,12 @@ public class TicketSaleController {
         );
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
+
+    @GetMapping("/user/{userId}/summary")
+    public ResponseEntity<UserSaleSummaryDTO> getUserSaleSummary(@PathVariable Long userId) {
+        return ResponseEntity.ok(ticketSaleService.getUserSaleSummary(userId));
+    }
+
     @PutMapping("/{id}/refund")
     public ResponseEntity<TicketSaleDTO> processRefund(
             @PathVariable Long id,

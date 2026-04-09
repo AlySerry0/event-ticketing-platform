@@ -2,8 +2,8 @@ package com.team7.eventticketing.sales.service;
 
 import com.team7.eventticketing.sales.dto.RevenueReportDTO;
 import com.team7.eventticketing.sales.dto.SaleDetailsDTO;
-import com.team7.eventticketing.sales.dto.SalePromotionDTO;
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
+import com.team7.eventticketing.sales.dto.UserSaleSummaryDTO;
 import com.team7.eventticketing.sales.model.*;
 import com.team7.eventticketing.sales.repository.PromotionRepository;
 import com.team7.eventticketing.sales.repository.SalePromotionRepository;
@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -201,6 +202,39 @@ public class TicketSaleService {
         }
         ticketSale.setTransactionDetails(transactionDetails);
         ticketSaleRepository.save(ticketSale);
+    }
+    public UserSaleSummaryDTO getUserSaleSummary(Long userId) {
+       boolean userExists = ticketSaleRepository.userExists(userId);
+
+        if (!userExists) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+        }
+
+        List<Object[]> rows = ticketSaleRepository.getUserSalesSummaryByMethod(
+                userId,
+                TicketSaleStatus.COMPLETED
+        );
+
+        Map<String, Double> methodBreakdown = new HashMap<>();
+        int totalSales = 0;
+        double totalAmount = 0.0;
+
+        for (Object[] row : rows) {
+            PaymentMethod method = (PaymentMethod) row[0];
+            Long count = (Long) row[1];
+            Double amount = ((Number) row[2]).doubleValue();
+
+            methodBreakdown.put(method.name(), amount);
+            totalSales += count.intValue();
+            totalAmount += amount;
+        }
+
+        return new UserSaleSummaryDTO(
+                userId,
+                totalSales,
+                totalAmount,
+                methodBreakdown
+        );
     }
 
     @Transactional

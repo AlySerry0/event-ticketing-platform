@@ -3,9 +3,9 @@ package com.team7.eventticketing.sales.repository;
 import com.team7.eventticketing.sales.model.TicketSale;
 import com.team7.eventticketing.sales.model.TicketSaleStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -72,4 +72,16 @@ public interface TicketSaleRepository extends JpaRepository<TicketSale, Long> {
     """)
     Long getRefundCount(@Param("start") LocalDateTime start,
                         @Param("end") LocalDateTime end);
+
+    @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE id = :userId", nativeQuery = true)
+    boolean userExists(@Param("userId") Long userId);
+
+    @Query("""
+        SELECT ts.method, COUNT(ts), COALESCE(SUM(ts.amount), 0)
+        FROM TicketSale ts
+        WHERE ts.userId = :userId AND ts.status = :status
+        GROUP BY ts.method
+    """)
+    List<Object[]> getUserSalesSummaryByMethod(@Param("userId") Long userId,
+                                               @Param("status") TicketSaleStatus status);
 }
