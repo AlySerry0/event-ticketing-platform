@@ -169,7 +169,7 @@ public class BookingService {
 			}
 			booking.setTotalAmount(total);
 		}
-		Booking savedBooking = bookingRepository.save(booking);
+		Booking savedBooking = bookingRepository.saveAndFlush(booking);
 		bookingRepository.createPendingTicketSale(
 				savedBooking.getId(),
 				savedBooking.getUserId(),
@@ -334,8 +334,9 @@ public class BookingService {
                 .orElseThrow(() -> new NoSuchElementException("Booking not found"));
 
         if (booking.getStatus() != BookingStatus.PENDING &&
-                booking.getStatus() != BookingStatus.CONFIRMED) {
-            throw new IllegalArgumentException("Items can only be added to PENDING or CONFIRMED bookings");
+                booking.getStatus() != BookingStatus.CONFIRMED &&
+                booking.getStatus() != BookingStatus.CHECKED_IN) {
+            throw new IllegalArgumentException("Items can only be added to PENDING, CONFIRMED, or CHECKED_IN bookings");
         }
 
         if (itemDTOs == null || itemDTOs.isEmpty()) {
