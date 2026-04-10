@@ -124,6 +124,7 @@ public class TicketSaleService {
                 .toList();
     }
 
+
     @Transactional
     public TicketSale applyPromotionToSale(Long saleId, Long promotionId) {
         TicketSale sale = ticketSaleRepository.findById(saleId)
@@ -141,10 +142,11 @@ public class TicketSaleService {
         if (!Boolean.TRUE.equals(promo.getActive())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion is inactive");
         }
-        if (promo.getExpiryDate().isBefore(LocalDateTime.now())) {
+        if (promo.getExpiryDate()==null||!promo.getExpiryDate().isAfter(LocalDateTime.now())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion is expired");
         }
-        if (promo.getCurrentUses() >= promo.getMaxUses()) {
+        int currentUses=promo.getCurrentUses() == null? 0 : promo.getCurrentUses();
+        if (currentUses >= promo.getMaxUses()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion usage limit reached");
         }
         if (salePromotionRepository.existsByTicketSaleIdAndPromotionId(saleId, promotionId)) {
@@ -161,7 +163,7 @@ public class TicketSaleService {
         if (discount>sale.getAmount() ){
             discount=sale.getAmount();
         }
-        promo.setCurrentUses(promo.getCurrentUses()+1);
+        promo.setCurrentUses(currentUses+1);
         promotionRepository.save(promo);
         SalePromotion salePromo = new SalePromotion();
         salePromo.setPromotion(promo);
@@ -171,7 +173,7 @@ public class TicketSaleService {
         return ticketSaleRepository.save(sale);
     }
     @Transactional
-    public void processTicketSale(Long bookingId, PaymentMethod method, String cardLastFour){
+    public TicketSale processTicketSale(Long bookingId, String methodStr, String cardLastFour){
         boolean doesExist = ticketSaleRepository.bookingExists(bookingId);
         if (!doesExist){
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");        }
@@ -185,11 +187,21 @@ public class TicketSaleService {
         if (ticketSale.getStatus() == TicketSaleStatus.COMPLETED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "already paid");
         }
-        if (method == null) {
+        if (methodStr == null||methodStr.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment method is required");
         }
+        PaymentMethod method;
+        try {
+            method = PaymentMethod.valueOf(methodStr. toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid payment method");
+        }
+        if (method == PaymentMethod. CREDIT_CARD &&
+                (cardLastFour == null || !cardLastFour.matches("\\d{4}"))){
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"cardLastFour must be 4 digits");
+        }
         ticketSale.setMethod(method);
-        ticketSale.setStatus( TicketSaleStatus.COMPLETED);
+        ticketSale.setStatus(TicketSaleStatus.COMPLETED);
         java.util.Map<String, Object> transactionDetails = ticketSale.getTransactionDetails();
 
         if (transactionDetails == null) {
@@ -200,8 +212,9 @@ public class TicketSaleService {
         if (cardLastFour != null) {
             transactionDetails.put("cardLastFour", cardLastFour);
         }
+        transactionDetails.put("method", method.name());
         ticketSale.setTransactionDetails(transactionDetails);
-        ticketSaleRepository.save(ticketSale);
+        return ticketSaleRepository.save(ticketSale);
     }
     public UserSaleSummaryDTO getUserSaleSummary(Long userId) {
        boolean userExists = ticketSaleRepository.userExists(userId);
