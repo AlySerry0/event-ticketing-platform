@@ -25,7 +25,7 @@ public interface PromotionRepository extends JpaRepository<Promotion, Long> {
     LEFT JOIN sale_promotions sp
         ON p.id = sp.promotion_id
     GROUP BY p.id, p.code, p.discount_type, p.discount_value, p.active, p.expiry_date
-    ORDER BY p.times_used DESC
+    ORDER BY times_used DESC 
     LIMIT :limit
     """, nativeQuery = true)
     List<Object[]> getTopUsedPromotions(@Param("limit") int limit);
