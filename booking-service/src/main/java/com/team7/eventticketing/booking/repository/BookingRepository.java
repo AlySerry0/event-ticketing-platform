@@ -42,6 +42,15 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 	@Query(value = "SELECT * FROM bookings WHERE metadata ->> :key = :value", nativeQuery = true)
 	List<Booking> findByMetadataKeyAndValue(@Param("key") String key, @Param("value") String value);
 
+    @Query(value = """
+    SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_name = 'tickets'
+    )
+    """, nativeQuery = true)
+    boolean ticketsTableExists();
+
 
     @Modifying
     @Transactional

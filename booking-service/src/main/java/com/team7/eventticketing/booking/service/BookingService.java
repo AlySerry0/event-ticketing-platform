@@ -285,10 +285,8 @@ public class BookingService {
 
         booking.setStatus(BookingStatus.CANCELLED);
 
-        try {
+        if (bookingRepository.ticketsTableExists()) {
             bookingRepository.cancelValidTicketsByBookingId(bookingId);
-        } catch (Exception e) {
-            // ignore if tickets table is not available
         }
 
         bookingRepository.save(booking);
