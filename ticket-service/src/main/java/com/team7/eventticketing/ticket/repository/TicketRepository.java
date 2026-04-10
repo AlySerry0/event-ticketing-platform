@@ -89,4 +89,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     List<Ticket> findByIssuedAtBetweenOrderByIssuedAtAsc(LocalDateTime start, LocalDateTime end);
     List<Ticket> findByStatusAndIssuedAtBetweenOrderByIssuedAtAsc(TicketStatus status, LocalDateTime start, LocalDateTime end);
+
+    boolean existsByTicketCode(String ticketCode);
 }
+

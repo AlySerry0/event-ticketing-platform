@@ -18,7 +18,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,6 +29,11 @@ public class TicketService {
 
 	
   public TicketDTO save(TicketDTO ticketDTO) {
+        if (ticketDTO.getId() == null && ticketDTO.getTicketCode() != null) {
+            if (ticketRepository.existsByTicketCode(ticketDTO.getTicketCode())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ticket code already exists");
+            }
+        }
 		Ticket ticket = convertToEntity(ticketDTO);
 		return convertToDTO(ticketRepository.save(ticket));
 	}
@@ -133,6 +137,10 @@ public class TicketService {
           throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
       }
 
+      if (ticketRepository.existsByTicketCode(request.getTicketCode())) {
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ticket code already exists");
+      }
+
       Ticket ticket = new Ticket();
       ticket.setBookingId(bookingId);
       ticket.setAttendeeName(request.getAttendeeName());
@@ -229,5 +237,41 @@ public class TicketService {
     return ticketRepository.findByIssuedAtBetweenOrderByIssuedAtAsc(startDateTime, endDateTime)
             .stream().map(this::convertToDTO).toList();
   }
+
+    @Transactional
+    public Optional<TicketDTO> updateTicket(Long id, TicketDTO ticketDetails) {
+        return ticketRepository.findById(id).map(ticket -> {
+            // Uniqueness check if ticket code is changing
+            if (ticketDetails.getTicketCode() != null && !ticketDetails.getTicketCode().equals(ticket.getTicketCode())) {
+                if (ticketRepository.existsByTicketCode(ticketDetails.getTicketCode())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ticket code already exists");
+                }
+                ticket.setTicketCode(ticketDetails.getTicketCode());
+            }
+
+            if (ticketDetails.getBookingId() != null)
+                ticket.setBookingId(ticketDetails.getBookingId());
+            if (ticketDetails.getAttendeeName() != null)
+                ticket.setAttendeeName(ticketDetails.getAttendeeName());
+            if (ticketDetails.getStatus() != null)
+                ticket.setStatus(ticketDetails.getStatus());
+
+            // Preservation: Only update issuedAt if explicitly provided and not null
+            if (ticketDetails.getIssuedAt() != null)
+                ticket.setIssuedAt(ticketDetails.getIssuedAt());
+
+            // Handle metadata merge
+            if (ticketDetails.getMetadata() != null) {
+                if (ticket.getMetadata() == null) {
+                    ticket.setMetadata(ticketDetails.getMetadata());
+                } else {
+                    ticket.getMetadata().putAll(ticketDetails.getMetadata());
+                }
+            }
+
+            return convertToDTO(ticketRepository.saveAndFlush(ticket));
+        });
+    }
 }
+
   
