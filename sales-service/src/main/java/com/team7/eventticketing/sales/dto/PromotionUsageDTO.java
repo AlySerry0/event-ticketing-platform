@@ -5,7 +5,12 @@ public class PromotionUsageDTO {
     private Long promotionId;
     private String code;
     private String discountType;
+    private Integer timesUsed;
     private Double discountValue;
+    private Double totalDiscountGiven;
+    private Boolean active;
+    private Boolean expired;
+    public PromotionUsageDTO(){};
 
     public Long getPromotionId() {
         return promotionId;
@@ -71,10 +76,7 @@ public class PromotionUsageDTO {
         this.expired = expired;
     }
 
-    private Integer timesUsed;
-    private Double totalDiscountGiven;
-    private Boolean active;
-    private Boolean expired;
+
 
     // constructor
     public PromotionUsageDTO(Long promotionId, String code, String discountType,

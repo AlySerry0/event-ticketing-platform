@@ -84,4 +84,7 @@ public interface TicketSaleRepository extends JpaRepository<TicketSale, Long> {
     """)
     List<Object[]> getUserSalesSummaryByMethod(@Param("userId") Long userId,
                                                @Param("status") TicketSaleStatus status);
+
+    boolean existsByBookingIdAndStatus(Long bookingId, TicketSaleStatus status);
+
 }
