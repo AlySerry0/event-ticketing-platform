@@ -225,6 +225,7 @@ public class BookingService {
         dto.setMetadata(booking.getMetadata());
         dto.setBookingDate(booking.getBookingDate());
         dto.setConfirmedAt(booking.getConfirmedAt());
+		dto.setCreatedAt(booking.getCreatedAt());
 
         if (booking.getBookingItems() != null) {
             dto.setBookingItems(
@@ -249,6 +250,7 @@ public class BookingService {
 		booking.setMetadata(dto.getMetadata());
 		booking.setBookingDate(dto.getBookingDate());
 		booking.setConfirmedAt(dto.getConfirmedAt());
+		booking.setCreatedAt(dto.getCreatedAt());
 		return booking;
 	}
 

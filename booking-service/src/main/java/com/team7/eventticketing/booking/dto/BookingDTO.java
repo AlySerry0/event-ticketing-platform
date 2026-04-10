@@ -16,7 +16,8 @@ public class BookingDTO {
 	private Map<String, Object> metadata;
 	private LocalDateTime bookingDate;
 	private LocalDateTime confirmedAt;
-    private List<BookingItemDTO> bookingItems;
+	private LocalDateTime createdAt;
+	private List<BookingItemDTO> bookingItems;
 
 	public Long getId() {
 		return id;
@@ -90,11 +91,19 @@ public class BookingDTO {
 		this.confirmedAt = confirmedAt;
 	}
 
-    public List<BookingItemDTO> getBookingItems() {
-        return bookingItems;
-    }
+	public LocalDateTime getCreatedAt() {
+		return createdAt;
+	}
 
-    public void setBookingItems(List<BookingItemDTO> bookingItems) {
-        this.bookingItems = bookingItems;
-    }
+	public void setCreatedAt(LocalDateTime createdAt) {
+		this.createdAt = createdAt;
+	}
+
+	public List<BookingItemDTO> getBookingItems() {
+		return bookingItems;
+	}
+
+	public void setBookingItems(List<BookingItemDTO> bookingItems) {
+		this.bookingItems = bookingItems;
+	}
 }
