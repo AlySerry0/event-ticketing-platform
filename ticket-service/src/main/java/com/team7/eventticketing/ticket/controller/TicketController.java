@@ -43,15 +43,9 @@ public class TicketController {
 
     @PutMapping("/{id}")
     public ResponseEntity<TicketDTO> update(@PathVariable Long id, @RequestBody TicketDTO ticketDetails) {
-        return ticketService.findById(id).map(ticket -> {
-            ticket.setBookingId(ticketDetails.getBookingId());
-            ticket.setAttendeeName(ticketDetails.getAttendeeName());
-            ticket.setTicketCode(ticketDetails.getTicketCode());
-            ticket.setStatus(ticketDetails.getStatus());
-            ticket.setIssuedAt(ticketDetails.getIssuedAt());
-            ticket.setMetadata(ticketDetails.getMetadata());
-            return ResponseEntity.ok(ticketService.save(ticket));
-        }).orElse(ResponseEntity.notFound().build());
+        return ticketService.updateTicket(id, ticketDetails)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
