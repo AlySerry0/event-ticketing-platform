@@ -45,6 +45,6 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     @Modifying
     @Transactional
-    @Query(value = "UPDATE booking_items SET status = 'REFUNDED' WHERE booking_id = :bookingId AND status IN ('RESERVED', 'CONFIRMED')", nativeQuery = true)
+    @Query(value = "UPDATE tickets SET status = 'CANCELLED' WHERE booking_id = :bookingId AND status = 'VALID'", nativeQuery = true)
     int cancelValidTicketsByBookingId(@Param("bookingId") Long bookingId);
 }
