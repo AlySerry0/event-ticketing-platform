@@ -44,10 +44,42 @@ public class Booking {
 	@Column(name = "confirmed_at")
 	private LocalDateTime confirmedAt;
 
+	@Column(name = "created_at", nullable = false)
+	private LocalDateTime createdAt;
+
 	@OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<BookingItem> bookingItems = new ArrayList<>();
 
 	public Booking() {
+	}
+
+	public Booking(Long userId, String contactEmail, BookingStatus status) {
+		this.userId = userId;
+		this.contactEmail = contactEmail;
+		this.status = status;
+		this.bookingDate = LocalDateTime.now();
+		this.createdAt = LocalDateTime.now();
+	}
+
+	@PrePersist
+	protected void onCreate() {
+		if (this.createdAt == null) {
+			this.createdAt = LocalDateTime.now();
+		}
+		if (this.bookingDate == null) {
+			this.bookingDate = LocalDateTime.now();
+		}
+		if (this.status == null) {
+			this.status = BookingStatus.PENDING;
+		}
+	}
+
+	public LocalDateTime getCreatedAt() {
+		return createdAt;
+	}
+
+	public void setCreatedAt(LocalDateTime createdAt) {
+		this.createdAt = createdAt;
 	}
 
 	public Long getId() {
