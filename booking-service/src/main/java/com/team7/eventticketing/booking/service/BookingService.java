@@ -386,7 +386,11 @@ public class BookingService {
         }
 
         booking.setStatus(BookingStatus.CANCELLED);
-        bookingRepository.cancelValidTicketsByBookingId(bookingId);
+
+        if (bookingRepository.ticketsTableExists()) {
+            bookingRepository.cancelValidTicketsByBookingId(bookingId);
+        }
+
         bookingRepository.save(booking);
     }
 }
