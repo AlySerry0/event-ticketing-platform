@@ -94,35 +94,19 @@ public class TicketSaleController {
     }
 
     @PostMapping("/booking/{bookingId}")
-    public ResponseEntity<Void> processTicketSale(
+    public ResponseEntity<TicketSaleDTO> processTicketSale(
             @PathVariable Long bookingId,
             @RequestBody ProcessTicketDTO request
     ) {
-        // 1. Check method exists
-        if (request.getMethod() == null || request.getMethod().isBlank()) {
-            return ResponseEntity.badRequest().build();
-        }
-        // 2. Convert to enum FIRST
-        PaymentMethod method;
-        try {
-            method = PaymentMethod.valueOf(request.getMethod().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        }
-        // 3. NOW you can use method safely
-        if (method == PaymentMethod.CREDIT_CARD &&
-                (request.getCardLastFour() == null || !request.getCardLastFour().matches("\\d{4}"))) {
-            return ResponseEntity.badRequest().build();
-        }
-        // 4. Call service
-        ticketSaleService.processTicketSale(
+
+        TicketSale updatedSale = ticketSaleService.processTicketSale(
                 bookingId,
-                method,
+                request.getMethod(),
                 request.getCardLastFour()
         );
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+        return ResponseEntity.status(HttpStatus.CREATED).body(ticketSaleService.convertToDTO(updatedSale));
     }
-
+    
     @GetMapping("/user/{userId}/summary")
     public ResponseEntity<UserSaleSummaryDTO> getUserSaleSummary(@PathVariable Long userId) {
         return ResponseEntity.ok(ticketSaleService.getUserSaleSummary(userId));
