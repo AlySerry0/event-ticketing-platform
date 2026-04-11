@@ -17,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -157,9 +158,17 @@ public class TicketService {
       return ticketRepository.findUnusedTicketsForUpcomingEvents();
   } 
 
-  public List<TicketDTO> getTicketsInDateRange(LocalDate startDate, LocalDate endDate, String ticketStatusInput) {
-    LocalDateTime startDateTime = startDate.atStartOfDay();
-    LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+  public List<TicketDTO> getTicketsInDateRange(String startDate, String endDate, String ticketStatusInput) {
+
+      LocalDateTime startDateTime = parseFlexibleDate(startDate, true);
+      LocalDateTime endDateTime = parseFlexibleDate(endDate, false);
+
+      if (startDateTime.isAfter(endDateTime)) {
+          throw new ResponseStatusException(
+                  HttpStatus.BAD_REQUEST,
+                  "startDate must be before or equal to endDate"
+          );
+      }
 
     if (ticketStatusInput != null && !ticketStatusInput.trim().isEmpty()) {
         TicketStatus ticketStatus;
@@ -175,4 +184,26 @@ public class TicketService {
     return ticketRepository.findByIssuedAtBetweenOrderByIssuedAtAsc(startDateTime, endDateTime)
             .stream().map(this::convertToDTO).toList();
   }
+
+    private LocalDateTime parseFlexibleDate(String input, boolean isStart) {
+        if (input == null || input.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Date parameter is required");
+        }
+
+        try {
+            return LocalDateTime.parse(input, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        } catch (Exception ignored) {
+        }
+
+        try {
+            LocalDate date = LocalDate.parse(input, DateTimeFormatter.ISO_LOCAL_DATE);
+            return isStart ? date.atStartOfDay() : date.atTime(23, 59, 59);
+        } catch (Exception ignored) {
+        }
+
+        throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Invalid date format. Use yyyy-MM-dd or yyyy-MM-dd'T'HH:mm:ss"
+        );
+    }
 }
