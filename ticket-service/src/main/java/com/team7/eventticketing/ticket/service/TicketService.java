@@ -28,16 +28,23 @@ public class TicketService {
 	@Autowired
 	private TicketRepository ticketRepository;
 
-	
-  public TicketDTO save(TicketDTO ticketDTO) {
+
+    public TicketDTO save(TicketDTO ticketDTO) {
+
+        if (!ticketRepository.existsBookingById(ticketDTO.getBookingId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
+        }
+
         if (ticketDTO.getId() == null && ticketDTO.getTicketCode() != null) {
             if (ticketRepository.existsByTicketCode(ticketDTO.getTicketCode())) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ticket code already exists");
             }
         }
-		Ticket ticket = convertToEntity(ticketDTO);
-		return convertToDTO(ticketRepository.save(ticket));
-	}
+        ticketDTO.setIssuedAt(LocalDateTime.now());
+        ticketDTO.setStatus(TicketStatus.VALID);
+        Ticket ticket = convertToEntity(ticketDTO);
+        return convertToDTO(ticketRepository.save(ticket));
+    }
 
 	public Optional<TicketDTO> findById(Long id) {
 		return ticketRepository.findById(id).map(this::convertToDTO);

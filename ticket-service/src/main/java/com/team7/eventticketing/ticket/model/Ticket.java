@@ -36,6 +36,16 @@ public class Ticket {
     @Column(columnDefinition = "jsonb")
     private Map<String, Object> metadata;
 
+    @PrePersist
+    protected void onCreate() {
+        if (issuedAt == null) {
+            issuedAt = LocalDateTime.now();
+        }
+        if (status == null) {
+            status = TicketStatus.VALID;
+        }
+    }
+
     public Ticket() {}
 
     public Long getId() { return id; }
