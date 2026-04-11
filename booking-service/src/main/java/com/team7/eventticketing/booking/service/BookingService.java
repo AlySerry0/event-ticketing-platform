@@ -31,15 +31,20 @@ public class BookingService {
 	@Autowired
 	private BookingRepository bookingRepository;
 
-    @Autowired
-    private BookingItemService bookingItemService;
+	@Autowired
+	private BookingItemService bookingItemService;
 
 	public BookingDTO save(BookingDTO bookingDTO) {
 		Booking booking = convertToEntity(bookingDTO);
-		booking.setBookingDate(LocalDateTime.now());
+
+		if (booking.getBookingDate() == null) {
+			booking.setBookingDate(LocalDateTime.now());
+		}
+
 		if (booking.getStatus() == null) {
 			booking.setStatus(BookingStatus.PENDING);
 		}
+
 		return convertToDTO(bookingRepository.save(booking));
 	}
 
@@ -164,7 +169,7 @@ public class BookingService {
 			}
 			booking.setTotalAmount(total);
 		}
-		Booking savedBooking = bookingRepository.save(booking);
+		Booking savedBooking = bookingRepository.saveAndFlush(booking);
 		bookingRepository.createPendingTicketSale(
 				savedBooking.getId(),
 				savedBooking.getUserId(),
@@ -220,6 +225,7 @@ public class BookingService {
         dto.setMetadata(booking.getMetadata());
         dto.setBookingDate(booking.getBookingDate());
         dto.setConfirmedAt(booking.getConfirmedAt());
+		dto.setCreatedAt(booking.getCreatedAt());
 
         if (booking.getBookingItems() != null) {
             dto.setBookingItems(
@@ -244,6 +250,7 @@ public class BookingService {
 		booking.setMetadata(dto.getMetadata());
 		booking.setBookingDate(dto.getBookingDate());
 		booking.setConfirmedAt(dto.getConfirmedAt());
+		booking.setCreatedAt(dto.getCreatedAt());
 		return booking;
 	}
 
@@ -329,8 +336,9 @@ public class BookingService {
                 .orElseThrow(() -> new NoSuchElementException("Booking not found"));
 
         if (booking.getStatus() != BookingStatus.PENDING &&
-                booking.getStatus() != BookingStatus.CONFIRMED) {
-            throw new IllegalArgumentException("Items can only be added to PENDING or CONFIRMED bookings");
+                booking.getStatus() != BookingStatus.CONFIRMED &&
+                booking.getStatus() != BookingStatus.CHECKED_IN) {
+            throw new IllegalArgumentException("Items can only be added to PENDING, CONFIRMED, or CHECKED_IN bookings");
         }
 
         if (itemDTOs == null || itemDTOs.isEmpty()) {
@@ -378,7 +386,11 @@ public class BookingService {
         }
 
         booking.setStatus(BookingStatus.CANCELLED);
-        bookingRepository.cancelValidTicketsByBookingId(bookingId);
+
+        if (bookingRepository.ticketsTableExists()) {
+            bookingRepository.cancelValidTicketsByBookingId(bookingId);
+        }
+
         bookingRepository.save(booking);
     }
 }

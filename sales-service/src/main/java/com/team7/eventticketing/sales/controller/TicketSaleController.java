@@ -1,12 +1,17 @@
 package com.team7.eventticketing.sales.controller;
 
 import com.team7.eventticketing.sales.dto.ProcessTicketDTO;
+import com.team7.eventticketing.sales.dto.RefundRequestDTO;
 import com.team7.eventticketing.sales.dto.RevenueReportDTO;
+import com.team7.eventticketing.sales.dto.SaleDetailsDTO;
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
 import com.team7.eventticketing.sales.model.PaymentMethod;
 import com.team7.eventticketing.sales.model.TicketSale;
+import com.team7.eventticketing.sales.model.TicketSaleStatus;
 import com.team7.eventticketing.sales.service.TicketSaleService;
+import com.team7.eventticketing.sales.dto.UserSaleSummaryDTO;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +32,10 @@ public class TicketSaleController {
     public TicketSaleDTO create(@RequestBody TicketSaleDTO ticketSaleDTO) {
         return ticketSaleService.save(ticketSaleDTO);
     }
+    @GetMapping("/{saleId}/details")
+    public ResponseEntity<SaleDetailsDTO> getSaleDetails(@PathVariable Long saleId) {
+        return ResponseEntity.ok(ticketSaleService.getSaleDetails(saleId));
+    }
 
     @GetMapping("/{id}")
     public ResponseEntity<TicketSaleDTO> getById(@PathVariable Long id) {
@@ -38,6 +47,19 @@ public class TicketSaleController {
     @GetMapping
     public List<TicketSaleDTO> getAll() {
         return ticketSaleService.findAll();
+    }
+
+    @GetMapping("/search")
+    public List<TicketSaleDTO> searchTicketSales(
+            @RequestParam(required = false) TicketSaleStatus status,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate startDate,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate endDate
+    ) {
+        return ticketSaleService.searchTicketSales(status, startDate, endDate);
     }
 
     @PutMapping("/{id}")
@@ -72,34 +94,33 @@ public class TicketSaleController {
     }
 
     @PostMapping("/booking/{bookingId}")
-    public ResponseEntity<Void> processTicketSale(
+    public ResponseEntity<TicketSaleDTO> processTicketSale(
             @PathVariable Long bookingId,
             @RequestBody ProcessTicketDTO request
     ) {
-        // 1. Check method exists
-        if (request.getMethod() == null || request.getMethod().isBlank()) {
-            return ResponseEntity.badRequest().build();
-        }
-        // 2. Convert to enum FIRST
-        PaymentMethod method;
-        try {
-            method = PaymentMethod.valueOf(request.getMethod().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        }
-        // 3. NOW you can use method safely
-        if (method == PaymentMethod.CREDIT_CARD &&
-                (request.getCardLastFour() == null || !request.getCardLastFour().matches("\\d{4}"))) {
-            return ResponseEntity.badRequest().build();
-        }
-        // 4. Call service
-        ticketSaleService.processTicketSale(
+
+        TicketSale updatedSale = ticketSaleService.processTicketSale(
                 bookingId,
-                method,
+                request.getMethod(),
                 request.getCardLastFour()
         );
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+        return ResponseEntity.status(HttpStatus.CREATED).body(ticketSaleService.convertToDTO(updatedSale));
     }
+    
+    @GetMapping("/user/{userId}/summary")
+    public ResponseEntity<UserSaleSummaryDTO> getUserSaleSummary(@PathVariable Long userId) {
+        return ResponseEntity.ok(ticketSaleService.getUserSaleSummary(userId));
+    }
+
+    @PutMapping("/{id}/refund")
+    public ResponseEntity<TicketSaleDTO> processRefund(
+            @PathVariable Long id,
+            @RequestBody RefundRequestDTO request
+    ) {
+        TicketSaleDTO refundedSale = ticketSaleService.processRefund(id, request.getReason());
+        return ResponseEntity.ok(refundedSale);
+    }
+
     @GetMapping("/reports/revenue")
     public RevenueReportDTO getRevenueReport(
             @RequestParam LocalDate startDate,
@@ -114,5 +135,12 @@ public class TicketSaleController {
         LocalDateTime end = endDate.atTime(23, 59, 59);
 
         return ticketSaleService.getRevenueReport(start, end);
+
+    }
+    @PutMapping("/{id}/retry")
+    public ResponseEntity<TicketSaleDTO> retryFailedSale(@PathVariable Long id) {
+        TicketSale updatedSale = ticketSaleService.retryFailedSale(id);
+        return ResponseEntity.ok(ticketSaleService.convertToDTO(updatedSale));
     }
 }
+

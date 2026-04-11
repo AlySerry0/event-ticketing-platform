@@ -1,4 +1,5 @@
 package com.team7.eventticketing.ticket.controller;
+import com.team7.eventticketing.ticket.dto.BatchTicketRequestDTO;
 
 import com.team7.eventticketing.ticket.dto.NearbyTicketDTO;
 import com.team7.eventticketing.ticket.dto.IssueTicketDTO;
@@ -15,8 +16,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-
-
 
 @RestController
 @RequestMapping("/api/tickets")
@@ -44,15 +43,9 @@ public class TicketController {
 
     @PutMapping("/{id}")
     public ResponseEntity<TicketDTO> update(@PathVariable Long id, @RequestBody TicketDTO ticketDetails) {
-        return ticketService.findById(id).map(ticket -> {
-            ticket.setBookingId(ticketDetails.getBookingId());
-            ticket.setAttendeeName(ticketDetails.getAttendeeName());
-            ticket.setTicketCode(ticketDetails.getTicketCode());
-            ticket.setStatus(ticketDetails.getStatus());
-            ticket.setIssuedAt(ticketDetails.getIssuedAt());
-            ticket.setMetadata(ticketDetails.getMetadata());
-            return ResponseEntity.ok(ticketService.save(ticket));
-        }).orElse(ResponseEntity.notFound().build());
+        return ticketService.updateTicket(id, ticketDetails)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
@@ -90,9 +83,9 @@ public class TicketController {
     }
   
     @DeleteMapping("/purge")
-    public ResponseEntity<Integer> purgeOldTickets(@RequestParam int olderThanDays) {
+    public ResponseEntity<Map<String, Integer>> purgeOldTickets(@RequestParam int olderThanDays) {
         int deletedCount = ticketService.purgeOldTickets(olderThanDays);
-        return ResponseEntity.ok(deletedCount);
+        return ResponseEntity.ok(Map.of("deletedCount", deletedCount));
     }
 
     @PostMapping("/booking/{bookingId}")
@@ -131,6 +124,32 @@ public class TicketController {
                     org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
         }
     }
+    
+    @GetMapping("/metadata/search")
+    public ResponseEntity<?> filterTicketsByMetadata(
+            @RequestParam String key,
+            @RequestParam String operator,
+            @RequestParam String value) {
+        try {
+            return ResponseEntity.ok(ticketService.filterTicketsByMetadata(key, operator, value));
+        } catch (ResponseStatusException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/batch")
+    public ResponseEntity<?> issueBatchTickets(@RequestBody BatchTicketRequestDTO batchRequest) {
+        try {
+            int count = ticketService.issueBatchTickets(batchRequest);
+            return ResponseEntity.status(201).body(Map.of("count", count));
+        } catch (ResponseStatusException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(e.getMessage());
+        }
+    }
 
     @GetMapping("/history")
     public ResponseEntity<List<TicketDTO>> getTicketsInDateRange(
@@ -140,3 +159,5 @@ public class TicketController {
         return ResponseEntity.ok(ticketService.getTicketsInDateRange(startDate, endDate, status));
     }
 }
+
+

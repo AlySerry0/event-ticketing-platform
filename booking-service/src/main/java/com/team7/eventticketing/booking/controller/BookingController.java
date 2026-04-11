@@ -4,7 +4,7 @@ import com.team7.eventticketing.booking.dto.BookingAnalyticsDTO;
 import com.team7.eventticketing.booking.dto.BookingCostEstimateDTO;
 import com.team7.eventticketing.booking.dto.BookingDTO;
 import com.team7.eventticketing.booking.dto.BookingEstimateRequestDTO;
-import com.team7.eventticketing.booking.model.Booking;
+
 import com.team7.eventticketing.booking.service.BookingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -133,7 +133,13 @@ public class BookingController {
 			@RequestParam String value) {
 		return ResponseEntity.ok(bookingService.filterBookingsByMetadata(key, value));
 	}
-
+	@GetMapping("/{id}/items")
+	public ResponseEntity<List<BookingItemDTO>> getBookingItems(@PathVariable Long id) {
+		return bookingService.findById(id)
+				.map(BookingDTO::getBookingItems)
+				.map(ResponseEntity::ok)
+				.orElse(ResponseEntity.notFound().build());
+	}
     @PostMapping("/{bookingId}/items")
     public ResponseEntity<BookingDTO> addItemsToBooking(
             @PathVariable Long bookingId,

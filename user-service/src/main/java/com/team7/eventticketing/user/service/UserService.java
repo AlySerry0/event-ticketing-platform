@@ -8,11 +8,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.team7.eventticketing.user.dto.TopAttendeeDTO;
+
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.team7.eventticketing.user.model.UserRole;
 import com.team7.eventticketing.user.model.User;
 
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -313,23 +316,27 @@ public class UserService {
      * [S1-F6] Top Attendees by Spending (Report DTO)
      */
     public List<TopAttendeeDTO> getTopAttendeesBySpending(
-                LocalDateTime startDate, LocalDateTime endDate,int limit){
+            LocalDate startDate, LocalDate endDate, int limit) {
 
-            if (startDate.isAfter(endDate)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Start date must not be after end date");
-            }
-
-            List<Object[]> results = userRepository
-                    .findTopAttendeesBySpending(startDate, endDate, limit);
-
-            return results.stream().map(row -> new TopAttendeeDTO(
-                    ((Number) row[0]).longValue(),
-                    (String) row[1],
-                    ((Number) row[2]).doubleValue(),
-                    ((Number) row[3]).longValue()
-            )).collect(Collectors.toList());
+        if (startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Start date must not be after end date");
         }
+
+        // Convert to LocalDateTime to cover the entire start and end days in the DB query
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+
+        List<Object[]> results = userRepository
+                .findTopAttendeesBySpending(startDateTime, endDateTime, limit);
+
+        return results.stream().map(row -> new TopAttendeeDTO(
+                ((Number) row[0]).longValue(),
+                (String) row[1],
+                ((Number) row[2]).doubleValue(),
+                ((Number) row[3]).longValue()
+        )).collect(Collectors.toList());
+    }
 
         /**
          * [S1-F8] Get User Profile with Favorite Venues

@@ -76,7 +76,20 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
         """, nativeQuery = true)
     List<Object[]> findNearbyTicketsNative(@Param("lat") double lat, @Param("lon") double lon, @Param("radiusKm") double radiusKm);
     
-    List<Ticket> findByIssuedAtBetweenOrderByIssuedAtAsc(LocalDateTime start, LocalDateTime end);
+    @Query(value = "SELECT * FROM tickets WHERE metadata ->> :key = :value", nativeQuery = true)
+    List<Ticket> findByMetadataEquals(@Param("key") String key, @Param("value") String value);
 
+    @Query(value = "SELECT * FROM tickets WHERE CAST(metadata ->> :key AS NUMERIC) > CAST(:value AS NUMERIC)", nativeQuery = true)
+    List<Ticket> findByMetadataGreaterThan(@Param("key") String key, @Param("value") String value);
+
+    @Query(value = "SELECT * FROM tickets WHERE CAST(metadata ->> :key AS NUMERIC) < CAST(:value AS NUMERIC)", nativeQuery = true)
+    List<Ticket> findByMetadataLessThan(@Param("key") String key, @Param("value") String value);
+
+    List<Ticket> findByTicketCodeIn(List<String> ticketCodes);
+
+    List<Ticket> findByIssuedAtBetweenOrderByIssuedAtAsc(LocalDateTime start, LocalDateTime end);
     List<Ticket> findByStatusAndIssuedAtBetweenOrderByIssuedAtAsc(TicketStatus status, LocalDateTime start, LocalDateTime end);
+
+    boolean existsByTicketCode(String ticketCode);
 }
+

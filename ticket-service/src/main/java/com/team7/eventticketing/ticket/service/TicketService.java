@@ -1,4 +1,5 @@
 package com.team7.eventticketing.ticket.service;
+import com.team7.eventticketing.ticket.dto.BatchTicketRequestDTO;
 
 import com.team7.eventticketing.ticket.dto.NearbyTicketDTO;
 import com.team7.eventticketing.ticket.dto.IssueTicketDTO;
@@ -18,7 +19,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,6 +30,11 @@ public class TicketService {
 
 	
   public TicketDTO save(TicketDTO ticketDTO) {
+        if (ticketDTO.getId() == null && ticketDTO.getTicketCode() != null) {
+            if (ticketRepository.existsByTicketCode(ticketDTO.getTicketCode())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ticket code already exists");
+            }
+        }
 		Ticket ticket = convertToEntity(ticketDTO);
 		return convertToDTO(ticketRepository.save(ticket));
 	}
@@ -133,6 +138,10 @@ public class TicketService {
           throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
       }
 
+      if (ticketRepository.existsByTicketCode(request.getTicketCode())) {
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ticket code already exists");
+      }
+
       Ticket ticket = new Ticket();
       ticket.setBookingId(bookingId);
       ticket.setAttendeeName(request.getAttendeeName());
@@ -157,6 +166,59 @@ public class TicketService {
   public List<UnusedTicketDTO> getUnusedTicketsForUpcomingEvents() {
       return ticketRepository.findUnusedTicketsForUpcomingEvents();
   } 
+
+  public List<TicketDTO> filterTicketsByMetadata(String key, String operator, String value) {
+    List<String> validOperators = List.of("eq", "gt", "lt");
+    if (!validOperators.contains(operator)) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid operator. Must be eq, gt, or lt");
+    }
+
+    List<Ticket> matchingTickets = switch (operator) {
+        case "eq" -> ticketRepository.findByMetadataEquals(key, value);
+        case "gt" -> ticketRepository.findByMetadataGreaterThan(key, value);
+        case "lt" -> ticketRepository.findByMetadataLessThan(key, value);
+        default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid operator");
+    };
+
+    return matchingTickets.stream().map(this::convertToDTO).toList();
+  }
+
+  @Transactional
+        public int issueBatchTickets(BatchTicketRequestDTO batchRequest) {
+                if (!ticketRepository.existsBookingById(batchRequest.getBookingId())) {
+                        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
+                }
+
+                List<IssueTicketDTO> ticketRequests = batchRequest.getTickets();
+
+                List<String> incomingTicketCodes = ticketRequests.stream()
+                                .map(IssueTicketDTO::getTicketCode)
+                                .toList();
+
+                long uniqueCount = incomingTicketCodes.stream().distinct().count();
+                if (uniqueCount < incomingTicketCodes.size()) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicate ticket codes found in batch");
+                }
+
+                List<Ticket> existingTickets = ticketRepository.findByTicketCodeIn(incomingTicketCodes);
+                if (!existingTickets.isEmpty()) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicate ticket codes found in database");
+                }
+
+                List<Ticket> ticketsToSave = ticketRequests.stream().map(ticketRequest -> {
+                        Ticket newTicket = new Ticket();
+                        newTicket.setBookingId(batchRequest.getBookingId());
+                        newTicket.setAttendeeName(ticketRequest.getAttendeeName());
+                        newTicket.setTicketCode(ticketRequest.getTicketCode());
+                        newTicket.setMetadata(ticketRequest.getMetadata());
+                        newTicket.setStatus(TicketStatus.VALID);
+                        newTicket.setIssuedAt(LocalDateTime.now());
+                        return newTicket;
+                }).toList();
+
+                ticketRepository.saveAll(ticketsToSave);
+                return ticketsToSave.size();
+        }
 
   public List<TicketDTO> getTicketsInDateRange(String startDate, String endDate, String ticketStatusInput) {
 
@@ -206,4 +268,41 @@ public class TicketService {
                 "Invalid date format. Use yyyy-MM-dd or yyyy-MM-dd'T'HH:mm:ss"
         );
     }
+
+    @Transactional
+    public Optional<TicketDTO> updateTicket(Long id, TicketDTO ticketDetails) {
+        return ticketRepository.findById(id).map(ticket -> {
+            // Uniqueness check if ticket code is changing
+            if (ticketDetails.getTicketCode() != null && !ticketDetails.getTicketCode().equals(ticket.getTicketCode())) {
+                if (ticketRepository.existsByTicketCode(ticketDetails.getTicketCode())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ticket code already exists");
+                }
+                ticket.setTicketCode(ticketDetails.getTicketCode());
+            }
+
+            if (ticketDetails.getBookingId() != null)
+                ticket.setBookingId(ticketDetails.getBookingId());
+            if (ticketDetails.getAttendeeName() != null)
+                ticket.setAttendeeName(ticketDetails.getAttendeeName());
+            if (ticketDetails.getStatus() != null)
+                ticket.setStatus(ticketDetails.getStatus());
+
+            // Preservation: Only update issuedAt if explicitly provided and not null
+            if (ticketDetails.getIssuedAt() != null)
+                ticket.setIssuedAt(ticketDetails.getIssuedAt());
+
+            // Handle metadata merge
+            if (ticketDetails.getMetadata() != null) {
+                if (ticket.getMetadata() == null) {
+                    ticket.setMetadata(ticketDetails.getMetadata());
+                } else {
+                    ticket.getMetadata().putAll(ticketDetails.getMetadata());
+                }
+            }
+
+            return convertToDTO(ticketRepository.saveAndFlush(ticket));
+        });
+    }
 }
+
+  
