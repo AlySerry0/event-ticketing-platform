@@ -18,14 +18,14 @@ public interface PromotionRepository extends JpaRepository<Promotion, Long> {
         p.discount_type,
         p.discount_value,
         COUNT(sp.id) AS times_used,
-        COALESCE(SUM(sp.discount_applied), 0),
+        COALESCE(SUM(sp.discount_applied), 0) AS total_discount_given,
         p.active,
         p.expiry_date
     FROM promotions p
     LEFT JOIN sale_promotions sp
         ON p.id = sp.promotion_id
     GROUP BY p.id, p.code, p.discount_type, p.discount_value, p.active, p.expiry_date
-    ORDER BY times_used DESC 
+    ORDER BY times_used DESC, p.id DESC
     LIMIT :limit
     """, nativeQuery = true)
     List<Object[]> getTopUsedPromotions(@Param("limit") int limit);
