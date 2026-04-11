@@ -153,8 +153,8 @@ public class TicketController {
 
     @GetMapping("/history")
     public ResponseEntity<List<TicketDTO>> getTicketsInDateRange(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam String startDate,
+            @RequestParam String endDate,
             @RequestParam(required = false) String status) {
         return ResponseEntity.ok(ticketService.getTicketsInDateRange(startDate, endDate, status));
     }
