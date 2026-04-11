@@ -128,50 +128,65 @@ public class TicketSaleService {
     @Transactional
     public TicketSale applyPromotionToSale(Long saleId, Long promotionId) {
         TicketSale sale = ticketSaleRepository.findById(saleId)
-                .orElseThrow(() ->
-                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket sale not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket sale not found"));
+
         if (sale.getStatus() != TicketSaleStatus.PENDING) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "cannot apply promotion to a completed/cancelled sale"
-            );
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion can only be applied to PENDING sales");
         }
+
         Promotion promo = promotionRepository.findById(promotionId)
-                .orElseThrow(() ->
-                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Promotion not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Promotion not found"));
+
         if (!Boolean.TRUE.equals(promo.getActive())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion is inactive");
         }
-        if (promo.getExpiryDate()==null||!promo.getExpiryDate().isAfter(LocalDateTime.now())) {
+
+        if (promo.getExpiryDate() == null || !promo.getExpiryDate().isAfter(LocalDateTime.now())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion is expired");
         }
-        int currentUses=promo.getCurrentUses() == null? 0 : promo.getCurrentUses();
+
+        int currentUses = (promo.getCurrentUses() != null) ? promo.getCurrentUses() : 0;
         if (currentUses >= promo.getMaxUses()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion usage limit reached");
         }
+
         if (salePromotionRepository.existsByTicketSaleIdAndPromotionId(saleId, promotionId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "promotion already applied");
         }
+
         double discount;
         if (promo.getDiscountType() == DiscountType.PERCENTAGE) {
-            discount= sale.getAmount() * promo.getDiscountValue() / 100;
+            discount = sale.getAmount() * (promo.getDiscountValue() / 100.0);
+        } else {
+            discount = promo.getDiscountValue();
+        }
 
+        double alreadyAppliedDiscount = 0.0;
+        if (sale.getSalePromotions() != null) {
+            alreadyAppliedDiscount = sale.getSalePromotions().stream()
+                    .mapToDouble(SalePromotion::getDiscountApplied)
+                    .sum();
         }
-        else {
-            discount= promo.getDiscountValue();
+        
+        double maxAvailableDiscount = Math.max(0.0, sale.getAmount() - alreadyAppliedDiscount);
+        if (discount > maxAvailableDiscount) {
+            discount = maxAvailableDiscount;
         }
-        if (discount>sale.getAmount() ){
-            discount=sale.getAmount();
-        }
-        promo.setCurrentUses(currentUses+1);
-        promotionRepository.save(promo);
+
+        discount = Math.round(discount * 100.0) / 100.0;
+
         SalePromotion salePromo = new SalePromotion();
         salePromo.setPromotion(promo);
-        salePromo.setAppliedAt(LocalDateTime.now());
         salePromo.setDiscountApplied(discount);
+        salePromo.setAppliedAt(LocalDateTime.now());
+        
         sale.addSalePromotion(salePromo);
-        return ticketSaleRepository.save(sale);
+        
+        promo.setCurrentUses(currentUses + 1);
+        promotionRepository.saveAndFlush(promo);
+        return ticketSaleRepository.saveAndFlush(sale);
     }
+
     @Transactional
     public TicketSale processTicketSale(Long bookingId, String methodStr, String cardLastFour){
         boolean doesExist = ticketSaleRepository.bookingExists(bookingId);

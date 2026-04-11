@@ -58,9 +58,9 @@ public class PromotionService {
         promotion.setDiscountType(dto.getDiscountType());
         promotion.setDiscountValue(dto.getDiscountValue());
         promotion.setMaxUses(dto.getMaxUses());
-        promotion.setCurrentUses(dto.getCurrentUses());
+        if (dto.getCurrentUses() != null) promotion.setCurrentUses(dto.getCurrentUses());
         promotion.setExpiryDate(dto.getExpiryDate());
-        promotion.setActive(dto.getActive());
+        if (dto.getActive() != null) promotion.setActive(dto.getActive());
         promotion.setMetadata(dto.getMetadata());
         return promotion;
     }
@@ -73,12 +73,13 @@ public class PromotionService {
         for (Object[] row : results) {
 
             Long id = ((Number) row[0]).longValue();
-            String code = row[1]!= null ? row[1].toString() : null;
-            String discountType = row[2]!= null ? row[2].toString() : null;
+            String code = row[1] != null ? row[1].toString() : null;
+            String discountType = row[2] != null ? row[2].toString() : null;
             Double discountValue = ((Number) row[3]).doubleValue();
             Integer timesUsed = ((Number) row[4]).intValue();
             Double totalDiscountGiven = ((Number) row[5]).doubleValue();
             Boolean active = (Boolean) row[6];
+
             LocalDateTime expiryDate = null;
             if (row[7] != null) {
                 if (row[7] instanceof java.sql.Timestamp ts) {
