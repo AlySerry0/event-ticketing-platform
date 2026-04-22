@@ -166,4 +166,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
        WHERE s.verified = false
        """)
     List<Event> findEventsWithUnverifiedSessions();
+
+    @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE email = :email", nativeQuery = true)
+    boolean userExistsByEmail(String email);
 }

@@ -87,4 +87,7 @@ public interface TicketSaleRepository extends JpaRepository<TicketSale, Long> {
 
     boolean existsByBookingIdAndStatus(Long bookingId, TicketSaleStatus status);
 
+    @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE email = :email", nativeQuery = true)
+    boolean userExistsByEmail(String email);
+
 }

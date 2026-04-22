@@ -56,4 +56,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Transactional
     @Query(value = "UPDATE tickets SET status = 'CANCELLED' WHERE booking_id = :bookingId AND status = 'VALID'", nativeQuery = true)
     int cancelValidTicketsByBookingId(@Param("bookingId") Long bookingId);
+
+    @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE email = :email", nativeQuery = true)
+    boolean userExistsByEmail(String email);
 }
