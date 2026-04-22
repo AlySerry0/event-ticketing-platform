@@ -32,7 +32,7 @@ public class SecurityConfig {
                         // Public endpoints — user-service only has these two + health
                         .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
                         // Health checks are public in every service
-                        .requestMatchers("/api/users/health").permitAll()
+                        .requestMatchers("/api/users/health", "/api/seed").permitAll()
                         // Everything else requires authentication
                         .anyRequest().authenticated()
                 )
