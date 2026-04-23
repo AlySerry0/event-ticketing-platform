@@ -22,6 +22,6 @@ public class SeedController {
         boolean userSeeded = dataSeeder.seedUserAccount();
         return ResponseEntity.ok(Map.of(
                 "admin", adminSeeded ? "SEEDED" : "SKIPPED, IT IS ALREADY SEEDED",
-                "products", userSeeded ? "SEEDED" : "SKIPPED, IT IS ALREADY SEEDED"));
+                "user", userSeeded ? "SEEDED" : "SKIPPED, IT IS ALREADY SEEDED"));
     }
 }

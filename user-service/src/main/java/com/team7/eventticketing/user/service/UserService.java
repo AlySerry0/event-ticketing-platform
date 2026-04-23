@@ -378,6 +378,28 @@ public class UserService {
                     .collect(Collectors.toList());
         }
 
+        @Transactional
+        public UserDTO changeRole(Long id, String roleStr) {
+            User user = userRepository.findById(id)
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND, "User not found"));
+            UserRole newRole;
+            try {
+                newRole = UserRole.valueOf(roleStr);
+            } catch (IllegalArgumentException e) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Invalid role: " + roleStr);
+            }
+            String oldRole = user.getRole().name();
+            user.setRole(newRole);
+            user = userRepository.save(user);
+
+            // TODO: fire Observer → MongoDB ROLE_CHANGED event (details: oldRole, newRole)
+            // TODO: invalidate Redis caches for this user
+
+            return convertToDTO(user);
+        }
+
         /**
          * Convert User entity to UserDTO
          */
