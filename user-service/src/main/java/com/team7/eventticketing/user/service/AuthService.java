@@ -82,6 +82,12 @@ public class AuthService {
                     "Invalid credentials");
         }
 
+        // Block deactivated accounts
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Account is deactivated");
+        }
+
         // TODO: fire Observer → MongoDB LOGGED_IN event here (M2 Observer pattern)
 
         String token = jwtService.generateToken(
