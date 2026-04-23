@@ -127,10 +127,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      mongo:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
     restart: on-failure
 
   event-service:
@@ -150,12 +146,6 @@ services:
       JWT_EXPIRATION_MS: "86400000"
     depends_on:
       postgres:
-        condition: service_healthy
-      mongo:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      elasticsearch:
         condition: service_healthy
     restart: on-failure
 
@@ -178,12 +168,6 @@ services:
       JWT_EXPIRATION_MS: "86400000"
     depends_on:
       postgres:
-        condition: service_healthy
-      mongo:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      neo4j:
         condition: service_healthy
     restart: on-failure
 
@@ -208,12 +192,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      mongo:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      cassandra:
-        condition: service_healthy
     restart: on-failure
 
   sales-service:
@@ -230,10 +208,6 @@ services:
       JWT_EXPIRATION_MS: "86400000"
     depends_on:
       postgres:
-        condition: service_healthy
-      mongo:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     restart: on-failure
 
