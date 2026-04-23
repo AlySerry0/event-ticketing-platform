@@ -1,6 +1,7 @@
 package com.team7.eventticketing.user.controller;
 
 import com.team7.eventticketing.user.dto.AuthResponseDTO;
+import com.team7.eventticketing.user.dto.LoginRequestDTO;
 import com.team7.eventticketing.user.dto.RegisterRequestDTO;
 import com.team7.eventticketing.user.service.AuthService;
 import org.springframework.http.HttpStatus;
@@ -22,5 +23,11 @@ public class AuthController {
             @RequestBody RegisterRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(authService.register(request));
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponseDTO> login(
+            @RequestBody LoginRequestDTO request) {
+        return ResponseEntity.ok(authService.login(request));
     }
 }

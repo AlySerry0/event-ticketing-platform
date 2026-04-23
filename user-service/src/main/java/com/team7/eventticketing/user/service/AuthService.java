@@ -64,6 +64,32 @@ public class AuthService {
         return new AuthResponseDTO(token, jwtService.getExpirationMs());
     }
 
+    public AuthResponseDTO login(LoginRequestDTO req) {
+        // Validate required fields
+        if (isBlank(req.email()) || isBlank(req.password())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Email and password are required");
+        }
+
+        // Find user by email
+        User user = userRepository.findByEmail(req.email())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Invalid credentials"));
+
+        // Verify password against BCrypt hash
+        if (!passwordEncoder.matches(req.password(), user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "Invalid credentials");
+        }
+
+        // TODO: fire Observer → MongoDB LOGGED_IN event here (M2 Observer pattern)
+
+        String token = jwtService.generateToken(
+                user.getEmail(), user.getId(), user.getRole().name());
+
+        return new AuthResponseDTO(token, jwtService.getExpirationMs());
+    }
+
 
     private boolean isBlank(String s) {
         return s == null || s.isBlank();
