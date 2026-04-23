@@ -91,5 +91,8 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     List<Ticket> findByStatusAndIssuedAtBetweenOrderByIssuedAtAsc(TicketStatus status, LocalDateTime start, LocalDateTime end);
 
     boolean existsByTicketCode(String ticketCode);
+
+    @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE email = :email", nativeQuery = true)
+    boolean userExistsByEmail(String email);
 }
 
