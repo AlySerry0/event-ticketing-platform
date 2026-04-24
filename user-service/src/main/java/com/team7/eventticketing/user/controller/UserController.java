@@ -8,6 +8,7 @@ import com.team7.eventticketing.user.dto.UserProfileDTO;
 import com.team7.eventticketing.user.service.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import com.team7.eventticketing.user.dto.TopAttendeeDTO;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -203,5 +204,12 @@ public class UserController {
             @RequestParam(defaultValue = "0") Integer minBookings) {
         List<UserDTO> users = userService.findUsersByFavoriteCategoryWithMinBookings(category, minBookings);
         return ResponseEntity.ok(users);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/{id}/role")
+    public ResponseEntity<UserDTO> changeRole(@PathVariable Long id,
+                                           @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(userService.changeRole(id, body.get("role")));
     }
 }
