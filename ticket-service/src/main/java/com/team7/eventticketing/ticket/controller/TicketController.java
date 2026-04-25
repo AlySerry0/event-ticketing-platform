@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -88,6 +89,7 @@ public class TicketController {
         return ResponseEntity.ok(Map.of("deletedCount", deletedCount));
     }
 
+    @PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
     @PostMapping("/booking/{bookingId}")
     public ResponseEntity<?> issueTicket(@PathVariable Long bookingId, @RequestBody IssueTicketDTO request) {
         try {
@@ -99,6 +101,7 @@ public class TicketController {
         }
     }
 
+    @PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
     @GetMapping("/booking/{bookingId}/latest")
     public ResponseEntity<?> getLatestTicket(@PathVariable Long bookingId) {
         try {
@@ -110,6 +113,7 @@ public class TicketController {
         }
     }
 
+    @PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
     @GetMapping("/nearby")
     public ResponseEntity<List<NearbyTicketDTO>> getNearbyTickets(@RequestParam double lat, @RequestParam double lon,
             @RequestParam double radiusKm) {
