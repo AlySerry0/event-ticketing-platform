@@ -120,6 +120,7 @@ public class BookingController {
 		}
 	}
 
+	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
 	@GetMapping("/analytics")
 	public ResponseEntity<BookingAnalyticsDTO> getAnalytics(
 			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
