@@ -2,6 +2,9 @@ package com.team7.eventticketing.user.security;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import java.util.Collections;
+import java.util.Set;
+
 public class AuthContext {
 
     private final HttpServletRequest request;
@@ -9,13 +12,11 @@ public class AuthContext {
     private String authenticatedEmail;
     private Long authenticatedUserId;
     private String authenticatedRole;
-    private String requiredRole; // null means any authenticated user is OK
+    private Set<String> allowedRoles = Collections.emptySet();
 
     public AuthContext(HttpServletRequest request) {
         this.request = request;
     }
-
-    // --- getters and setters ---
 
     public HttpServletRequest getRequest()           { return request; }
     public String getToken()                         { return token; }
@@ -26,6 +27,6 @@ public class AuthContext {
     public void setAuthenticatedUserId(Long id)      { this.authenticatedUserId = id; }
     public String getAuthenticatedRole()             { return authenticatedRole; }
     public void setAuthenticatedRole(String role)    { this.authenticatedRole = role; }
-    public String getRequiredRole()                  { return requiredRole; }
-    public void setRequiredRole(String role)         { this.requiredRole = role; }
+    public Set<String> getAllowedRoles()             { return allowedRoles; }
+    public void setAllowedRoles(Set<String> roles)   { this.allowedRoles = roles; }
 }
