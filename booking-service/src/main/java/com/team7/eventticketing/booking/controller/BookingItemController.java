@@ -16,13 +16,13 @@ public class BookingItemController {
 	@Autowired
 	private BookingItemService bookingItemService;
 
-	@PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
 	@PostMapping
 	public BookingItemDTO create(@RequestBody BookingItemDTO bookingItemDTO) {
 		return bookingItemService.save(bookingItemDTO);
 	}
 
-	@PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
 	@GetMapping("/{id}")
 	public ResponseEntity<BookingItemDTO> getById(@PathVariable Long id) {
 		return bookingItemService.findById(id)
@@ -30,13 +30,13 @@ public class BookingItemController {
 				.orElse(ResponseEntity.notFound().build());
 	}
 
-	@PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
 	@GetMapping
 	public List<BookingItemDTO> getAll() {
 		return bookingItemService.findAll();
 	}
 
-	@PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
 	@PutMapping("/{id}")
 	public ResponseEntity<BookingItemDTO> update(@PathVariable Long id, @RequestBody BookingItemDTO itemDetails) {
 		return bookingItemService.updateBookingItem(id, itemDetails)
@@ -44,7 +44,7 @@ public class BookingItemController {
 				.orElse(ResponseEntity.notFound().build());
 	}
 
-	@PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> delete(@PathVariable Long id) {
 		if (bookingItemService.findById(id).isPresent()) {
