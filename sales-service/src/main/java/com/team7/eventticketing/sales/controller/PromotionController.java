@@ -6,6 +6,7 @@ import com.team7.eventticketing.sales.service.PromotionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -16,11 +17,13 @@ public class PromotionController {
     @Autowired
     private PromotionService promotionService;
 
+    @PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
     @PostMapping
     public PromotionDTO create(@RequestBody PromotionDTO promotionDTO) {
         return promotionService.save(promotionDTO);
     }
 
+    @PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
     @GetMapping("/{id:\\d+}")
     public ResponseEntity<PromotionDTO> getById(@PathVariable Long id) {
         return promotionService.findById(id)
@@ -28,11 +31,13 @@ public class PromotionController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
     @GetMapping
     public List<PromotionDTO> getAll() {
         return promotionService.findAll();
     }
 
+    @PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<PromotionDTO> update(@PathVariable Long id, @RequestBody PromotionDTO promotionDetails) {
         return promotionService.findById(id).map(promotion -> {
@@ -48,6 +53,7 @@ public class PromotionController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         if (promotionService.findById(id).isPresent()) {
