@@ -27,13 +27,13 @@ public class BookingController {
 	@Autowired
 	private BookingService bookingService;
 
-	@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PostMapping
 	public BookingDTO create(@RequestBody BookingDTO bookingDTO) {
 		return bookingService.save(bookingDTO);
 	}
 
-	@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/{id}")
 	public ResponseEntity<BookingDTO> getById(@PathVariable Long id) {
 		return bookingService.findById(id)
@@ -41,7 +41,7 @@ public class BookingController {
 				.orElse(ResponseEntity.notFound().build());
 	}
 
-	@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping
 	public List<BookingDTO> getAll() {
 		return bookingService.findAll();
@@ -96,7 +96,7 @@ public class BookingController {
 		return ResponseEntity.ok(bookingService.completeBooking(id));
 	}
 
-	@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PutMapping("/{id}")
 	public ResponseEntity<BookingDTO> update(@PathVariable Long id, @RequestBody BookingDTO bookingDetails) {
 		return bookingService.updateBooking(id, bookingDetails)
@@ -104,7 +104,7 @@ public class BookingController {
 				.orElse(ResponseEntity.notFound().build());
 	}
 
-	@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> delete(@PathVariable Long id) {
 		if (bookingService.findById(id).isPresent()) {
