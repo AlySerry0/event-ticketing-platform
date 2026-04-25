@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -24,11 +25,13 @@ public class TicketController {
     @Autowired
     private TicketService ticketService;
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PostMapping
     public TicketDTO create(@RequestBody TicketDTO ticketDTO) {
         return ticketService.save(ticketDTO);
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/{id}")
     public ResponseEntity<TicketDTO> getById(@PathVariable Long id) {
         return ticketService.findById(id)
@@ -36,11 +39,13 @@ public class TicketController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping
     public List<TicketDTO> getAll() {
         return ticketService.findAll();
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<TicketDTO> update(@PathVariable Long id, @RequestBody TicketDTO ticketDetails) {
         return ticketService.updateTicket(id, ticketDetails)
@@ -48,6 +53,7 @@ public class TicketController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         if (ticketService.findById(id).isPresent()) {
