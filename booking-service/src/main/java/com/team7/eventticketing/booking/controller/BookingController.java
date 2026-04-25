@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
 import com.team7.eventticketing.booking.dto.BookingItemDTO;
 
@@ -47,6 +48,7 @@ public class BookingController {
 	 * [S3-F1] Get Bookings by Status and Date Range
 	 * GET /api/bookings/search?status={s}&startDate={d}&endDate={d}
 	 */
+	@PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
 	@GetMapping("/search")
 	public ResponseEntity<List<BookingDTO>> searchBookings(
 			@RequestParam(required = false) String status,
@@ -61,6 +63,7 @@ public class BookingController {
 		}
 	}
 
+	@PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
 	@PutMapping("/{id}/confirm")
 	public ResponseEntity<BookingDTO> confirmBooking(@PathVariable Long id, @RequestParam Long eventId) {
 		try {
@@ -108,6 +111,7 @@ public class BookingController {
 		return ResponseEntity.notFound().build();
 	}
 
+	@PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
 	@PostMapping("/estimate")
 	public ResponseEntity<?> estimateCost(@RequestBody BookingEstimateRequestDTO request) {
 		try {
