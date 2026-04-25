@@ -5,6 +5,7 @@ import com.team7.eventticketing.booking.service.BookingItemService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -15,11 +16,13 @@ public class BookingItemController {
 	@Autowired
 	private BookingItemService bookingItemService;
 
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PostMapping
 	public BookingItemDTO create(@RequestBody BookingItemDTO bookingItemDTO) {
 		return bookingItemService.save(bookingItemDTO);
 	}
 
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/{id}")
 	public ResponseEntity<BookingItemDTO> getById(@PathVariable Long id) {
 		return bookingItemService.findById(id)
@@ -27,11 +30,13 @@ public class BookingItemController {
 				.orElse(ResponseEntity.notFound().build());
 	}
 
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping
 	public List<BookingItemDTO> getAll() {
 		return bookingItemService.findAll();
 	}
 
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PutMapping("/{id}")
 	public ResponseEntity<BookingItemDTO> update(@PathVariable Long id, @RequestBody BookingItemDTO itemDetails) {
 		return bookingItemService.updateBookingItem(id, itemDetails)
@@ -39,6 +44,7 @@ public class BookingItemController {
 				.orElse(ResponseEntity.notFound().build());
 	}
 
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> delete(@PathVariable Long id) {
 		if (bookingItemService.findById(id).isPresent()) {
