@@ -16,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -28,6 +29,7 @@ public class TicketSaleController {
     @Autowired
     private TicketSaleService ticketSaleService;
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PostMapping
     public TicketSaleDTO create(@RequestBody TicketSaleDTO ticketSaleDTO) {
         return ticketSaleService.save(ticketSaleDTO);
@@ -37,6 +39,7 @@ public class TicketSaleController {
         return ResponseEntity.ok(ticketSaleService.getSaleDetails(saleId));
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/{id}")
     public ResponseEntity<TicketSaleDTO> getById(@PathVariable Long id) {
         return ticketSaleService.findById(id)
@@ -44,6 +47,7 @@ public class TicketSaleController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping
     public List<TicketSaleDTO> getAll() {
         return ticketSaleService.findAll();
@@ -62,6 +66,7 @@ public class TicketSaleController {
         return ticketSaleService.searchTicketSales(status, startDate, endDate);
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<TicketSaleDTO> update(@PathVariable Long id, @RequestBody TicketSaleDTO ticketSaleDetails) {
         return ticketSaleService.findById(id).map(ticketSale -> {
@@ -76,6 +81,7 @@ public class TicketSaleController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         if (ticketSaleService.findById(id).isPresent()) {
