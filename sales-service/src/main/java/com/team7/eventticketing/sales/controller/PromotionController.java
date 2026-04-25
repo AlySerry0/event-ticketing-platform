@@ -17,13 +17,13 @@ public class PromotionController {
     @Autowired
     private PromotionService promotionService;
 
-    @PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @PostMapping
     public PromotionDTO create(@RequestBody PromotionDTO promotionDTO) {
         return promotionService.save(promotionDTO);
     }
 
-    @PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @GetMapping("/{id:\\d+}")
     public ResponseEntity<PromotionDTO> getById(@PathVariable Long id) {
         return promotionService.findById(id)
@@ -31,13 +31,13 @@ public class PromotionController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @GetMapping
     public List<PromotionDTO> getAll() {
         return promotionService.findAll();
     }
 
-    @PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<PromotionDTO> update(@PathVariable Long id, @RequestBody PromotionDTO promotionDetails) {
         return promotionService.findById(id).map(promotion -> {
@@ -53,7 +53,7 @@ public class PromotionController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    @PreAuthorize("hasAnyAuthority('USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         if (promotionService.findById(id).isPresent()) {
