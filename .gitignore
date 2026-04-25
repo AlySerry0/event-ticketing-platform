@@ -42,7 +42,3 @@ build/
 ### Mac OS ###
 .DS_Store
 
-### Gemini ###
-.gemini
-GEMINI.md
-docs/
