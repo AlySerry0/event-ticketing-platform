@@ -19,7 +19,7 @@ public class AttendedRelationship {
 
     private Integer attendanceCount;
     private LocalDateTime lastAttendedDate;
-    private List<Long> recorded_booking_ids = new ArrayList<>();
+    private List<Long> recordedBookingIds = new ArrayList<>();
 
     public AttendedRelationship() {
     }
@@ -56,11 +56,11 @@ public class AttendedRelationship {
         this.lastAttendedDate = lastAttendedDate;
     }
 
-    public List<Long> getRecorded_booking_ids() {
-        return recorded_booking_ids;
+    public List<Long> getRecordedBookingIds() {
+        return recordedBookingIds;
     }
 
-    public void setRecorded_booking_ids(List<Long> recorded_booking_ids) {
-        this.recorded_booking_ids = recorded_booking_ids;
+    public void setRecordedBookingIds(List<Long> recordedBookingIds) {
+        this.recordedBookingIds = recordedBookingIds;
     }
 }
