@@ -94,6 +94,7 @@ public class TicketController {
         return ResponseEntity.ok(Map.of("deletedCount", deletedCount));
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PostMapping("/booking/{bookingId}")
     public ResponseEntity<?> issueTicket(@PathVariable Long bookingId, @RequestBody IssueTicketDTO request) {
         try {
@@ -105,6 +106,7 @@ public class TicketController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/booking/{bookingId}/latest")
     public ResponseEntity<?> getLatestTicket(@PathVariable Long bookingId) {
         try {
@@ -116,6 +118,7 @@ public class TicketController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/nearby")
     public ResponseEntity<List<NearbyTicketDTO>> getNearbyTickets(@RequestParam double lat, @RequestParam double lon,
             @RequestParam double radiusKm) {
