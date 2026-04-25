@@ -51,6 +51,7 @@ public class BookingController {
 	 * [S3-F1] Get Bookings by Status and Date Range
 	 * GET /api/bookings/search?status={s}&startDate={d}&endDate={d}
 	 */
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/search")
 	public ResponseEntity<List<BookingDTO>> searchBookings(
 			@RequestParam(required = false) String status,
@@ -65,6 +66,7 @@ public class BookingController {
 		}
 	}
 
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PutMapping("/{id}/confirm")
 	public ResponseEntity<BookingDTO> confirmBooking(@PathVariable Long id, @RequestParam Long eventId) {
 		try {
@@ -114,6 +116,7 @@ public class BookingController {
 		return ResponseEntity.notFound().build();
 	}
 
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PostMapping("/estimate")
 	public ResponseEntity<?> estimateCost(@RequestBody BookingEstimateRequestDTO request) {
 		try {
