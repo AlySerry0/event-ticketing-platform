@@ -25,13 +25,13 @@ public class TicketController {
     @Autowired
     private TicketService ticketService;
 
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PostMapping
     public TicketDTO create(@RequestBody TicketDTO ticketDTO) {
         return ticketService.save(ticketDTO);
     }
 
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/{id}")
     public ResponseEntity<TicketDTO> getById(@PathVariable Long id) {
         return ticketService.findById(id)
@@ -39,13 +39,13 @@ public class TicketController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping
     public List<TicketDTO> getAll() {
         return ticketService.findAll();
     }
 
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<TicketDTO> update(@PathVariable Long id, @RequestBody TicketDTO ticketDetails) {
         return ticketService.updateTicket(id, ticketDetails)
@@ -53,7 +53,7 @@ public class TicketController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         if (ticketService.findById(id).isPresent()) {
