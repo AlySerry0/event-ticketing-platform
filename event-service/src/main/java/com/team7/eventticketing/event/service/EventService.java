@@ -1,7 +1,6 @@
 package com.team7.eventticketing.event.service;
 
-import com.team7.eventticketing.event.adapter.EventRevenueAdapter;
-import com.team7.eventticketing.event.adapter.TopEventAdapter;
+import com.team7.eventticketing.event.adapter.ObjectArrayDtoAdapter;
 import com.team7.eventticketing.event.dto.*;
 import com.team7.eventticketing.event.model.Event;
 import com.team7.eventticketing.event.model.EventCategory;
@@ -63,8 +62,7 @@ public class EventService {
     private final EventRepository eventRepository;
 
     // Adapters (Adapter Pattern)
-    private final EventRevenueAdapter eventRevenueAdapter = new EventRevenueAdapter();
-    private final TopEventAdapter topEventAdapter = new TopEventAdapter();
+    private final ObjectArrayDtoAdapter objectArrayDtoAdapter = new ObjectArrayDtoAdapter();
 
     /**
      * Constructor — MongoEventLogger is injected by Spring and registered
@@ -312,7 +310,11 @@ public class EventService {
         }
 
         // Adapter Pattern — delegates Object[] → EventRevenueDTO conversion
-        return eventRevenueAdapter.adapt(row, event.getId(), event.getName());
+        return objectArrayDtoAdapter.toEventRevenueDTO(
+                row,
+                event.getId(),
+                event.getName()
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -374,7 +376,7 @@ public class EventService {
         List<Object[]> results = eventRepository.findTopRatedEvents(limit);
         // Adapter Pattern — delegates Object[] → TopEventDTO conversion
         return results.stream()
-                .map(topEventAdapter::adapt)
+                .map(objectArrayDtoAdapter::toTopEventDTO)
                 .toList();
     }
 
