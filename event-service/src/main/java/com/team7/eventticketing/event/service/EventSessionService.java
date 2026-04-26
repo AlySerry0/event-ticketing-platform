@@ -437,13 +437,13 @@ public class EventSessionService {
                             .map(this::convertToDTO)
                             .collect(Collectors.toList());
 
-                    return new EventSessionAlertDTO(
-                            event.getId(),
-                            event.getName(),
-                            event.getStatus().name(),
-                            unverifiedSessions,
-                            unverifiedSessions.size()
-                    );
+                    return EventSessionAlertDTO.builder()
+                            .eventId(event.getId())
+                            .eventName(event.getName())
+                            .eventStatus(event.getStatus().name())
+                            .unverifiedSessions(unverifiedSessions)
+                            .unverifiedCount(unverifiedSessions.size())
+                            .build();
                 })
                 .collect(Collectors.toList());
     }

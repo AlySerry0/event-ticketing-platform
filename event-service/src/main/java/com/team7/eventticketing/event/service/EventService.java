@@ -459,33 +459,7 @@ public class EventService {
         return convertToDTO(updatedEvent);
     }
 
-    // -----------------------------------------------------------------------
-    // S2-F9 — Unverified sessions (read — no observer needed)
-    // -----------------------------------------------------------------------
 
-    public List<EventSessionAlertDTO> getEventsWithUnverifiedSessions() {
-        return eventRepository.findEventsWithUnverifiedSessions()
-                .stream()
-                .map(event -> {
-                    List<EventSessionDTO> unverifiedSessions = event.getEventSessions()
-                            .stream()
-                            .filter(s -> Boolean.FALSE.equals(s.getVerified()))
-                            .map(s -> new EventSessionDTO(
-                                    s.getId(), s.getTitle(), s.getSpeaker(),
-                                    s.getStartTime(), s.getEndTime(), s.getCapacity(),
-                                    s.getVerified(), s.getMetadata(), s.getCreatedAt()))
-                            .collect(Collectors.toList());
-
-                    return EventSessionAlertDTO.builder()
-                            .eventId(event.getId())
-                            .eventName(event.getName())
-                            .eventStatus(event.getStatus().name())
-                            .unverifiedSessions(unverifiedSessions)
-                            .unverifiedCount(unverifiedSessions.size())
-                            .build();
-                })
-                .collect(Collectors.toList());
-    }
 
     // -----------------------------------------------------------------------
     // Delete
