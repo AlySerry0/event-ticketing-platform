@@ -3,6 +3,8 @@
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -22,8 +24,9 @@ public class CacheInvalidationService {
     public void invalidateCacheWildcard(String pattern) {
         try {
             Set<String> keysToDelete = new HashSet<>();
-            redisTemplate.execute((org.springframework.data.redis.connection.RedisConnection connection) -> {
-                try (org.springframework.data.redis.core.Cursor<byte[]> cursor = connection.keyCommands().scan(ScanOptions.scanOptions().match(pattern).count(100).build())) {
+            redisTemplate.execute((RedisConnection connection) -> {
+                try (Cursor<byte[]> cursor = connection.keyCommands()
+                        .scan(ScanOptions.scanOptions().match(pattern).count(100).build())) {
                     while (cursor.hasNext()) {
                         keysToDelete.add(new String(cursor.next(), StandardCharsets.UTF_8));
                     }
