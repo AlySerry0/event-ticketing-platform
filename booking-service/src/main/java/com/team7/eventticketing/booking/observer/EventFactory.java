@@ -8,8 +8,8 @@ import java.util.Map;
 @Component
 public class EventFactory {
 
-    public MongoEvent createEvent(String eventType, Map<String, Object> params) {
-        if ("BOOKING".equals(eventType)) {
+    public MongoEvent createEvent(EventType eventType, Map<String, Object> params) {
+        if (EventType.BOOKING.equals(eventType)) {
             Long bookingId = null;
             if (params.containsKey("bookingId")) {
                 Object val = params.get("bookingId");

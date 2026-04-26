@@ -28,7 +28,7 @@ public class MongoEventLogger implements EntityObserver {
                 Map<String, Object> params = (Map<String, Object>) payload;
                 params.putIfAbsent("action", action);
                 
-                MongoEvent event = eventFactory.createEvent("BOOKING", params);
+                MongoEvent event = eventFactory.createEvent(EventType.BOOKING, params);
                 if (event instanceof BookingEvent bookingEvent) {
                     bookingEventRepository.save(bookingEvent);
                 }
