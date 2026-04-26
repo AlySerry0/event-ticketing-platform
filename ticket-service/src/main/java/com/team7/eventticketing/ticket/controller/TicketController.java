@@ -63,11 +63,13 @@ public class TicketController {
         return ResponseEntity.notFound().build();
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/unused-upcoming")
     public List<UnusedTicketDTO> getUnusedUpcomingTickets() {
         return ticketService.getUnusedTicketsForUpcomingEvents();
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/event/{eventId}/summary")
     public ResponseEntity<Object> getEventSummary(@PathVariable Long eventId) {
         try {
@@ -87,7 +89,8 @@ public class TicketController {
             throw ex;
         }
     }
-  
+
+    @PreAuthorize("hasAnyRole('ADMIN')")
     @DeleteMapping("/purge")
     public ResponseEntity<Map<String, Integer>> purgeOldTickets(@RequestParam int olderThanDays) {
         int deletedCount = ticketService.purgeOldTickets(olderThanDays);
