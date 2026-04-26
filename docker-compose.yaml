@@ -88,6 +88,21 @@ services:
       retries: 10
       start_period: 30s
 
+  cassandra-init:
+    image: cassandra:latest
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    entrypoint: >
+      bash -c "
+      echo 'Waiting for Cassandra...';
+      sleep 10;
+      cqlsh cassandra 9042 -e \"
+      CREATE KEYSPACE IF NOT EXISTS eventticketingks
+      WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+      \";
+      "
+
   cassandra:
     image: cassandra:latest
     container_name: eventticketing-cassandra
