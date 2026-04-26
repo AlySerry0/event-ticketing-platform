@@ -1,4 +1,4 @@
-﻿package com.team7.eventticketing.sales.config;
+package com.team7.eventticketing.sales.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.EnableCaching;

@@ -1,4 +1,4 @@
-﻿package com.team7.eventticketing.ticket.util;
+package com.team7.eventticketing.ticket.util;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
