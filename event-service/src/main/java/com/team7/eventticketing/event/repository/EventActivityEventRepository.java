@@ -1,5 +1,6 @@
-package com.team7.eventticketing.event.observer;
+package com.team7.eventticketing.event.repository;
 
+import com.team7.eventticketing.event.model.EventActivityEvent;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 

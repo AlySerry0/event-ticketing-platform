@@ -1,5 +1,7 @@
 package com.team7.eventticketing.event.observer;
 
+import com.team7.eventticketing.event.model.EventActivityEvent;
+import com.team7.eventticketing.event.repository.EventActivityEventRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;

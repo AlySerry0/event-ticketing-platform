@@ -1,5 +1,7 @@
 package com.team7.eventticketing.event.observer;
 
+import com.team7.eventticketing.event.model.EventActivityEvent;
+
 import java.time.LocalDateTime;
 import java.util.Map;
 
