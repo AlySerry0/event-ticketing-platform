@@ -14,8 +14,8 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
   data:
-    mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin}
+#    mongodb:
+#      uri: ${SPRING_DATA_MONGODB_URI:mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin}
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: 6379
@@ -25,7 +25,8 @@ spring:
       authentication:
         username: ${SPRING_NEO4J_AUTHENTICATION_USERNAME:neo4j}
         password: ${SPRING_NEO4J_AUTHENTICATION_PASSWORD:neo4jpass}
-
+  mongodb:
+    uri: ${SPRING_MONGODB_URI:mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin}
   web:
     error:
       include-message: always

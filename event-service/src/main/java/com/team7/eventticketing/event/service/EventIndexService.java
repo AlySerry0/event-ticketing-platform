@@ -70,25 +70,12 @@ public class EventIndexService {
     }
 
     public void removeFromIndex(Long eventId, String eventName) {
-        // ES remove — soft dependency
+        // ES remove — soft dependency only
         try {
             searchRepository.deleteById(eventId);
         } catch (Exception ex) {
             log.warn("Elasticsearch delete failed for eventId={}: {}", eventId, ex.getMessage());
         }
-
-        // MongoDB log — MongoEventLogger handles its own try-catch
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("eventId", eventId);
-        payload.put("name", eventName);
-        payload.put("source", "auto_crud_delete");
-        mongoEventLogger.onEvent("EVENT_DELETED", payload);
-    }
-
-    public void removeFromIndex(Long eventId) {
-        searchRepository.deleteById(eventId);
-        // Log EVENT_DELETED via observer
-        Map<String, Object> payload = Map.of("eventId", eventId, "source", "auto_crud_delete");
-        mongoEventLogger.onEvent("EVENT_DELETED", payload);
+        // NO mongoEventLogger call here — EventService.deleteEvent() handles that
     }
 }

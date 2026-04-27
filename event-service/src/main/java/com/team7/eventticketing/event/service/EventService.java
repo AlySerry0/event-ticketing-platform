@@ -478,12 +478,13 @@ public class EventService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Event not found with id: " + eventId));
 
-        eventIndexService.removeFromIndex(eventId);  // remove from ES first
+        eventIndexService.removeFromIndex(eventId, event.getName()); // ES only
         eventRepository.delete(event);
 
         // Observer notification — EVENT_DELETED
         Map<String, Object> extra = new HashMap<>();
         extra.put("name", event.getName());
+        extra.put("source", "auto_crud_delete");
         notifyObservers("EVENT_DELETED", buildPayload(eventId, extra));
     }
 
