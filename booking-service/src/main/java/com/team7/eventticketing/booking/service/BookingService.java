@@ -8,6 +8,7 @@ import com.team7.eventticketing.booking.model.Booking;
 import com.team7.eventticketing.booking.model.BookingItem;
 import com.team7.eventticketing.booking.model.BookingStatus;
 import com.team7.eventticketing.booking.repository.BookingRepository;
+import com.team7.eventticketing.booking.util.CacheInvalidationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,9 @@ public class BookingService {
 	@Autowired
 	private BookingItemService bookingItemService;
 
+	@Autowired
+	private CacheInvalidationService cacheInvalidationService;
+
 	public BookingDTO save(BookingDTO bookingDTO) {
 		Booking booking = convertToEntity(bookingDTO);
 
@@ -45,7 +49,9 @@ public class BookingService {
 			booking.setStatus(BookingStatus.PENDING);
 		}
 
-		return convertToDTO(bookingRepository.save(booking));
+		BookingDTO savedBooking = convertToDTO(bookingRepository.save(booking));
+		invalidateEventDashboardCache(savedBooking.getEventId());
+		return savedBooking;
 	}
 
 	public Optional<BookingDTO> findById(Long id) {
@@ -59,11 +65,16 @@ public class BookingService {
 	}
 
 	public void deleteById(Long id) {
+		Long eventId = bookingRepository.findById(id)
+				.map(Booking::getEventId)
+				.orElse(null);
 		bookingRepository.deleteById(id);
+		invalidateEventDashboardCache(eventId);
 	}
 
 	public Optional<BookingDTO> updateBooking(Long id, BookingDTO bookingDetails) {
 		return bookingRepository.findById(id).map(booking -> {
+			Long oldEventId = booking.getEventId();
 			if (bookingDetails.getContactEmail() != null)
 				booking.setContactEmail(bookingDetails.getContactEmail());
 			if (bookingDetails.getStatus() != null)
@@ -87,7 +98,10 @@ public class BookingService {
 					booking.getMetadata().putAll(bookingDetails.getMetadata());
 				}
 			}
-			return convertToDTO(bookingRepository.save(booking));
+			BookingDTO updatedBooking = convertToDTO(bookingRepository.save(booking));
+			invalidateEventDashboardCache(oldEventId);
+			invalidateEventDashboardCache(updatedBooking.getEventId());
+			return updatedBooking;
 		});
 	}
 
@@ -148,7 +162,9 @@ public class BookingService {
 		booking.setStatus(BookingStatus.CONFIRMED);
 		booking.setConfirmedAt(LocalDateTime.now());
 
-		return convertToDTO(bookingRepository.save(booking));
+		BookingDTO confirmedBooking = convertToDTO(bookingRepository.save(booking));
+		invalidateEventDashboardCache(confirmedBooking.getEventId());
+		return confirmedBooking;
 	}
 
 	@Transactional
@@ -174,7 +190,9 @@ public class BookingService {
 				savedBooking.getId(),
 				savedBooking.getUserId(),
 				savedBooking.getTotalAmount());
-		return convertToDTO(savedBooking);
+		BookingDTO completedBooking = convertToDTO(savedBooking);
+		invalidateEventDashboardCache(completedBooking.getEventId());
+		return completedBooking;
 	}
 
 	public BookingCostEstimateDTO getCostEstimate(BookingEstimateRequestDTO request) {
@@ -372,7 +390,9 @@ public class BookingService {
         }
 
         Booking savedBooking = bookingRepository.save(booking);
-        return convertToDTO(savedBooking);
+        BookingDTO updatedBooking = convertToDTO(savedBooking);
+        invalidateEventDashboardCache(updatedBooking.getEventId());
+        return updatedBooking;
     }
 
     @Transactional
@@ -392,6 +412,14 @@ public class BookingService {
         }
 
         bookingRepository.save(booking);
+        invalidateEventDashboardCache(booking.getEventId());
     }
+
+	private void invalidateEventDashboardCache(Long eventId) {
+		if (eventId == null) {
+			return;
+		}
+		cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::" + eventId);
+	}
 }
 

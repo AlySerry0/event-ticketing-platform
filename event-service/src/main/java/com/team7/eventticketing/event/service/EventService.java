@@ -8,6 +8,7 @@ import com.team7.eventticketing.event.model.EventStatus;
 import com.team7.eventticketing.event.observer.EntityObserver;
 import com.team7.eventticketing.event.observer.MongoEventLogger;
 import com.team7.eventticketing.event.repository.EventRepository;
+import com.team7.eventticketing.event.util.CacheInvalidationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +61,8 @@ public class EventService {
     // Dependencies
     // -----------------------------------------------------------------------
     private final EventRepository eventRepository;
+    private final EventDashboardCacheService eventDashboardCacheService;
+    private final CacheInvalidationService cacheInvalidationService;
 
     // Adapters (Adapter Pattern)
     private final ObjectArrayDtoAdapter objectArrayDtoAdapter = new ObjectArrayDtoAdapter();
@@ -68,8 +71,13 @@ public class EventService {
      * Constructor — MongoEventLogger is injected by Spring and registered
      * as the single observer for this service.
      */
-    public EventService(EventRepository eventRepository, MongoEventLogger mongoEventLogger) {
+    public EventService(EventRepository eventRepository,
+                        EventDashboardCacheService eventDashboardCacheService,
+                        CacheInvalidationService cacheInvalidationService,
+                        MongoEventLogger mongoEventLogger) {
         this.eventRepository = eventRepository;
+        this.eventDashboardCacheService = eventDashboardCacheService;
+        this.cacheInvalidationService = cacheInvalidationService;
         this.register(mongoEventLogger);
     }
 
@@ -244,6 +252,7 @@ public class EventService {
         Map<String, Object> extra = new HashMap<>();
         extra.put("name", updatedEvent.getName());
         notifyObservers("EVENT_UPDATED", buildPayload(eventId, extra));
+        invalidateEventDashboardCache(eventId);
 
         return result;
     }
@@ -272,6 +281,7 @@ public class EventService {
         Map<String, Object> extra = new HashMap<>();
         extra.put("updatedKeys", new ArrayList<>(detailsUpdate.keySet()));
         notifyObservers("DETAILS_UPDATED", buildPayload(eventId, extra));
+        invalidateEventDashboardCache(eventId);
 
         return result;
     }
@@ -317,6 +327,12 @@ public class EventService {
         );
     }
 
+    public EventDashboardDTO getEventDashboard(Long eventId) {
+        EventDashboardDTO dashboard = eventDashboardCacheService.getDashboard(eventId);
+        notifyObservers("DASHBOARD_VIEWED", buildPayload(eventId, Collections.emptyMap()));
+        return dashboard;
+    }
+
     // -----------------------------------------------------------------------
     // S2-F4 — Status update
     // -----------------------------------------------------------------------
@@ -346,6 +362,7 @@ public class EventService {
         extra.put("oldStatus", oldStatus);
         extra.put("newStatus", newStatus.name());
         notifyObservers("STATUS_CHANGED", buildPayload(eventId, extra));
+        invalidateEventDashboardCache(eventId);
     }
 
     // -----------------------------------------------------------------------
@@ -424,6 +441,7 @@ public class EventService {
         extra.put("rating", rating);
         extra.put("newAverageRating", newAvg);
         notifyObservers("RATED", buildPayload(eventId, extra));
+        invalidateEventDashboardCache(eventId);
     }
 
     // -----------------------------------------------------------------------
@@ -455,6 +473,7 @@ public class EventService {
         Map<String, Object> extra = new HashMap<>();
         extra.put("rating", newRating);
         notifyObservers("RATED", buildPayload(eventId, extra));
+        invalidateEventDashboardCache(eventId);
 
         return convertToDTO(updatedEvent);
     }
@@ -477,6 +496,11 @@ public class EventService {
         Map<String, Object> extra = new HashMap<>();
         extra.put("name", event.getName());
         notifyObservers("EVENT_DELETED", buildPayload(eventId, extra));
+        invalidateEventDashboardCache(eventId);
+    }
+
+    private void invalidateEventDashboardCache(Long eventId) {
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::" + eventId);
     }
 
     // -----------------------------------------------------------------------

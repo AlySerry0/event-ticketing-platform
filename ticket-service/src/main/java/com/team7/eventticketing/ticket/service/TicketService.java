@@ -9,6 +9,7 @@ import com.team7.eventticketing.ticket.dto.UnusedTicketDTO;
 import com.team7.eventticketing.ticket.model.Ticket;
 import com.team7.eventticketing.ticket.model.TicketStatus;
 import com.team7.eventticketing.ticket.repository.TicketRepository;
+import com.team7.eventticketing.ticket.util.CacheInvalidationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,9 @@ public class TicketService {
 	@Autowired
 	private TicketRepository ticketRepository;
 
+	@Autowired
+	private CacheInvalidationService cacheInvalidationService;
+
 
     public TicketDTO save(TicketDTO ticketDTO) {
 
@@ -43,7 +47,9 @@ public class TicketService {
         ticketDTO.setIssuedAt(LocalDateTime.now());
         ticketDTO.setStatus(TicketStatus.VALID);
         Ticket ticket = convertToEntity(ticketDTO);
-        return convertToDTO(ticketRepository.save(ticket));
+        TicketDTO savedTicket = convertToDTO(ticketRepository.save(ticket));
+        invalidateEventDashboardCacheByBookingId(savedTicket.getBookingId());
+        return savedTicket;
     }
 
 	public Optional<TicketDTO> findById(Long id) {
@@ -57,7 +63,9 @@ public class TicketService {
 	}
 
 	public void deleteById(Long id) {
+		Long eventId = ticketRepository.findEventIdByTicketId(id);
 		ticketRepository.deleteById(id);
+		invalidateEventDashboardCache(eventId);
 	}
 
 	public TicketDTO convertToDTO(Ticket ticket) {
@@ -157,7 +165,9 @@ public class TicketService {
       ticket.setStatus(TicketStatus.VALID);
       ticket.setIssuedAt(LocalDateTime.now());
 
-      return convertToDTO(ticketRepository.save(ticket));
+      TicketDTO issuedTicket = convertToDTO(ticketRepository.save(ticket));
+      invalidateEventDashboardCacheByBookingId(bookingId);
+      return issuedTicket;
   }
 
   public TicketDTO getLatestTicketForBooking(Long bookingId) {
@@ -224,6 +234,7 @@ public class TicketService {
                 }).toList();
 
                 ticketRepository.saveAll(ticketsToSave);
+                invalidateEventDashboardCacheByBookingId(batchRequest.getBookingId());
                 return ticketsToSave.size();
         }
 
@@ -279,6 +290,7 @@ public class TicketService {
     @Transactional
     public Optional<TicketDTO> updateTicket(Long id, TicketDTO ticketDetails) {
         return ticketRepository.findById(id).map(ticket -> {
+            Long oldEventId = ticketRepository.findEventIdByBookingId(ticket.getBookingId());
             // Uniqueness check if ticket code is changing
             if (ticketDetails.getTicketCode() != null && !ticketDetails.getTicketCode().equals(ticket.getTicketCode())) {
                 if (ticketRepository.existsByTicketCode(ticketDetails.getTicketCode())) {
@@ -307,8 +319,23 @@ public class TicketService {
                 }
             }
 
-            return convertToDTO(ticketRepository.saveAndFlush(ticket));
+            TicketDTO updatedTicket = convertToDTO(ticketRepository.saveAndFlush(ticket));
+            Long newEventId = ticketRepository.findEventIdByBookingId(updatedTicket.getBookingId());
+            invalidateEventDashboardCache(oldEventId);
+            invalidateEventDashboardCache(newEventId);
+            return updatedTicket;
         });
+    }
+
+    private void invalidateEventDashboardCacheByBookingId(Long bookingId) {
+        invalidateEventDashboardCache(ticketRepository.findEventIdByBookingId(bookingId));
+    }
+
+    private void invalidateEventDashboardCache(Long eventId) {
+        if (eventId == null) {
+            return;
+        }
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::" + eventId);
     }
 }
 

@@ -1,6 +1,7 @@
 package com.team7.eventticketing.event.controller;
 
 import com.team7.eventticketing.event.dto.CreateEventDTO;
+import com.team7.eventticketing.event.dto.EventDashboardDTO;
 import com.team7.eventticketing.event.dto.EventDTO;
 import com.team7.eventticketing.event.dto.EventRevenueDTO;
 import com.team7.eventticketing.event.dto.TopEventDTO;
@@ -191,6 +192,15 @@ public class EventController {
             @RequestParam LocalDate endDate) {
         EventRevenueDTO summary = eventService.getEventRevenueSummary(id, startDate, endDate);
         return ResponseEntity.ok(summary);
+    }
+
+    /**
+     * Get event performance dashboard according to S2-F12
+     * GET /api/events/{id}/dashboard
+     */
+    @GetMapping("/{id}/dashboard")
+    public ResponseEntity<EventDashboardDTO> getEventDashboard(@PathVariable Long id) {
+        return ResponseEntity.ok(eventService.getEventDashboard(id));
     }
 
     /**
