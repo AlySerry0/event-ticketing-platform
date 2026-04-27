@@ -24,7 +24,7 @@ import java.time.LocalDateTime;
  *   rating      → Double   (range filtering)
  *   status      → Keyword  (exact filter: UPCOMING/ONGOING/COMPLETED/CANCELLED)
  */
-@Document(indexName = "events")
+@Document(indexName = "events", createIndex = false)
 public class EventSearchDocument {
 
     @Id
