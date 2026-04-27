@@ -2,12 +2,12 @@ package com.team7.eventticketing.user.service;
 
 import com.team7.eventticketing.user.dto.FavoriteVenueDTO;
 import com.team7.eventticketing.user.dto.UserDTO;
-import com.team7.eventticketing.user.model.User;
-import com.team7.eventticketing.user.repository.UserRepository;
 import com.team7.eventticketing.user.model.FavoriteVenue;
 import com.team7.eventticketing.user.model.User;
 import com.team7.eventticketing.user.repository.FavoriteVenueRepository;
 import com.team7.eventticketing.user.repository.UserRepository;
+import com.team7.eventticketing.user.util.CacheInvalidationService;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,14 +22,19 @@ public class FavoriteVenueService {
 
     private final FavoriteVenueRepository favoriteVenueRepository;
     private final UserRepository userRepository;
+    private final CacheInvalidationService cacheInvalidationService;
 
-    public FavoriteVenueService(FavoriteVenueRepository favoriteVenueRepository, UserRepository userRepository) {
+    public FavoriteVenueService(FavoriteVenueRepository favoriteVenueRepository,
+                                UserRepository userRepository,
+                                CacheInvalidationService cacheInvalidationService) {
         this.favoriteVenueRepository = favoriteVenueRepository;
         this.userRepository = userRepository;
+        this.cacheInvalidationService = cacheInvalidationService;
     }
 
     /**
-     * Add a favorite venue for a user
+     * Add a favorite venue.
+     * Per PDF §4.4.4 POST rule: nothing to invalidate.
      */
     @Transactional
     public FavoriteVenueDTO addFavoriteVenue(Long userId, FavoriteVenueDTO favoriteVenueDTO) {
@@ -62,7 +67,7 @@ public class FavoriteVenueService {
     }
 
     /**
-     * Get all favorite venues for a user
+     * Get all favorite venues for a user (NOT cached — list endpoint per PDF §4.4.2)
      */
     public List<FavoriteVenueDTO> getUserFavoriteVenues(Long userId) {
         if (!userRepository.existsById(userId)) {
@@ -79,8 +84,9 @@ public class FavoriteVenueService {
     }
 
     /**
-     * Get favorite venue by ID
+     * Get favorite venue by ID — CRUD detail cache (15 min)
      */
+    @Cacheable(value = "favorite-venue", key = "#id")
     public FavoriteVenueDTO getFavoriteVenueById(Long id) {
         FavoriteVenue favoriteVenue = favoriteVenueRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -91,7 +97,7 @@ public class FavoriteVenueService {
     }
 
     /**
-     * Update favorite venue
+     * Update favorite venue — invalidate detail + S1-F8 (profile uses venues)
      */
     @Transactional
     public FavoriteVenueDTO updateFavoriteVenue(Long id, FavoriteVenueDTO favoriteVenueDTO) {
@@ -121,11 +127,12 @@ public class FavoriteVenueService {
         }
 
         FavoriteVenue updatedVenue = favoriteVenueRepository.save(favoriteVenue);
+        invalidateVenueCaches(id);
         return convertToDTO(updatedVenue);
     }
 
     /**
-     * Delete favorite venue
+     * Delete favorite venue — invalidate detail + S1-F8
      */
     @Transactional
     public void deleteFavoriteVenue(Long id) {
@@ -136,10 +143,11 @@ public class FavoriteVenueService {
             );
         }
         favoriteVenueRepository.deleteById(id);
+        invalidateVenueCaches(id);
     }
 
     /**
-     * Get default favorite venue for a user
+     * Get default favorite venue for a user (NOT cached — not in §4.4 enumeration)
      */
     public FavoriteVenueDTO getDefaultFavoriteVenue(Long userId) {
         if (!userRepository.existsById(userId)) {
@@ -159,6 +167,49 @@ public class FavoriteVenueService {
 
         return convertToDTO(favoriteVenue);
     }
+
+    /**
+     * [S1-F7] Set Default Favorite Venue — invalidate ALL favorite-venue keys + S1-F8
+     * (multiple venues' isDefault flag flips, so wildcard for safety)
+     */
+    @Transactional
+    public UserDTO setDefaultFavoriteVenue(Long userId, Long venueId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "User not found with ID: " + userId));
+
+        FavoriteVenue venue = favoriteVenueRepository.findById(venueId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Venue not found with ID: " + venueId));
+
+        if (!venue.getUser().getId().equals(userId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Venue does not belong to this user");
+        }
+
+        favoriteVenueRepository.resetAllDefaultsForUser(userId);
+
+        venue.setIsDefault(true);
+        favoriteVenueRepository.save(venue);
+
+        User updatedUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "User not found with ID: " + userId));
+
+        // Multiple venue rows changed → wildcard their detail cache + invalidate profile
+        cacheInvalidationService.invalidateCacheWildcard("user-service::favorite-venue::*");
+        cacheInvalidationService.invalidateCacheWildcard("user-service::S1-F8::*");
+
+        return convertToDTO(updatedUser);
+    }
+
+    private void invalidateVenueCaches(Long venueId) {
+        cacheInvalidationService.invalidateCacheWildcard("user-service::favorite-venue::" + venueId);
+        // S1-F8 profile DTO embeds favorite venues — invalidate so updates surface
+        cacheInvalidationService.invalidateCacheWildcard("user-service::S1-F8::*");
+    }
+
     private UserDTO convertToDTO(User user) {
         UserDTO userDTO = new UserDTO();
         userDTO.setId(user.getId());
@@ -172,9 +223,6 @@ public class FavoriteVenueService {
         return userDTO;
     }
 
-    /**
-     * Convert FavoriteVenue entity to FavoriteVenueDTO
-     */
     private FavoriteVenueDTO convertToDTO(FavoriteVenue favoriteVenue) {
         FavoriteVenueDTO dto = new FavoriteVenueDTO();
         dto.setId(favoriteVenue.getId());
@@ -186,42 +234,5 @@ public class FavoriteVenueService {
         dto.setMetadata(favoriteVenue.getMetadata());
         dto.setCreatedAt(favoriteVenue.getCreatedAt());
         return dto;
-    }
-
-    /**
-     * [S1-F7] Set Default Favorite Venue (Transactional + Relationship)
-     */
-    @Transactional
-    public UserDTO setDefaultFavoriteVenue(Long userId, Long venueId) {
-        // 1. Find user or throw 404
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "User not found with ID: " + userId));
-
-        // 2. Find venue or throw 404
-        FavoriteVenue venue = favoriteVenueRepository.findById(venueId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Venue not found with ID: " + venueId));
-
-        // 3. Verify venue belongs to this user or throw 400
-        if (!venue.getUser().getId().equals(userId)) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Venue does not belong to this user");
-        }
-
-        // 4. Reset all defaults for this user
-        favoriteVenueRepository.resetAllDefaultsForUser(userId);
-
-        // 5. Set target venue as default
-        venue.setIsDefault(true);
-        favoriteVenueRepository.save(venue);
-
-        // 6. Return updated user with their favorite venues
-        User updatedUser = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "User not found with ID: " + userId));
-
-        return convertToDTO(updatedUser);
     }
 }
