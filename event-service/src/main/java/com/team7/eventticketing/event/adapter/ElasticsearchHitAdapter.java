@@ -76,7 +76,7 @@ public class ElasticsearchHitAdapter {
     //
     // Add a typed adapt method here when you define a search result DTO, e.g.:
     //
-    //   public EventSearchResultDTO adapt(Hit<EventSearchDocument> hit) {
+    //   public EventSearchResultDTO adaptToSearchResult(Hit<EventSearchDocument> hit) {
     //       EventSearchDocument doc = hit.source();
     //       return EventSearchResultDTO.builder()
     //           .id(doc.getId())

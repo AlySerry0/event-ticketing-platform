@@ -58,7 +58,7 @@ public class MongoDocumentAdapter {
     //
     // Add a typed adapt method here when you have a dashboard DTO, e.g.:
     //
-    //   public ActivityFeedItemDTO adapt(EventActivityEvent event) {
+    //   public ActivityFeedItemDTO adaptToActivityFeedItem(EventActivityEvent event) {
     //       return ActivityFeedItemDTO.builder()
     //           .action(event.getAction())
     //           .timestamp(event.getTimestamp())
