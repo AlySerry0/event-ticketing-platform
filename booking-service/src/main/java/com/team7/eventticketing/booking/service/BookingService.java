@@ -8,7 +8,6 @@ import com.team7.eventticketing.booking.model.Booking;
 import com.team7.eventticketing.booking.model.BookingItem;
 import com.team7.eventticketing.booking.model.BookingStatus;
 import com.team7.eventticketing.booking.repository.BookingRepository;
-import com.team7.eventticketing.booking.util.CacheInvalidationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -35,9 +34,6 @@ public class BookingService {
 	@Autowired
 	private BookingItemService bookingItemService;
 
-	@Autowired
-	private CacheInvalidationService cacheInvalidationService;
-
 	public BookingDTO save(BookingDTO bookingDTO) {
 		Booking booking = convertToEntity(bookingDTO);
 
@@ -49,9 +45,7 @@ public class BookingService {
 			booking.setStatus(BookingStatus.PENDING);
 		}
 
-		BookingDTO savedBooking = convertToDTO(bookingRepository.save(booking));
-		invalidateEventDashboardCache(savedBooking.getEventId());
-		return savedBooking;
+		return convertToDTO(bookingRepository.save(booking));
 	}
 
 	public Optional<BookingDTO> findById(Long id) {
@@ -65,16 +59,11 @@ public class BookingService {
 	}
 
 	public void deleteById(Long id) {
-		Long eventId = bookingRepository.findById(id)
-				.map(Booking::getEventId)
-				.orElse(null);
 		bookingRepository.deleteById(id);
-		invalidateEventDashboardCache(eventId);
 	}
 
 	public Optional<BookingDTO> updateBooking(Long id, BookingDTO bookingDetails) {
 		return bookingRepository.findById(id).map(booking -> {
-			Long oldEventId = booking.getEventId();
 			if (bookingDetails.getContactEmail() != null)
 				booking.setContactEmail(bookingDetails.getContactEmail());
 			if (bookingDetails.getStatus() != null)
@@ -98,10 +87,7 @@ public class BookingService {
 					booking.getMetadata().putAll(bookingDetails.getMetadata());
 				}
 			}
-			BookingDTO updatedBooking = convertToDTO(bookingRepository.save(booking));
-			invalidateEventDashboardCache(oldEventId);
-			invalidateEventDashboardCache(updatedBooking.getEventId());
-			return updatedBooking;
+			return convertToDTO(bookingRepository.save(booking));
 		});
 	}
 
@@ -162,9 +148,7 @@ public class BookingService {
 		booking.setStatus(BookingStatus.CONFIRMED);
 		booking.setConfirmedAt(LocalDateTime.now());
 
-		BookingDTO confirmedBooking = convertToDTO(bookingRepository.save(booking));
-		invalidateEventDashboardCache(confirmedBooking.getEventId());
-		return confirmedBooking;
+		return convertToDTO(bookingRepository.save(booking));
 	}
 
 	@Transactional
@@ -190,9 +174,7 @@ public class BookingService {
 				savedBooking.getId(),
 				savedBooking.getUserId(),
 				savedBooking.getTotalAmount());
-		BookingDTO completedBooking = convertToDTO(savedBooking);
-		invalidateEventDashboardCache(completedBooking.getEventId());
-		return completedBooking;
+		return convertToDTO(savedBooking);
 	}
 
 	public BookingCostEstimateDTO getCostEstimate(BookingEstimateRequestDTO request) {
@@ -232,30 +214,30 @@ public class BookingService {
 
 
 
-    public BookingDTO convertToDTO(Booking booking) {
-        BookingDTO dto = new BookingDTO();
-        dto.setId(booking.getId());
-        dto.setUserId(booking.getUserId());
-        dto.setEventId(booking.getEventId());
-        dto.setContactEmail(booking.getContactEmail());
-        dto.setStatus(booking.getStatus());
-        dto.setTotalAmount(booking.getTotalAmount());
-        dto.setMetadata(booking.getMetadata());
-        dto.setBookingDate(booking.getBookingDate());
-        dto.setConfirmedAt(booking.getConfirmedAt());
+	public BookingDTO convertToDTO(Booking booking) {
+		BookingDTO dto = new BookingDTO();
+		dto.setId(booking.getId());
+		dto.setUserId(booking.getUserId());
+		dto.setEventId(booking.getEventId());
+		dto.setContactEmail(booking.getContactEmail());
+		dto.setStatus(booking.getStatus());
+		dto.setTotalAmount(booking.getTotalAmount());
+		dto.setMetadata(booking.getMetadata());
+		dto.setBookingDate(booking.getBookingDate());
+		dto.setConfirmedAt(booking.getConfirmedAt());
 		dto.setCreatedAt(booking.getCreatedAt());
 
-        if (booking.getBookingItems() != null) {
-            dto.setBookingItems(
-                    booking.getBookingItems().stream()
-                            .sorted(Comparator.comparing(BookingItem::getEventOrder))
-                            .map(bookingItemService::convertToDTO)
-                            .toList()
-            );
-        }
+		if (booking.getBookingItems() != null) {
+			dto.setBookingItems(
+					booking.getBookingItems().stream()
+							.sorted(Comparator.comparing(BookingItem::getEventOrder))
+							.map(bookingItemService::convertToDTO)
+							.toList()
+			);
+		}
 
-        return dto;
-    }
+		return dto;
+	}
 
 	private Booking convertToEntity(BookingDTO dto) {
 		Booking booking = new Booking();
@@ -318,108 +300,98 @@ public class BookingService {
 	}
 
 
-    public BookingDetailsDTO getBookingDetails(Long bookingId) {
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new NoSuchElementException("Booking not found"));
+	public BookingDetailsDTO getBookingDetails(Long bookingId) {
+		Booking booking = bookingRepository.findById(bookingId)
+				.orElseThrow(() -> new NoSuchElementException("Booking not found"));
 
-        BookingDetailsDTO dto = new BookingDetailsDTO();
-        dto.setBookingId(booking.getId());
-        dto.setUserId(booking.getUserId());
-        dto.setEventId(booking.getEventId());
-        dto.setStatus(booking.getStatus());
-        dto.setTotalAmount(booking.getTotalAmount());
-        dto.setMetadata(booking.getMetadata());
+		BookingDetailsDTO dto = new BookingDetailsDTO();
+		dto.setBookingId(booking.getId());
+		dto.setUserId(booking.getUserId());
+		dto.setEventId(booking.getEventId());
+		dto.setStatus(booking.getStatus());
+		dto.setTotalAmount(booking.getTotalAmount());
+		dto.setMetadata(booking.getMetadata());
 
-        List<BookingItem> bookingItems = booking.getBookingItems() == null ? List.of() : booking.getBookingItems();
+		List<BookingItem> bookingItems = booking.getBookingItems() == null ? List.of() : booking.getBookingItems();
 
-        List<BookingItemDTO> itemDTOs = bookingItems.stream()
-                .sorted(Comparator.comparing(BookingItem::getEventOrder))
-                .map(bookingItemService::convertToDTO)
-                .toList();
+		List<BookingItemDTO> itemDTOs = bookingItems.stream()
+				.sorted(Comparator.comparing(BookingItem::getEventOrder))
+				.map(bookingItemService::convertToDTO)
+				.toList();
 
-        int confirmedItems = (int) bookingItems.stream()
-                .filter(item -> item.getStatus() == BookingItemStatus.CONFIRMED)
-                .count();
+		int confirmedItems = (int) bookingItems.stream()
+				.filter(item -> item.getStatus() == BookingItemStatus.CONFIRMED)
+				.count();
 
-        dto.setItems(itemDTOs);
-        dto.setTotalItems(itemDTOs.size());
-        dto.setConfirmedItems(confirmedItems);
+		dto.setItems(itemDTOs);
+		dto.setTotalItems(itemDTOs.size());
+		dto.setConfirmedItems(confirmedItems);
 
-        return dto;
-    }
+		return dto;
+	}
 
-    @Transactional
-    public BookingDTO addItemsToBooking(Long bookingId, List<BookingItemDTO> itemDTOs) {
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new NoSuchElementException("Booking not found"));
+	@Transactional
+	public BookingDTO addItemsToBooking(Long bookingId, List<BookingItemDTO> itemDTOs) {
+		Booking booking = bookingRepository.findById(bookingId)
+				.orElseThrow(() -> new NoSuchElementException("Booking not found"));
 
-        if (booking.getStatus() != BookingStatus.PENDING &&
-                booking.getStatus() != BookingStatus.CONFIRMED &&
-                booking.getStatus() != BookingStatus.CHECKED_IN) {
-            throw new IllegalArgumentException("Items can only be added to PENDING, CONFIRMED, or CHECKED_IN bookings");
-        }
-
-        if (itemDTOs == null || itemDTOs.isEmpty()) {
-            throw new IllegalArgumentException("At least one item must be provided");
-        }
-
-        int currentMaxOrder = booking.getBookingItems() == null ? 0 :
-                booking.getBookingItems().stream()
-                        .mapToInt(BookingItem::getEventOrder)
-                        .max()
-                        .orElse(0);
-
-        for (BookingItemDTO itemDTO : itemDTOs) {
-            if (itemDTO.getSessionId() == null ||
-                    itemDTO.getSessionTitle() == null || itemDTO.getSessionTitle().trim().isEmpty() ||
-                    itemDTO.getQuantity() == null ||
-                    itemDTO.getUnitPrice() == null) {
-                throw new IllegalArgumentException("Each item must have sessionId, sessionTitle, quantity, and unitPrice");
-            }
-
-            BookingItem item = new BookingItem();
-            item.setEventOrder(++currentMaxOrder);
-            item.setSessionId(itemDTO.getSessionId());
-            item.setSessionTitle(itemDTO.getSessionTitle());
-            item.setQuantity(itemDTO.getQuantity());
-            item.setUnitPrice(itemDTO.getUnitPrice());
-            item.setStatus(BookingItemStatus.RESERVED);
-            item.setMetadata(itemDTO.getMetadata());
-
-            booking.addBookingItem(item);
-        }
-
-        Booking savedBooking = bookingRepository.save(booking);
-        BookingDTO updatedBooking = convertToDTO(savedBooking);
-        invalidateEventDashboardCache(updatedBooking.getEventId());
-        return updatedBooking;
-    }
-
-    @Transactional
-    public void cancelBooking(Long bookingId) {
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new NoSuchElementException("Booking not found"));
-
-        if (booking.getStatus() != BookingStatus.PENDING &&
-                booking.getStatus() != BookingStatus.CONFIRMED) {
-            throw new IllegalArgumentException("Only PENDING or CONFIRMED bookings can be cancelled");
-        }
-
-        booking.setStatus(BookingStatus.CANCELLED);
-
-        if (bookingRepository.ticketsTableExists()) {
-            bookingRepository.cancelValidTicketsByBookingId(bookingId);
-        }
-
-        bookingRepository.save(booking);
-        invalidateEventDashboardCache(booking.getEventId());
-    }
-
-	private void invalidateEventDashboardCache(Long eventId) {
-		if (eventId == null) {
-			return;
+		if (booking.getStatus() != BookingStatus.PENDING &&
+				booking.getStatus() != BookingStatus.CONFIRMED &&
+				booking.getStatus() != BookingStatus.CHECKED_IN) {
+			throw new IllegalArgumentException("Items can only be added to PENDING, CONFIRMED, or CHECKED_IN bookings");
 		}
-		cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::" + eventId);
+
+		if (itemDTOs == null || itemDTOs.isEmpty()) {
+			throw new IllegalArgumentException("At least one item must be provided");
+		}
+
+		int currentMaxOrder = booking.getBookingItems() == null ? 0 :
+				booking.getBookingItems().stream()
+						.mapToInt(BookingItem::getEventOrder)
+						.max()
+						.orElse(0);
+
+		for (BookingItemDTO itemDTO : itemDTOs) {
+			if (itemDTO.getSessionId() == null ||
+					itemDTO.getSessionTitle() == null || itemDTO.getSessionTitle().trim().isEmpty() ||
+					itemDTO.getQuantity() == null ||
+					itemDTO.getUnitPrice() == null) {
+				throw new IllegalArgumentException("Each item must have sessionId, sessionTitle, quantity, and unitPrice");
+			}
+
+			BookingItem item = new BookingItem();
+			item.setEventOrder(++currentMaxOrder);
+			item.setSessionId(itemDTO.getSessionId());
+			item.setSessionTitle(itemDTO.getSessionTitle());
+			item.setQuantity(itemDTO.getQuantity());
+			item.setUnitPrice(itemDTO.getUnitPrice());
+			item.setStatus(BookingItemStatus.RESERVED);
+			item.setMetadata(itemDTO.getMetadata());
+
+			booking.addBookingItem(item);
+		}
+
+		Booking savedBooking = bookingRepository.save(booking);
+		return convertToDTO(savedBooking);
+	}
+
+	@Transactional
+	public void cancelBooking(Long bookingId) {
+		Booking booking = bookingRepository.findById(bookingId)
+				.orElseThrow(() -> new NoSuchElementException("Booking not found"));
+
+		if (booking.getStatus() != BookingStatus.PENDING &&
+				booking.getStatus() != BookingStatus.CONFIRMED) {
+			throw new IllegalArgumentException("Only PENDING or CONFIRMED bookings can be cancelled");
+		}
+
+		booking.setStatus(BookingStatus.CANCELLED);
+
+		if (bookingRepository.ticketsTableExists()) {
+			bookingRepository.cancelValidTicketsByBookingId(bookingId);
+		}
+
+		bookingRepository.save(booking);
 	}
 }
 

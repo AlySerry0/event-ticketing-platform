@@ -8,7 +8,6 @@ import com.team7.eventticketing.event.model.EventStatus;
 import com.team7.eventticketing.event.observer.EntityObserver;
 import com.team7.eventticketing.event.observer.MongoEventLogger;
 import com.team7.eventticketing.event.repository.EventRepository;
-import com.team7.eventticketing.event.util.CacheInvalidationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -61,8 +60,6 @@ public class EventService {
     // Dependencies
     // -----------------------------------------------------------------------
     private final EventRepository eventRepository;
-    private final EventDashboardCacheService eventDashboardCacheService;
-    private final CacheInvalidationService cacheInvalidationService;
 
     // Adapters (Adapter Pattern)
     private final ObjectArrayDtoAdapter objectArrayDtoAdapter = new ObjectArrayDtoAdapter();
@@ -72,12 +69,8 @@ public class EventService {
      * as the single observer for this service.
      */
     public EventService(EventRepository eventRepository,
-                        EventDashboardCacheService eventDashboardCacheService,
-                        CacheInvalidationService cacheInvalidationService,
                         MongoEventLogger mongoEventLogger) {
         this.eventRepository = eventRepository;
-        this.eventDashboardCacheService = eventDashboardCacheService;
-        this.cacheInvalidationService = cacheInvalidationService;
         this.register(mongoEventLogger);
     }
 
@@ -252,7 +245,7 @@ public class EventService {
         Map<String, Object> extra = new HashMap<>();
         extra.put("name", updatedEvent.getName());
         notifyObservers("EVENT_UPDATED", buildPayload(eventId, extra));
-        invalidateEventDashboardCache(eventId);
+
 
         return result;
     }
@@ -281,7 +274,7 @@ public class EventService {
         Map<String, Object> extra = new HashMap<>();
         extra.put("updatedKeys", new ArrayList<>(detailsUpdate.keySet()));
         notifyObservers("DETAILS_UPDATED", buildPayload(eventId, extra));
-        invalidateEventDashboardCache(eventId);
+
 
         return result;
     }
@@ -328,7 +321,39 @@ public class EventService {
     }
 
     public EventDashboardDTO getEventDashboard(Long eventId) {
-        EventDashboardDTO dashboard = eventDashboardCacheService.getDashboard(eventId);
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Event not found with id: " + eventId));
+
+        Object[] row = eventRepository.findEventDashboardMetrics(eventId);
+
+        long totalBookings = row != null && row.length > 0 && row[0] != null
+                ? ((Number) row[0]).longValue()
+                : 0L;
+        double totalRevenue = row != null && row.length > 1 && row[1] != null
+                ? ((Number) row[1]).doubleValue()
+                : 0.0;
+        long totalTicketsSold = row != null && row.length > 2 && row[2] != null
+                ? ((Number) row[2]).longValue()
+                : 0L;
+        long usedTickets = row != null && row.length > 3 && row[3] != null
+                ? ((Number) row[3]).longValue()
+                : 0L;
+
+        double averageAttendanceRate = totalTicketsSold == 0
+                ? 0.0
+                : (double) usedTickets / totalTicketsSold;
+
+        EventDashboardDTO dashboard = EventDashboardDTO.builder()
+                .eventId(event.getId())
+                .name(event.getName())
+                .totalBookings(totalBookings)
+                .totalTicketsSold(totalTicketsSold)
+                .totalRevenue(totalRevenue)
+                .averageAttendanceRate(averageAttendanceRate)
+                .averageRating(event.getRating() == null ? 0.0 : event.getRating())
+                .build();
+
         notifyObservers("DASHBOARD_VIEWED", buildPayload(eventId, Collections.emptyMap()));
         return dashboard;
     }
@@ -362,7 +387,7 @@ public class EventService {
         extra.put("oldStatus", oldStatus);
         extra.put("newStatus", newStatus.name());
         notifyObservers("STATUS_CHANGED", buildPayload(eventId, extra));
-        invalidateEventDashboardCache(eventId);
+
     }
 
     // -----------------------------------------------------------------------
@@ -441,7 +466,7 @@ public class EventService {
         extra.put("rating", rating);
         extra.put("newAverageRating", newAvg);
         notifyObservers("RATED", buildPayload(eventId, extra));
-        invalidateEventDashboardCache(eventId);
+
     }
 
     // -----------------------------------------------------------------------
@@ -473,7 +498,6 @@ public class EventService {
         Map<String, Object> extra = new HashMap<>();
         extra.put("rating", newRating);
         notifyObservers("RATED", buildPayload(eventId, extra));
-        invalidateEventDashboardCache(eventId);
 
         return convertToDTO(updatedEvent);
     }
@@ -496,12 +520,9 @@ public class EventService {
         Map<String, Object> extra = new HashMap<>();
         extra.put("name", event.getName());
         notifyObservers("EVENT_DELETED", buildPayload(eventId, extra));
-        invalidateEventDashboardCache(eventId);
+
     }
 
-    private void invalidateEventDashboardCache(Long eventId) {
-        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::" + eventId);
-    }
 
     // -----------------------------------------------------------------------
     // Conversion helper
