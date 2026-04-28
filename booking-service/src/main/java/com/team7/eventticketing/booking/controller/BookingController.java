@@ -88,7 +88,7 @@ public class BookingController {
         }
     }
 
-	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PutMapping("/{id}/complete")
 	public ResponseEntity<BookingDTO> completeBooking(@PathVariable Long id) {
 		return ResponseEntity.ok(bookingService.completeBooking(id));
@@ -120,7 +120,7 @@ public class BookingController {
 		}
 	}
 
-	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/analytics")
 	public ResponseEntity<BookingAnalyticsDTO> getAnalytics(
 			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -130,7 +130,7 @@ public class BookingController {
 		return ResponseEntity.ok(report);
 	}
 
-	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/metadata/search")
 	public ResponseEntity<List<BookingDTO>> searchByMetadata(
 			@RequestParam String key,
