@@ -26,7 +26,8 @@ spring:
     local-datacenter: ${SPRING_CASSANDRA_LOCAL_DATACENTER:datacenter1}
     keyspace-name: ${SPRING_CASSANDRA_KEYSPACE_NAME:eventticketingks}
     schema-action: CREATE_IF_NOT_EXISTS
-
+  mongodb:
+    uri: ${SPRING_DATA_MONGODB_URI:mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin}
   web:
     error:
       include-message: always

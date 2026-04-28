@@ -1,10 +1,12 @@
 package com.team7.eventticketing.event.controller;
 
 import com.team7.eventticketing.event.dto.CreateEventDTO;
+import com.team7.eventticketing.event.dto.EventDashboardDTO;
 import com.team7.eventticketing.event.dto.EventDTO;
 import com.team7.eventticketing.event.dto.EventRevenueDTO;
 import com.team7.eventticketing.event.dto.TopEventDTO;
 import com.team7.eventticketing.event.dto.UpdateEventDTO;
+import com.team7.eventticketing.event.service.EventIndexService;
 import com.team7.eventticketing.event.service.EventService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,9 +26,11 @@ import java.util.Map;
 public class EventController {
 
     private final EventService eventService;
+    private final EventIndexService eventIndexService;
 
-    public EventController(EventService eventService) {
+    public EventController(EventService eventService, EventIndexService eventIndexService) {
         this.eventService = eventService;
+        this.eventIndexService = eventIndexService;
     }
 
     /**
@@ -194,6 +198,15 @@ public class EventController {
     }
 
     /**
+     * Get event performance dashboard according to S2-F12
+     * GET /api/events/{id}/dashboard
+     */
+    @GetMapping("/{id}/dashboard")
+    public ResponseEntity<EventDashboardDTO> getEventDashboard(@PathVariable Long id) {
+        return ResponseEntity.ok(eventService.getEventDashboard(id));
+    }
+
+    /**
      * Update event status according to S2-F4
      * PUT /api/events/{id}/status
      * Body: {"status":"CANCELLED"}
@@ -291,6 +304,12 @@ public class EventController {
 
         Integer finalRating = rating.intValue();
         eventService.rateEventAfterAttendance(id, bookingId, finalRating);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/index")
+    public ResponseEntity<Void> indexEvent(@PathVariable Long id) {
+        eventIndexService.indexEvent(id, "explicit");
         return ResponseEntity.ok().build();
     }
 }

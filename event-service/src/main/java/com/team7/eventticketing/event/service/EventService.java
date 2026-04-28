@@ -39,6 +39,9 @@ public class EventService {
     // Observer registry (classical GoF — not Spring ApplicationEventPublisher)
     // -----------------------------------------------------------------------
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
+    private final  EventIndexService eventIndexService;  // needed to trigger re-indexing on updates
+
+
 
     public void register(EntityObserver observer) {
         if (!observers.contains(observer)) {
@@ -68,8 +71,9 @@ public class EventService {
      * Constructor — MongoEventLogger is injected by Spring and registered
      * as the single observer for this service.
      */
-    public EventService(EventRepository eventRepository, MongoEventLogger mongoEventLogger) {
+    public EventService(EventRepository eventRepository, MongoEventLogger mongoEventLogger, EventIndexService eventIndexService) {
         this.eventRepository = eventRepository;
+        this.eventIndexService = eventIndexService;
         this.register(mongoEventLogger);
     }
 
@@ -107,6 +111,7 @@ public class EventService {
         }
 
         Event savedEvent = eventRepository.save(event);
+        eventIndexService.indexEvent(savedEvent.getId(), "auto_crud_create");
         EventDTO result = convertToDTO(savedEvent);
 
         // Observer notification — EVENT_CREATED
@@ -238,12 +243,15 @@ public class EventService {
         if (eventDTO.getDetails() != null)   event.setDetails(eventDTO.getDetails());
 
         Event updatedEvent = eventRepository.save(event);
+        eventIndexService.indexEvent(updatedEvent.getId(), "auto_crud_update");
+
         EventDTO result = convertToDTO(updatedEvent);
 
         // Observer notification — EVENT_UPDATED
         Map<String, Object> extra = new HashMap<>();
         extra.put("name", updatedEvent.getName());
         notifyObservers("EVENT_UPDATED", buildPayload(eventId, extra));
+
 
         return result;
     }
@@ -272,6 +280,7 @@ public class EventService {
         Map<String, Object> extra = new HashMap<>();
         extra.put("updatedKeys", new ArrayList<>(detailsUpdate.keySet()));
         notifyObservers("DETAILS_UPDATED", buildPayload(eventId, extra));
+
 
         return result;
     }
@@ -317,6 +326,44 @@ public class EventService {
         );
     }
 
+    public EventDashboardDTO getEventDashboard(Long eventId) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Event not found with id: " + eventId));
+
+        Object[] row = eventRepository.findEventDashboardMetrics(eventId);
+
+        long totalBookings = row != null && row.length > 0 && row[0] != null
+                ? ((Number) row[0]).longValue()
+                : 0L;
+        double totalRevenue = row != null && row.length > 1 && row[1] != null
+                ? ((Number) row[1]).doubleValue()
+                : 0.0;
+        long totalTicketsSold = row != null && row.length > 2 && row[2] != null
+                ? ((Number) row[2]).longValue()
+                : 0L;
+        long usedTickets = row != null && row.length > 3 && row[3] != null
+                ? ((Number) row[3]).longValue()
+                : 0L;
+
+        double averageAttendanceRate = totalTicketsSold == 0
+                ? 0.0
+                : (double) usedTickets / totalTicketsSold;
+
+        EventDashboardDTO dashboard = EventDashboardDTO.builder()
+                .eventId(event.getId())
+                .name(event.getName())
+                .totalBookings(totalBookings)
+                .totalTicketsSold(totalTicketsSold)
+                .totalRevenue(totalRevenue)
+                .averageAttendanceRate(averageAttendanceRate)
+                .averageRating(event.getRating() == null ? 0.0 : event.getRating())
+                .build();
+
+        notifyObservers("DASHBOARD_VIEWED", buildPayload(eventId, Collections.emptyMap()));
+        return dashboard;
+    }
+
     // -----------------------------------------------------------------------
     // S2-F4 — Status update
     // -----------------------------------------------------------------------
@@ -346,6 +393,7 @@ public class EventService {
         extra.put("oldStatus", oldStatus);
         extra.put("newStatus", newStatus.name());
         notifyObservers("STATUS_CHANGED", buildPayload(eventId, extra));
+
     }
 
     // -----------------------------------------------------------------------
@@ -424,6 +472,7 @@ public class EventService {
         extra.put("rating", rating);
         extra.put("newAverageRating", newAvg);
         notifyObservers("RATED", buildPayload(eventId, extra));
+
     }
 
     // -----------------------------------------------------------------------
@@ -471,13 +520,17 @@ public class EventService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Event not found with id: " + eventId));
 
+        eventIndexService.removeFromIndex(eventId, event.getName()); // ES only
         eventRepository.delete(event);
 
         // Observer notification — EVENT_DELETED
         Map<String, Object> extra = new HashMap<>();
         extra.put("name", event.getName());
+        extra.put("source", "auto_crud_delete");
         notifyObservers("EVENT_DELETED", buildPayload(eventId, extra));
+
     }
+
 
     // -----------------------------------------------------------------------
     // Conversion helper
