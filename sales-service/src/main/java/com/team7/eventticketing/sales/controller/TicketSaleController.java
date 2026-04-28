@@ -145,5 +145,10 @@ public class TicketSaleController {
         TicketSale updatedSale = ticketSaleService.retryFailedSale(id);
         return ResponseEntity.ok(ticketSaleService.convertToDTO(updatedSale));
     }
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+    @GetMapping("/{id}/audit-trail")
+    public ResponseEntity<SaleAuditTrailDTO> getSaleAuditTrail(@PathVariable Long id) {
+        return ResponseEntity.ok(ticketSaleService.getSaleAuditTrail(id));
+    }
 }
 
