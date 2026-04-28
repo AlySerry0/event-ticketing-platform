@@ -7,6 +7,7 @@ import com.team7.eventticketing.event.dto.TopEventDTO;
 import com.team7.eventticketing.event.dto.UpdateEventDTO;
 import com.team7.eventticketing.event.service.EventIndexService;
 import com.team7.eventticketing.event.service.EventService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -301,5 +302,22 @@ public class EventController {
     public ResponseEntity<Void> indexEvent(@PathVariable Long id) {
         eventIndexService.indexEvent(id, "explicit");
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/search/full-text")
+    public ResponseEntity<List<EventDTO>> searchEventsFullText(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String venue,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) Double minRating,
+            @RequestParam(required = false) Double maxRating) {
+
+        List<EventDTO> results = eventService.searchEventsFullText(
+                query, category, venue, status, startDate, endDate, minRating, maxRating);
+
+        return ResponseEntity.ok(results);
     }
 }

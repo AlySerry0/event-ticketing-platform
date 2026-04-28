@@ -1,13 +1,19 @@
 package com.team7.eventticketing.event.service;
 
+import com.team7.eventticketing.event.adapter.ElasticsearchHitAdapter;
 import com.team7.eventticketing.event.adapter.ObjectArrayDtoAdapter;
 import com.team7.eventticketing.event.dto.*;
+import com.team7.eventticketing.event.elasticsearch.EventSearchDocument;
 import com.team7.eventticketing.event.model.Event;
 import com.team7.eventticketing.event.model.EventCategory;
 import com.team7.eventticketing.event.model.EventStatus;
 import com.team7.eventticketing.event.observer.EntityObserver;
 import com.team7.eventticketing.event.observer.MongoEventLogger;
 import com.team7.eventticketing.event.repository.EventRepository;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.elasticsearch.core.query.Criteria;
+import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,7 +46,8 @@ public class EventService {
     // -----------------------------------------------------------------------
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
     private final  EventIndexService eventIndexService;  // needed to trigger re-indexing on updates
-
+    private final ElasticsearchOperations elasticsearchOperations;
+    private final ElasticsearchHitAdapter elasticsearchHitAdapter;
 
 
     public void register(EntityObserver observer) {
@@ -71,9 +78,11 @@ public class EventService {
      * Constructor — MongoEventLogger is injected by Spring and registered
      * as the single observer for this service.
      */
-    public EventService(EventRepository eventRepository, MongoEventLogger mongoEventLogger, EventIndexService eventIndexService) {
+    public EventService(EventRepository eventRepository, MongoEventLogger mongoEventLogger, EventIndexService eventIndexService, ElasticsearchOperations elasticsearchOperations, ElasticsearchHitAdapter elasticsearchHitAdapter) {
         this.eventRepository = eventRepository;
         this.eventIndexService = eventIndexService;
+        this.elasticsearchOperations = elasticsearchOperations;
+        this.elasticsearchHitAdapter = elasticsearchHitAdapter;
         this.register(mongoEventLogger);
     }
 
@@ -486,6 +495,62 @@ public class EventService {
         extra.put("name", event.getName());
         extra.put("source", "auto_crud_delete");
         notifyObservers("EVENT_DELETED", buildPayload(eventId, extra));
+    }
+
+
+    public List<EventDTO> searchEventsFullText(
+            String query, String category, String venue, String status,
+            LocalDate startDate, LocalDate endDate, Double minRating, Double maxRating) {
+
+        Criteria criteria = new Criteria();
+
+        // b) Full-text search on query against name, description, and venue
+        if (query != null && !query.isBlank()) {
+            criteria.subCriteria(new Criteria("name").contains(query)
+                    .or(new Criteria("description").contains(query))
+                    .or(new Criteria("venue").contains(query)));
+        }
+
+        // c) Optional Exact Match & Range Filters
+        if (category != null && !category.isBlank()) {
+            criteria.and(new Criteria("category").is(category));
+        }
+        if (venue != null && !venue.isBlank()) {
+            criteria.and(new Criteria("venue").is(venue));
+        }
+        if (status != null && !status.isBlank()) {
+            criteria.and(new Criteria("status").is(status));
+        }
+
+        // Rating Range Filter
+        if (minRating != null) {
+            criteria.and(new Criteria("rating").greaterThanEqual(minRating));
+        }
+        if (maxRating != null) {
+            criteria.and(new Criteria("rating").lessThanEqual(maxRating));
+        }
+
+        // Date Range Filter (Expanding to cover the entire day constraints)
+        if (startDate != null || endDate != null) {
+            Criteria dateCriteria = new Criteria("eventDate");
+            if (startDate != null) {
+                dateCriteria.greaterThanEqual(startDate.atStartOfDay());
+            }
+            if (endDate != null) {
+                dateCriteria.lessThanEqual(endDate.atTime(LocalTime.MAX));
+            }
+            criteria.and(dateCriteria);
+        }
+
+        CriteriaQuery criteriaQuery = new CriteriaQuery(criteria);
+
+        // Execute query
+        SearchHits<EventSearchDocument> searchHits = elasticsearchOperations.search(criteriaQuery, EventSearchDocument.class);
+
+        // d) Map hits using the required Adapter Pattern
+        return searchHits.getSearchHits().stream()
+                .map(elasticsearchHitAdapter::adapt)
+                .collect(Collectors.toList());
     }
 
     // -----------------------------------------------------------------------
