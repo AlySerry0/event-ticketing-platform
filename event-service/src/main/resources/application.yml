@@ -15,8 +15,8 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
   data:
-#    mongodb:
-#      uri: ${SPRING_DATA_MONGODB_URI:mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin}
+    mongodb:
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin}
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: 6379
