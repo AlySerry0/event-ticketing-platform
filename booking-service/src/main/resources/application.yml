@@ -25,7 +25,8 @@ spring:
       authentication:
         username: ${SPRING_NEO4J_AUTHENTICATION_USERNAME:neo4j}
         password: ${SPRING_NEO4J_AUTHENTICATION_PASSWORD:neo4jpass}
-
+  mongodb:
+    uri: ${SPRING_MONGODB_URI:mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin}
   web:
     error:
       include-message: always

@@ -52,7 +52,7 @@ services:
       retries: 5
 
   elasticsearch:
-    image: elasticsearch:8.19.12
+    image: elasticsearch:9.0.3
     container_name: eventticketing-elasticsearch
     ports:
       - "9200:9200"
@@ -153,7 +153,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/eventticketingdb
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
-      SPRING_DATA_MONGODB_URI: mongodb://root:rootpass@mongo:27017/eventticketingmongo?authSource=admin
+      SPRING_MONGODB_URI: mongodb://root:rootpass@mongo:27017/eventticketingmongo?authSource=admin
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PASSWORD: redispass
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200

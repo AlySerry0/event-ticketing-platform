@@ -39,6 +39,9 @@ public class EventService {
     // Observer registry (classical GoF — not Spring ApplicationEventPublisher)
     // -----------------------------------------------------------------------
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
+    private final  EventIndexService eventIndexService;  // needed to trigger re-indexing on updates
+
+
 
     public void register(EntityObserver observer) {
         if (!observers.contains(observer)) {
@@ -68,9 +71,9 @@ public class EventService {
      * Constructor — MongoEventLogger is injected by Spring and registered
      * as the single observer for this service.
      */
-    public EventService(EventRepository eventRepository,
-                        MongoEventLogger mongoEventLogger) {
+    public EventService(EventRepository eventRepository, MongoEventLogger mongoEventLogger, EventIndexService eventIndexService) {
         this.eventRepository = eventRepository;
+        this.eventIndexService = eventIndexService;
         this.register(mongoEventLogger);
     }
 
@@ -108,6 +111,7 @@ public class EventService {
         }
 
         Event savedEvent = eventRepository.save(event);
+        eventIndexService.indexEvent(savedEvent.getId(), "auto_crud_create");
         EventDTO result = convertToDTO(savedEvent);
 
         // Observer notification — EVENT_CREATED
@@ -239,6 +243,8 @@ public class EventService {
         if (eventDTO.getDetails() != null)   event.setDetails(eventDTO.getDetails());
 
         Event updatedEvent = eventRepository.save(event);
+        eventIndexService.indexEvent(updatedEvent.getId(), "auto_crud_update");
+
         EventDTO result = convertToDTO(updatedEvent);
 
         // Observer notification — EVENT_UPDATED
@@ -514,11 +520,13 @@ public class EventService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Event not found with id: " + eventId));
 
+        eventIndexService.removeFromIndex(eventId, event.getName()); // ES only
         eventRepository.delete(event);
 
         // Observer notification — EVENT_DELETED
         Map<String, Object> extra = new HashMap<>();
         extra.put("name", event.getName());
+        extra.put("source", "auto_crud_delete");
         notifyObservers("EVENT_DELETED", buildPayload(eventId, extra));
 
     }
