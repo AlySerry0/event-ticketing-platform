@@ -2,6 +2,9 @@ package com.team7.eventticketing.user.service;
 
 import com.team7.eventticketing.user.dto.*;
 import com.team7.eventticketing.user.model.*;
+import com.team7.eventticketing.user.observer.EntityObserver;
+import com.team7.eventticketing.user.observer.MongoEventLogger;
+import com.team7.eventticketing.user.repository.AuthEventRepository;
 import com.team7.eventticketing.user.repository.UserRepository;
 import com.team7.eventticketing.user.util.CacheInvalidationService;
 import org.springframework.cache.annotation.Cacheable;
@@ -18,16 +21,12 @@ import com.team7.eventticketing.user.model.UserRole;
 import com.team7.eventticketing.user.model.User;
 
 import java.time.LocalTime;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
-import java.util.List;
 import java.util.stream.Collectors;
 
 import com.team7.eventticketing.user.dto.UserBookingSummaryDTO;
 import com.team7.eventticketing.user.repository.BookingSummaryProjection;
-
-import java.util.Arrays;
 
 @Service
 @Transactional(readOnly = true)
@@ -36,10 +35,37 @@ public class UserService {
     private final UserRepository userRepository;
     private final CacheInvalidationService cacheInvalidationService;
 
+    private final List<EntityObserver> observers = new ArrayList<>();
+
     public UserService(UserRepository userRepository,
-                       CacheInvalidationService cacheInvalidationService) {
+                       CacheInvalidationService cacheInvalidationService,
+                       AuthEventRepository authEventRepository) {
         this.userRepository = userRepository;
         this.cacheInvalidationService = cacheInvalidationService;
+        this.registerObserver(new MongoEventLogger(authEventRepository));
+    }
+
+    // -----------------------------------------------------------------------
+    // Observer management methods (Section 3.3)
+    // -----------------------------------------------------------------------
+
+    public void registerObserver(EntityObserver observer) {
+        observers.add(observer);
+    }
+
+    public void unregisterObserver(EntityObserver observer) {
+        observers.remove(observer);
+    }
+
+    /**
+     * Notifies all registered observers of a state change.
+     * The first argument is the action string (what happened).
+     * The second argument is the payload (relevant data).
+     */
+    private void notifyObservers(String eventType, Object payload) {
+        for (EntityObserver observer : observers) {
+            observer.onEvent(eventType, payload);
+        }
     }
 
     /**
@@ -75,6 +101,12 @@ public class UserService {
         }
 
         User savedUser = userRepository.save(user);
+        notifyObservers("USER_CREATED", Map.of(
+                "userId", savedUser.getId(),
+                "email", savedUser.getEmail(),
+                "role", savedUser.getRole(),
+                "timestamp", savedUser.getCreatedAt()
+        ));
         return convertToDTO(savedUser);
     }
 
@@ -166,6 +198,12 @@ public class UserService {
 
         User updatedUser = userRepository.save(user);
         invalidateUserCaches(id);
+        notifyObservers("USER_UPDATED", Map.of(
+                "userId", updatedUser.getId(),
+                "email", updatedUser.getEmail(),
+                "role", updatedUser.getRole(),
+                "timestamp", LocalDateTime.now()
+        ));
         return convertToDTO(updatedUser);
     }
 
@@ -192,6 +230,12 @@ public class UserService {
         user.setStatus(UserStatus.DEACTIVATED);
         User updatedUser = userRepository.save(user);
         invalidateUserCaches(id);
+        notifyObservers("USER_DEACTIVATED", Map.of(
+                "userId", updatedUser.getId(),
+                "email", updatedUser.getEmail(),
+                "role", updatedUser.getRole(),
+                "timestamp", LocalDateTime.now()
+        ));
         return convertToDTO(updatedUser);
     }
 
@@ -209,6 +253,12 @@ public class UserService {
         user.setStatus(UserStatus.ACTIVE);
         User updatedUser = userRepository.save(user);
         invalidateUserCaches(id);
+        notifyObservers("USER_ACTIVATED", Map.of(
+                "userId", updatedUser.getId(),
+                "email", updatedUser.getEmail(),
+                "role", updatedUser.getRole(),
+                "timestamp", LocalDateTime.now()
+        ));
         return convertToDTO(updatedUser);
     }
 
@@ -225,6 +275,10 @@ public class UserService {
         }
         userRepository.deleteById(id);
         invalidateUserCaches(id);
+        notifyObservers("USER_DELETED", Map.of(
+                "userId", id,
+                "timestamp", LocalDateTime.now()
+        ));
     }
 
     /**
@@ -265,6 +319,13 @@ public class UserService {
             currentPreferences.putAll(newPreferences);
         }
 
+        notifyObservers("USER_UPDATED", Map.of(
+                "userId", user.getId(),
+                "email", user.getEmail(),
+                "role", user.getRole(),
+                "updatedFields", List.of("preferences"),
+                "timestamp", LocalDateTime.now()
+        ));
         user.setPreferences(currentPreferences);
         User updatedUser = userRepository.save(user);
         invalidateUserCaches(id);
@@ -398,8 +459,13 @@ public class UserService {
         user.setRole(newRole);
         user = userRepository.save(user);
 
-        // TODO: fire Observer → MongoDB ROLE_CHANGED event (details: oldRole, newRole)
-
+        notifyObservers("ROLE_CHANGED", Map.of(
+                "userId", user.getId(),
+                "email", user.getEmail(),
+                "oldRole", oldRole,
+                "newRole", newRole.name(),
+                "timestamp", LocalDateTime.now()
+        ));
         // Invalidate user detail + activity feed (S1-F12) per PDF §4.4.4 M2 rule
         cacheInvalidationService.invalidateCacheWildcard("user-service::user::" + id);
         cacheInvalidationService.invalidateCacheWildcard("user-service::S1-F12::*");
