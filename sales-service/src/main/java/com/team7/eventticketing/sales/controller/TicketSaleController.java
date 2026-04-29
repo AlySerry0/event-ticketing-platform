@@ -47,6 +47,7 @@ public class TicketSaleController {
         return ticketSaleService.findAll();
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/search")
     public List<TicketSaleDTO> searchTicketSales(
             @RequestParam(required = false) TicketSaleStatus status,
@@ -109,12 +110,14 @@ public class TicketSaleController {
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(ticketSaleService.convertToDTO(updatedSale));
     }
-    
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/user/{userId}/summary")
     public ResponseEntity<UserSaleSummaryDTO> getUserSaleSummary(@PathVariable Long userId) {
         return ResponseEntity.ok(ticketSaleService.getUserSaleSummary(userId));
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PutMapping("/{id}/refund")
     public ResponseEntity<TicketSaleDTO> processRefund(
             @PathVariable Long id,
