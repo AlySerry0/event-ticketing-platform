@@ -21,6 +21,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import com.team7.eventticketing.sales.observer.EntityObserver;
+import com.team7.eventticketing.sales.observer.MongoEventLogger;
+import com.team7.eventticketing.sales.util.CacheInvalidationService;
+import jakarta.annotation.PostConstruct;
+
+import java.util.ArrayList;
+
 @Service
 public class TicketSaleService {
 
@@ -291,6 +298,23 @@ public class TicketSaleService {
         ticketSale.setTransactionDetails(transactionDetails);
 
         TicketSale saved = ticketSaleRepository.save(ticketSale);
+
+        Map<String, Object> detailsPayload = new HashMap<>();
+        detailsPayload.put("refundReason", reason);
+        detailsPayload.put("refundedAt", saved.getTransactionDetails().get("refundedAt"));
+
+        Map<String, Object> eventPayload = new HashMap<>();
+        eventPayload.put("saleId", saved.getId());
+        eventPayload.put("method", saved.getMethod() != null ? saved.getMethod().name() : null);
+        eventPayload.put("amount", saved.getAmount());
+        eventPayload.put("details", detailsPayload);
+
+        notifyObservers("REFUNDED", eventPayload);
+
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + saved.getId());
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::ticket-sale::" + saved.getId());
+
         return convertToDTO(saved);
     }
 
@@ -374,6 +398,34 @@ public class TicketSaleService {
         dto.setFinalAmount(sale.getAmount() - totalDiscount);
 
         return dto;
+    }
+
+    @Autowired
+    private MongoEventLogger mongoEventLogger;
+
+    @Autowired
+    private CacheInvalidationService cacheInvalidationService;
+
+    private final List<EntityObserver> observers = new ArrayList<>();
+
+
+    @PostConstruct
+    public void initObservers() {
+        register(mongoEventLogger);
+    }
+
+    public void register(EntityObserver observer) {
+        observers.add(observer);
+    }
+
+    public void unregister(EntityObserver observer) {
+        observers.remove(observer);
+    }
+
+    protected void notifyObservers(String eventType, Object payload) {
+        for (EntityObserver observer : observers) {
+            observer.onEvent(eventType, payload);
+        }
     }
 
 }
