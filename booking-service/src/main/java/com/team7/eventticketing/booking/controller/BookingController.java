@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -92,7 +93,8 @@ public class BookingController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
     }
-	
+
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PutMapping("/{id}/complete")
 	public ResponseEntity<BookingDTO> completeBooking(@PathVariable Long id) {
 		return ResponseEntity.ok(bookingService.completeBooking(id));
@@ -127,6 +129,7 @@ public class BookingController {
 		}
 	}
 
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/analytics")
 	public ResponseEntity<BookingAnalyticsDTO> getAnalytics(
 			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -136,6 +139,7 @@ public class BookingController {
 		return ResponseEntity.ok(report);
 	}
 
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/metadata/search")
 	public ResponseEntity<List<BookingDTO>> searchByMetadata(
 			@RequestParam String key,

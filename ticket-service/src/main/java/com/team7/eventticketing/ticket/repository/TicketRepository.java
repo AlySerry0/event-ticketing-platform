@@ -58,6 +58,11 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     @Query(value = "SELECT EXISTS(SELECT 1 FROM bookings WHERE id = :bookingId)", nativeQuery = true)
     boolean existsBookingById(@Param("bookingId") Long bookingId);
 
+    @Query(value = "SELECT event_id FROM bookings WHERE id = :bookingId", nativeQuery = true)
+    Long findEventIdByBookingId(@Param("bookingId") Long bookingId);
+
+   
+
     @Query(value = """
         SELECT 
             t.id, 
