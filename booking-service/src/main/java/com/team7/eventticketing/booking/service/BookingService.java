@@ -17,6 +17,14 @@ import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
 import com.team7.eventticketing.booking.dto.BookingItemDTO;
 import com.team7.eventticketing.booking.model.BookingItemStatus;
 import java.util.Comparator;
+import com.team7.eventticketing.booking.observer.EntityObserver;
+import com.team7.eventticketing.booking.observer.EntitySubject;
+import com.team7.eventticketing.booking.observer.MongoEventLogger;
+import com.team7.eventticketing.booking.util.CacheInvalidationService;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -26,13 +34,23 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 
 @Service
-public class BookingService {
+public class BookingService implements EntitySubject {
 
 	@Autowired
 	private BookingRepository bookingRepository;
 
 	@Autowired
 	private BookingItemService bookingItemService;
+
+    @Autowired
+    private CacheInvalidationService cacheInvalidationService;
+
+    private final List<EntityObserver> observers = new ArrayList<>();
+
+    @Autowired
+    public void registerMongoLogger(MongoEventLogger mongoEventLogger) {
+        register(mongoEventLogger);
+    }
 
 	public BookingDTO save(BookingDTO bookingDTO) {
 		Booking booking = convertToEntity(bookingDTO);
@@ -330,6 +348,12 @@ public class BookingService {
 		return dto;
 	}
 
+    private void invalidateBookingCaches(Long bookingId) {
+        cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + bookingId);
+        cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F9::*");
+        cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+    }
+
 	@Transactional
 	public BookingDTO addItemsToBooking(Long bookingId, List<BookingItemDTO> itemDTOs) {
 		Booking booking = bookingRepository.findById(bookingId)
@@ -372,7 +396,19 @@ public class BookingService {
 		}
 
 		Booking savedBooking = bookingRepository.save(booking);
-		return convertToDTO(savedBooking);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("bookingId", savedBooking.getId());
+        payload.put("userId", savedBooking.getUserId());
+        payload.put("eventId", savedBooking.getEventId());
+        payload.put("itemsAdded", itemDTOs.size());
+        payload.put("status", savedBooking.getStatus().name());
+
+        notifyObservers("ITEMS_ADDED", payload);
+
+        invalidateBookingCaches(savedBooking.getId());
+
+        return convertToDTO(savedBooking);
 	}
 
 	@Transactional
@@ -391,7 +427,34 @@ public class BookingService {
 			bookingRepository.cancelValidTicketsByBookingId(bookingId);
 		}
 
-		bookingRepository.save(booking);
+        Booking savedBooking = bookingRepository.save(booking);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("bookingId", savedBooking.getId());
+        payload.put("userId", savedBooking.getUserId());
+        payload.put("eventId", savedBooking.getEventId());
+        payload.put("status", savedBooking.getStatus().name());
+
+        notifyObservers("BOOKING_CANCELLED", payload);
+
+        invalidateBookingCaches(savedBooking.getId());
 	}
+
+    @Override
+    public void register(EntityObserver o) {
+        observers.add(o);
+    }
+
+    @Override
+    public void unregister(EntityObserver o) {
+        observers.remove(o);
+    }
+
+    @Override
+    public void notifyObservers(String action, Object payload) {
+        for (EntityObserver observer : observers) {
+            observer.onEvent(action, payload);
+        }
+    }
 }
 
