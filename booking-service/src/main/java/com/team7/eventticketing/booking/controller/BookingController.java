@@ -13,7 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.security.access.prepost.PreAuthorize;
 import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
 import com.team7.eventticketing.booking.dto.BookingItemDTO;
 
@@ -82,6 +81,7 @@ public class BookingController {
 		}
 	}
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PutMapping("/{id}/cancel")
     public ResponseEntity<Void> cancelBooking(@PathVariable Long id) {
         try {
@@ -146,6 +146,8 @@ public class BookingController {
 			@RequestParam String value) {
 		return ResponseEntity.ok(bookingService.filterBookingsByMetadata(key, value));
 	}
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/{id}/items")
 	public ResponseEntity<List<BookingItemDTO>> getBookingItems(@PathVariable Long id) {
 		return bookingService.findById(id)
@@ -153,6 +155,8 @@ public class BookingController {
 				.map(ResponseEntity::ok)
 				.orElse(ResponseEntity.notFound().build());
 	}
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PostMapping("/{bookingId}/items")
     public ResponseEntity<BookingDTO> addItemsToBooking(
             @PathVariable Long bookingId,
@@ -167,6 +171,7 @@ public class BookingController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/{bookingId}/details")
     public ResponseEntity<BookingDetailsDTO> getBookingDetails(@PathVariable Long bookingId) {
         try {
