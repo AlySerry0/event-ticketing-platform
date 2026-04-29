@@ -1,6 +1,7 @@
 package com.team7.eventticketing.booking.controller;
 
 import com.team7.eventticketing.booking.dto.BookingAnalyticsDTO;
+import com.team7.eventticketing.booking.dto.BookingAnalyticsDashboardDTO;
 import com.team7.eventticketing.booking.dto.BookingCostEstimateDTO;
 import com.team7.eventticketing.booking.dto.BookingDTO;
 import com.team7.eventticketing.booking.dto.BookingEstimateRequestDTO;
@@ -10,7 +11,6 @@ import com.team7.eventticketing.booking.service.BookingService;
 import com.team7.eventticketing.booking.observer.MongoEventLogger;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -33,13 +33,13 @@ public class BookingController {
 	@Autowired
 	private MongoEventLogger mongoEventLogger;
 
-	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
 	@PostMapping
 	public BookingDTO create(@RequestBody BookingDTO bookingDTO) {
 		return bookingService.save(bookingDTO);
 	}
 
-	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
 	@GetMapping("/{id}")
 	public ResponseEntity<BookingDTO> getById(@PathVariable Long id) {
 		return bookingService.findById(id)
@@ -47,7 +47,7 @@ public class BookingController {
 				.orElse(ResponseEntity.notFound().build());
 	}
 
-	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
 	@GetMapping
 	public List<BookingDTO> getAll() {
 		return bookingService.findAll();
@@ -55,9 +55,8 @@ public class BookingController {
 
 	/**
 	 * [S3-F1] Get Bookings by Status and Date Range
-	 * GET /api/bookings/search?status={s}&startDate={d}&endDate={d}
 	 */
-	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
 	@GetMapping("/search")
 	public ResponseEntity<List<BookingDTO>> searchBookings(
 			@RequestParam(required = false) String status,
@@ -72,7 +71,7 @@ public class BookingController {
 		}
 	}
 
-	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
 	@PutMapping("/{id}/confirm")
 	public ResponseEntity<BookingDTO> confirmBooking(@PathVariable Long id, @RequestParam Long eventId) {
 		try {
@@ -97,13 +96,13 @@ public class BookingController {
 		}
 	}
 
-	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
 	@PutMapping("/{id}/complete")
 	public ResponseEntity<BookingDTO> completeBooking(@PathVariable Long id) {
 		return ResponseEntity.ok(bookingService.completeBooking(id));
 	}
 
-	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
 	@PutMapping("/{id}")
 	public ResponseEntity<BookingDTO> update(@PathVariable Long id, @RequestBody BookingDTO bookingDetails) {
 		return bookingService.updateBooking(id, bookingDetails)
@@ -111,7 +110,7 @@ public class BookingController {
 				.orElse(ResponseEntity.notFound().build());
 	}
 
-	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> delete(@PathVariable Long id) {
 		if (bookingService.findById(id).isPresent()) {
@@ -121,7 +120,7 @@ public class BookingController {
 		return ResponseEntity.notFound().build();
 	}
 
-	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
 	@PostMapping("/estimate")
 	public ResponseEntity<?> estimateCost(@RequestBody BookingEstimateRequestDTO request) {
 		try {
@@ -132,16 +131,36 @@ public class BookingController {
 		}
 	}
 
-	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	/**
+	 * [M1 S3-F6] Original Analytics Endpoint
+	 * GET /api/bookings/analytics?startDate={d}&endDate={d}
+	 */
+	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
 	@GetMapping("/analytics")
-	@Cacheable(value = "booking-service", key = "'S3-F10::' + #startDate + '_' + #endDate")
 	public ResponseEntity<BookingAnalyticsDTO> getAnalytics(
 			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
 			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
 		BookingAnalyticsDTO report = bookingService.getAnalytics(startDate, endDate);
+		return ResponseEntity.ok(report);
+	}
 
-		mongoEventLogger.onEvent("DASHBOARD_VIEWED", Map.of(
+	/**
+	 * [M2 S3-F10] Analytics Dashboard Endpoint (NEW)
+	 * GET /api/bookings/analytics/dashboard?startDate={d}&endDate={d}
+	 */
+	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
+	@GetMapping("/analytics/dashboard")
+	public ResponseEntity<BookingAnalyticsDashboardDTO> getAnalyticsDashboard(
+			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+		// Call the service (Caching will be handled INSIDE the service method in Phase 5)
+		BookingAnalyticsDashboardDTO report = bookingService.getAnalyticsDashboard(startDate, endDate);
+
+		// Because @Cacheable is removed from the Controller, this method always runs.
+		// This guarantees the Observability log fires even on cache hits.
+		mongoEventLogger.onEvent("ANALYTICS_VIEWED", Map.of(
 				"dashboardType", "BookingAnalytics",
 				"startDate", startDate.toString(),
 				"endDate", endDate.toString(),
@@ -151,13 +170,17 @@ public class BookingController {
 		return ResponseEntity.ok(report);
 	}
 
-	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	/**
+	 * [M1 S3-F5] Metadata Search
+	 */
+	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
 	@GetMapping("/metadata/search")
 	public ResponseEntity<List<BookingDTO>> searchByMetadata(
 			@RequestParam String key,
 			@RequestParam String value) {
 		return ResponseEntity.ok(bookingService.filterBookingsByMetadata(key, value));
 	}
+
 	@GetMapping("/{id}/items")
 	public ResponseEntity<List<BookingItemDTO>> getBookingItems(@PathVariable Long id) {
 		return bookingService.findById(id)
@@ -165,6 +188,7 @@ public class BookingController {
 				.map(ResponseEntity::ok)
 				.orElse(ResponseEntity.notFound().build());
 	}
+
 	@PostMapping("/{bookingId}/items")
 	public ResponseEntity<BookingDTO> addItemsToBooking(
 			@PathVariable Long bookingId,
