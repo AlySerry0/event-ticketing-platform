@@ -1,6 +1,7 @@
 package com.team7.eventticketing.event.service;
 
 import com.team7.eventticketing.event.elasticsearch.EventSearchDocument;
+import com.team7.eventticketing.event.observer.EntityObserver;
 import com.team7.eventticketing.event.repository.EventSearchRepository;
 import com.team7.eventticketing.event.model.Event;
 import com.team7.eventticketing.event.observer.MongoEventLogger;
@@ -11,6 +12,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,16 +24,29 @@ public class EventIndexService {
 
     private final EventRepository eventRepository;          // PG
     private final EventSearchRepository searchRepository;   // ES
-    private final MongoEventLogger mongoEventLogger;        // Observer
     private static final Logger log = LoggerFactory.getLogger(EventIndexService.class);
 
+    private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
+
+    public void register(EntityObserver observer) {
+        if (!observers.contains(observer)) {
+            observers.add(observer);
+        }
+    }
+
+    private void notifyObservers(String action, Object payload) {
+        for (EntityObserver observer : observers) {
+            observer.onEvent(action, payload);
+        }
+    }
     // constructor injection...
     public EventIndexService(EventRepository eventRepository,
                              EventSearchRepository searchRepository,
                              MongoEventLogger mongoEventLogger) {
         this.eventRepository = eventRepository;
         this.searchRepository = searchRepository;
-        this.mongoEventLogger = mongoEventLogger;
+
+        this.register(mongoEventLogger);
     }
 
 
@@ -66,8 +82,7 @@ public class EventIndexService {
         payload.put("indexedFields", List.of("name","category","venue",
                 "description","eventDate","rating","status"));
         payload.put("source", source);
-        mongoEventLogger.onEvent("INDEXED", payload);
-    }
+        notifyObservers("INDEXED", payload);    }
 
     public void removeFromIndex(Long eventId, String eventName) {
         // ES remove — soft dependency only
