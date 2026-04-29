@@ -28,7 +28,6 @@ import com.team7.eventticketing.booking.observer.EntityObserver;
 import com.team7.eventticketing.booking.observer.EntitySubject;
 import com.team7.eventticketing.booking.observer.MongoEventLogger;
 import com.team7.eventticketing.booking.util.CacheInvalidationService;
-import java.util.ArrayList;
 import java.util.Map;
 @Service
 public class BookingService implements EntitySubject {
@@ -39,7 +38,7 @@ public class BookingService implements EntitySubject {
 	@Autowired
 	private BookingItemService bookingItemService;
 
-	private final List<EntityObserver> observers = new ArrayList<>();
+	private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
 	private final CacheInvalidationService cacheInvalidationService;
 
 	@Autowired
@@ -76,7 +75,13 @@ public class BookingService implements EntitySubject {
 			booking.setStatus(BookingStatus.PENDING);
 		}
 
-		return convertToDTO(bookingRepository.save(booking));
+		Booking savedBooking = bookingRepository.save(booking);
+
+		this.notifyObservers("BOOKING_CREATED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::*");
+
+		return convertToDTO(savedBooking);
 	}
 
 	public Optional<BookingDTO> findById(Long id) {
@@ -91,6 +96,10 @@ public class BookingService implements EntitySubject {
 
 	public void deleteById(Long id) {
 		bookingRepository.deleteById(id);
+		
+		this.notifyObservers("BOOKING_DELETED", Map.of("bookingId", id));
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + id);
 	}
 
 	public Optional<BookingDTO> updateBooking(Long id, BookingDTO bookingDetails) {
@@ -118,7 +127,13 @@ public class BookingService implements EntitySubject {
 					booking.getMetadata().putAll(bookingDetails.getMetadata());
 				}
 			}
-			return convertToDTO(bookingRepository.save(booking));
+			Booking savedBooking = bookingRepository.save(booking);
+			
+			this.notifyObservers("BOOKING_UPDATED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
+			cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+			cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + id);
+
+			return convertToDTO(savedBooking);
 		});
 	}
 
@@ -211,6 +226,11 @@ public class BookingService implements EntitySubject {
 				savedBooking.getId(),
 				savedBooking.getUserId(),
 				savedBooking.getTotalAmount());
+		
+		this.notifyObservers("BOOKING_COMPLETED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + id);
+
 		return convertToDTO(savedBooking);
 	}
 
@@ -409,6 +429,11 @@ public class BookingService implements EntitySubject {
 		}
 
 		Booking savedBooking = bookingRepository.save(booking);
+		
+		this.notifyObservers("ITEMS_ADDED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + bookingId);
+
 		return convertToDTO(savedBooking);
 	}
 
@@ -429,6 +454,10 @@ public class BookingService implements EntitySubject {
 		}
 
 		bookingRepository.save(booking);
+		
+		this.notifyObservers("BOOKING_CANCELLED", Map.of("bookingId", bookingId, "status", booking.getStatus()));
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + bookingId);
 	}
 }
 
