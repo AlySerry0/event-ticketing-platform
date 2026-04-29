@@ -4,21 +4,23 @@ import com.team7.eventticketing.booking.dto.BookingAnalyticsDTO;
 import com.team7.eventticketing.booking.dto.BookingCostEstimateDTO;
 import com.team7.eventticketing.booking.dto.BookingDTO;
 import com.team7.eventticketing.booking.dto.BookingEstimateRequestDTO;
-
+import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
+import com.team7.eventticketing.booking.dto.BookingItemDTO;
 import com.team7.eventticketing.booking.service.BookingService;
+import com.team7.eventticketing.booking.observer.MongoEventLogger;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.security.access.prepost.PreAuthorize;
-import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
-import com.team7.eventticketing.booking.dto.BookingItemDTO;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 @RestController
@@ -27,6 +29,9 @@ public class BookingController {
 
 	@Autowired
 	private BookingService bookingService;
+
+	@Autowired
+	private MongoEventLogger mongoEventLogger;
 
 	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PostMapping
@@ -74,25 +79,23 @@ public class BookingController {
 			BookingDTO confirmedBooking = bookingService.confirmBookingAndAssignEvent(id, eventId);
 			return ResponseEntity.ok(confirmedBooking);
 		} catch (NoSuchElementException e) {
-			// Catches "Booking not found" and "Event not found"
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
 		} catch (IllegalArgumentException e) {
-			// Catches "Booking is not PENDING" and "Event is not UPCOMING"
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
 		}
 	}
 
-    @PutMapping("/{id}/cancel")
-    public ResponseEntity<Void> cancelBooking(@PathVariable Long id) {
-        try {
-            bookingService.cancelBooking(id);
-            return ResponseEntity.ok().build();
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-        }
-    }
+	@PutMapping("/{id}/cancel")
+	public ResponseEntity<Void> cancelBooking(@PathVariable Long id) {
+		try {
+			bookingService.cancelBooking(id);
+			return ResponseEntity.ok().build();
+		} catch (NoSuchElementException e) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+		} catch (IllegalArgumentException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+		}
+	}
 
 	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PutMapping("/{id}/complete")
@@ -131,11 +134,20 @@ public class BookingController {
 
 	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/analytics")
+	@Cacheable(value = "booking-service", key = "'S3-F10::' + #startDate + '_' + #endDate")
 	public ResponseEntity<BookingAnalyticsDTO> getAnalytics(
 			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
 			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
 		BookingAnalyticsDTO report = bookingService.getAnalytics(startDate, endDate);
+
+		mongoEventLogger.onEvent("DASHBOARD_VIEWED", Map.of(
+				"dashboardType", "BookingAnalytics",
+				"startDate", startDate.toString(),
+				"endDate", endDate.toString(),
+				"totalRevenueCalculated", report.getTotalRevenue()
+		));
+
 		return ResponseEntity.ok(report);
 	}
 
@@ -153,26 +165,26 @@ public class BookingController {
 				.map(ResponseEntity::ok)
 				.orElse(ResponseEntity.notFound().build());
 	}
-    @PostMapping("/{bookingId}/items")
-    public ResponseEntity<BookingDTO> addItemsToBooking(
-            @PathVariable Long bookingId,
-            @RequestBody List<BookingItemDTO> items) {
-        try {
-            BookingDTO updatedBooking = bookingService.addItemsToBooking(bookingId, items);
-            return ResponseEntity.ok(updatedBooking);
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-        }
-    }
+	@PostMapping("/{bookingId}/items")
+	public ResponseEntity<BookingDTO> addItemsToBooking(
+			@PathVariable Long bookingId,
+			@RequestBody List<BookingItemDTO> items) {
+		try {
+			BookingDTO updatedBooking = bookingService.addItemsToBooking(bookingId, items);
+			return ResponseEntity.ok(updatedBooking);
+		} catch (NoSuchElementException e) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+		} catch (IllegalArgumentException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+		}
+	}
 
-    @GetMapping("/{bookingId}/details")
-    public ResponseEntity<BookingDetailsDTO> getBookingDetails(@PathVariable Long bookingId) {
-        try {
-            return ResponseEntity.ok(bookingService.getBookingDetails(bookingId));
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
-    }
+	@GetMapping("/{bookingId}/details")
+	public ResponseEntity<BookingDetailsDTO> getBookingDetails(@PathVariable Long bookingId) {
+		try {
+			return ResponseEntity.ok(bookingService.getBookingDetails(bookingId));
+		} catch (NoSuchElementException e) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+		}
+	}
 }
