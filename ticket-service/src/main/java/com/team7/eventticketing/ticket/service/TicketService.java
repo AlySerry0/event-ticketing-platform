@@ -21,12 +21,44 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import com.team7.eventticketing.ticket.observer.EntityObserver;
+import com.team7.eventticketing.ticket.observer.EntitySubject;
+import com.team7.eventticketing.ticket.observer.MongoEventLogger;
+import com.team7.eventticketing.ticket.util.CacheInvalidationService;
+import java.util.ArrayList;
+import java.util.Map;
 
 @Service
-public class TicketService {
+public class TicketService implements EntitySubject {
 
     @Autowired
     private TicketRepository ticketRepository;
+
+    private final List<EntityObserver> observers = new ArrayList<>();
+    private final CacheInvalidationService cacheInvalidationService;
+
+    @Autowired
+    public TicketService(MongoEventLogger mongoEventLogger, CacheInvalidationService cacheInvalidationService) {
+        this.cacheInvalidationService = cacheInvalidationService;
+        this.register(mongoEventLogger);
+    }
+
+    @Override
+    public void register(EntityObserver o) {
+        observers.add(o);
+    }
+
+    @Override
+    public void unregister(EntityObserver o) {
+        observers.remove(o);
+    }
+
+    @Override
+    public void notifyObservers(String action, Object payload) {
+        for (EntityObserver observer : observers) {
+            observer.onEvent(action, payload);
+        }
+    }
 
 
     public TicketDTO save(TicketDTO ticketDTO) {
@@ -43,7 +75,13 @@ public class TicketService {
         ticketDTO.setIssuedAt(LocalDateTime.now());
         ticketDTO.setStatus(TicketStatus.VALID);
         Ticket ticket = convertToEntity(ticketDTO);
-        return convertToDTO(ticketRepository.save(ticket));
+        Ticket savedTicket = ticketRepository.save(ticket);
+        
+        this.notifyObservers("TICKET_SAVED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
+
+        return convertToDTO(savedTicket);
     }
 
     public Optional<TicketDTO> findById(Long id) {
@@ -155,9 +193,13 @@ public class TicketService {
         ticket.setTicketCode(request.getTicketCode());
         ticket.setMetadata(request.getMetadata());
         ticket.setStatus(TicketStatus.VALID);
-        ticket.setIssuedAt(LocalDateTime.now());
+        Ticket savedTicket = ticketRepository.save(ticket);
+        
+        this.notifyObservers("TICKET_ISSUED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
 
-        return convertToDTO(ticketRepository.save(ticket));
+        return convertToDTO(savedTicket);
     }
 
     public TicketDTO getLatestTicketForBooking(Long bookingId) {
@@ -223,8 +265,16 @@ public class TicketService {
             return newTicket;
         }).toList();
 
-        ticketRepository.saveAll(ticketsToSave);
-        return ticketsToSave.size();
+        List<Ticket> savedTickets = ticketRepository.saveAll(ticketsToSave);
+        
+        for (Ticket ticket : savedTickets) {
+            this.notifyObservers("TICKET_ISSUED", Map.of("ticketId", ticket.getId(), "status", ticket.getStatus().name()));
+        }
+        
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
+        
+        return savedTickets.size();
     }
 
     public List<TicketDTO> getTicketsInDateRange(String startDate, String endDate, String ticketStatusInput) {
@@ -307,7 +357,13 @@ public class TicketService {
                 }
             }
 
-            return convertToDTO(ticketRepository.saveAndFlush(ticket));
+            Ticket savedTicket = ticketRepository.saveAndFlush(ticket);
+            
+            this.notifyObservers("TICKET_UPDATED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
+            cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+            cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
+
+            return convertToDTO(savedTicket);
         });
     }
 }
