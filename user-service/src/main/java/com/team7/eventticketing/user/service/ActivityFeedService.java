@@ -13,6 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.team7.eventticketing.user.adapter.MongoDocumentAdapter;
+
 import java.util.List;
 
 @Service
@@ -20,6 +22,7 @@ public class ActivityFeedService {
 
     private final AuthEventRepository authEventRepository;
     private final UserRepository userRepository;
+    private final MongoDocumentAdapter mongoDocumentAdapter = new MongoDocumentAdapter();
 
     public ActivityFeedService(AuthEventRepository authEventRepository,
                                UserRepository userRepository) {
@@ -61,13 +64,17 @@ public class ActivityFeedService {
         Page<AuthEvent> resultPage = authEventRepository
                 .findByUserIdOrderByTimestampDesc(userId, pageable);
 
+//        List<ActivityEventDTO> content = resultPage.getContent()
+//                .stream()
+//                .map(event -> new ActivityEventDTO(
+//                        event.getAction(),
+//                        event.getTimestamp(),
+//                        event.getDetails()
+//                ))
+//                .toList();
         List<ActivityEventDTO> content = resultPage.getContent()
                 .stream()
-                .map(event -> new ActivityEventDTO(
-                        event.getAction(),
-                        event.getTimestamp(),
-                        event.getDetails()
-                ))
+                .map(mongoDocumentAdapter::adapt)
                 .toList();
 
         return new ActivityFeedDTO(
