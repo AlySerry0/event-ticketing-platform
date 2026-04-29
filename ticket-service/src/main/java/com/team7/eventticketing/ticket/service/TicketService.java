@@ -1,16 +1,13 @@
 package com.team7.eventticketing.ticket.service;
 import com.team7.eventticketing.ticket.adapter.EventSummaryAdapter;
-import com.team7.eventticketing.ticket.dto.BatchTicketRequestDTO;
+import com.team7.eventticketing.ticket.adapter.TicketAnalyticsAdapter;
+import com.team7.eventticketing.ticket.dto.*;
 
-import com.team7.eventticketing.ticket.dto.NearbyTicketDTO;
-import com.team7.eventticketing.ticket.dto.IssueTicketDTO;
-import com.team7.eventticketing.ticket.dto.EventAttendanceSummaryDTO;
-import com.team7.eventticketing.ticket.dto.TicketDTO;
-import com.team7.eventticketing.ticket.dto.UnusedTicketDTO;
 import com.team7.eventticketing.ticket.model.Ticket;
 import com.team7.eventticketing.ticket.model.TicketStatus;
 import com.team7.eventticketing.ticket.repository.TicketRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,12 +37,14 @@ public class TicketService implements EntitySubject {
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
     private final CacheInvalidationService cacheInvalidationService;
     private final EventSummaryAdapter eventSummaryAdapter;
+    private final TicketAnalyticsAdapter ticketAnalyticsAdapter;
 
     @Autowired
-    public TicketService(MongoEventLogger mongoEventLogger, TicketRepository ticketRepository, CacheInvalidationService cacheInvalidationService, EventSummaryAdapter eventSummaryAdapter) {
+    public TicketService(MongoEventLogger mongoEventLogger, TicketRepository ticketRepository, CacheInvalidationService cacheInvalidationService, EventSummaryAdapter eventSummaryAdapter, TicketAnalyticsAdapter ticketAnalyticsAdapter) {
         this.ticketRepository = ticketRepository;
         this.cacheInvalidationService = cacheInvalidationService;
         this.eventSummaryAdapter = eventSummaryAdapter;
+        this.ticketAnalyticsAdapter = ticketAnalyticsAdapter;
         this.register(mongoEventLogger);
     }
 
@@ -82,7 +81,7 @@ public class TicketService implements EntitySubject {
         ticketDTO.setStatus(TicketStatus.VALID);
         Ticket ticket = convertToEntity(ticketDTO);
         Ticket savedTicket = ticketRepository.save(ticket);
-        
+
         this.notifyObservers("TICKET_CREATED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
@@ -102,7 +101,7 @@ public class TicketService implements EntitySubject {
 
     public void deleteById(Long id) {
         ticketRepository.deleteById(id);
-        
+
         this.notifyObservers("TICKET_DELETED", Map.of("ticketId", id));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::" + id);
@@ -133,20 +132,20 @@ public class TicketService implements EntitySubject {
     }
 
     public EventAttendanceSummaryDTO getEventSummary(Long eventId) {
-      List<Object[]> results = ticketRepository.getEventAttendanceSummary(eventId);
-      if (results == null || results.isEmpty()) {
-          throw new RuntimeException("No tickets found");
-      }
+        List<Object[]> results = ticketRepository.getEventAttendanceSummary(eventId);
+        if (results == null || results.isEmpty()) {
+            throw new RuntimeException("No tickets found");
+        }
 
-      Object[] row = results.get(0);
-      EventAttendanceSummaryDTO dto = eventSummaryAdapter.convert(row);
-      if (dto.getTotalTickets() == 0) {
-          throw new RuntimeException("No tickets found");
-      }
-      dto.setEventId(eventId);
+        Object[] row = results.get(0);
+        EventAttendanceSummaryDTO dto = eventSummaryAdapter.convert(row);
+        if (dto.getTotalTickets() == 0) {
+            throw new RuntimeException("No tickets found");
+        }
+        dto.setEventId(eventId);
 
-      return dto;
-  }
+        return dto;
+    }
 
     @Transactional
     public int purgeOldTickets(int olderThanDays) {
@@ -155,10 +154,10 @@ public class TicketService implements EntitySubject {
         }
         LocalDateTime cutoff = LocalDateTime.now().minusDays(olderThanDays);
         int deletedCount = ticketRepository.deleteOldExpiredOrCancelled(cutoff);
-        
+
         this.notifyObservers("OLD_DATA_PURGED", Map.of("olderThanDays", olderThanDays, "deletedCount", deletedCount));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
-        
+
         return deletedCount;
     }
 
@@ -194,7 +193,7 @@ public class TicketService implements EntitySubject {
         ticket.setMetadata(request.getMetadata());
         ticket.setStatus(TicketStatus.VALID);
         Ticket savedTicket = ticketRepository.save(ticket);
-        
+
         this.notifyObservers("TICKET_ISSUED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::" + savedTicket.getId());
@@ -266,12 +265,12 @@ public class TicketService implements EntitySubject {
         }).toList();
 
         List<Ticket> savedTickets = ticketRepository.saveAll(ticketsToSave);
-        
+
         this.notifyObservers("BATCH_ISSUED", Map.of("bookingId", batchRequest.getBookingId(), "size", savedTickets.size()));
-        
+
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
-        
+
         return savedTickets.size();
     }
 
@@ -356,13 +355,32 @@ public class TicketService implements EntitySubject {
             }
 
             Ticket savedTicket = ticketRepository.saveAndFlush(ticket);
-            
+
             this.notifyObservers("TICKET_UPDATED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
             cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
             cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::" + id);
 
             return convertToDTO(savedTicket);
         });
+    }
+
+
+
+    public TicketAnalyticsDTO getAnalytics(LocalDate startDate, LocalDate endDate) {
+        if (startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid date range");
+        }
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.atTime(23, 59, 59, 999_000_000);
+        Object[] row = ticketRepository.getTicketAnalytics(start, end);
+        if (row == null) {
+            row = new Object[]{0L, 0L, 0L, 0L, 0L};
+        }
+        notifyObservers(
+                "ANALYTICS_VIEWED",
+                Map.of("startDate", startDate.toString(), "endDate", endDate.toString())
+        );
+        return ticketAnalyticsAdapter.convert(row);
     }
 }
 

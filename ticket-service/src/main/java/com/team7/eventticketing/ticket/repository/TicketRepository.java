@@ -99,5 +99,20 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE email = :email", nativeQuery = true)
     boolean userExistsByEmail(String email);
+
+    @Query(value = """
+        SELECT
+            COUNT(*) AS totalIssued,
+            SUM(CASE WHEN status = 'USED' THEN 1 ELSE 0 END) AS usedCount,
+            SUM(CASE WHEN status = 'VALID' THEN 1 ELSE 0 END) AS validCount,
+            SUM(CASE WHEN status = 'EXPIRED' THEN 1 ELSE 0 END) AS expiredCount,
+            SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelledCount
+        FROM tickets
+        WHERE issued_at BETWEEN :start AND :end
+        """, nativeQuery = true)
+    Object[] getTicketAnalytics(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+    );
 }
 
