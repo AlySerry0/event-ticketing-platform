@@ -29,6 +29,8 @@ import com.team7.eventticketing.booking.observer.EntitySubject;
 import com.team7.eventticketing.booking.observer.MongoEventLogger;
 import com.team7.eventticketing.booking.util.CacheInvalidationService;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+
 @Service
 public class BookingService implements EntitySubject {
 
