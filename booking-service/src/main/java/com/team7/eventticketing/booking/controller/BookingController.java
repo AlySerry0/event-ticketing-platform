@@ -31,13 +31,13 @@ public class BookingController {
 	private BookingService bookingService;
 
 
-	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PostMapping
 	public BookingDTO create(@RequestBody BookingDTO bookingDTO) {
 		return bookingService.save(bookingDTO);
 	}
 
-	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/{id}")
 	public ResponseEntity<BookingDTO> getById(@PathVariable Long id) {
 		return bookingService.findById(id)
@@ -45,7 +45,7 @@ public class BookingController {
 				.orElse(ResponseEntity.notFound().build());
 	}
 
-	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping
 	public List<BookingDTO> getAll() {
 		return bookingService.findAll();
@@ -54,7 +54,7 @@ public class BookingController {
 	/**
 	 * [S3-F1] Get Bookings by Status and Date Range
 	 */
-	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/search")
 	public ResponseEntity<List<BookingDTO>> searchBookings(
 			@RequestParam(required = false) String status,
@@ -69,7 +69,7 @@ public class BookingController {
 		}
 	}
 
-	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PutMapping("/{id}/confirm")
 	public ResponseEntity<BookingDTO> confirmBooking(@PathVariable Long id, @RequestParam Long eventId) {
 		try {
@@ -94,13 +94,13 @@ public class BookingController {
 		}
 	}
 
-	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PutMapping("/{id}/complete")
 	public ResponseEntity<BookingDTO> completeBooking(@PathVariable Long id) {
 		return ResponseEntity.ok(bookingService.completeBooking(id));
 	}
 
-	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PutMapping("/{id}")
 	public ResponseEntity<BookingDTO> update(@PathVariable Long id, @RequestBody BookingDTO bookingDetails) {
 		return bookingService.updateBooking(id, bookingDetails)
@@ -108,7 +108,7 @@ public class BookingController {
 				.orElse(ResponseEntity.notFound().build());
 	}
 
-	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> delete(@PathVariable Long id) {
 		if (bookingService.findById(id).isPresent()) {
@@ -118,7 +118,7 @@ public class BookingController {
 		return ResponseEntity.notFound().build();
 	}
 
-	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PostMapping("/estimate")
 	public ResponseEntity<?> estimateCost(@RequestBody BookingEstimateRequestDTO request) {
 		try {
@@ -133,7 +133,7 @@ public class BookingController {
 	 * [M1 S3-F6] Original Analytics Endpoint
 	 * GET /api/bookings/analytics?startDate={d}&endDate={d}
 	 */
-	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/analytics")
 	public ResponseEntity<BookingAnalyticsDTO> getAnalytics(
 			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
