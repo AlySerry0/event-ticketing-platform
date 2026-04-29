@@ -532,7 +532,7 @@ CacheInvalidationService cacheInvalidationService) {
      * Never call this directly from the controller; call getEventDashboard() instead.
      */
     @Cacheable(value = "S2-F12", key = "#eventId")
-    public EventDashboardDTO getEventDashboardCached(Long eventId) {
+    public EventDashboardDTO getEventDashboard(Long eventId) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Event not found with id: " + eventId));
@@ -551,7 +551,7 @@ CacheInvalidationService cacheInvalidationService) {
         double averageAttendanceRate = totalTicketsSold == 0
                 ? 0.0
                 : (double) usedTickets / totalTicketsSold;
-
+        notifyObservers("DASHBOARD_VIEWED", buildPayload(eventId, Collections.emptyMap()));
         return EventDashboardDTO.builder()
                 .eventId(event.getId())
                 .name(event.getName())
@@ -561,17 +561,6 @@ CacheInvalidationService cacheInvalidationService) {
                 .averageAttendanceRate(averageAttendanceRate)
                 .averageRating(event.getRating() == null ? 0.0 : event.getRating())
                 .build();
-    }
-
-    /**
-     * Public method — controller calls this.
-     * Cache hit or miss: DB result comes from cache.
-     * Mongo log always runs regardless of cache state (spec §10.2.3 step g).
-     */
-    public EventDashboardDTO getEventDashboard(Long eventId) {
-        EventDashboardDTO result = getEventDashboardCached(eventId);
-        notifyObservers("DASHBOARD_VIEWED", buildPayload(eventId, Collections.emptyMap()));
-        return result;
     }
 
     // -----------------------------------------------------------------------
@@ -595,7 +584,7 @@ CacheInvalidationService cacheInvalidationService) {
         notifyObservers("EVENT_DELETED", buildPayload(eventId, extra));
     }
 
-
+    @Cacheable(value = "S2-F10", key = "#query + '_' + #category + '_' + #venue + #status + '_' + #startDate + '_' + #endDate + '_' + #minRating + '_' + #maxRating")
     public List<EventDTO> searchEventsFullText(
             String query, String category, String venue, String status,
             LocalDate startDate, LocalDate endDate, Double minRating, Double maxRating) {
