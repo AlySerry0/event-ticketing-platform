@@ -1,4 +1,5 @@
 package com.team7.eventticketing.ticket.service;
+import com.team7.eventticketing.ticket.adapter.EventSummaryAdapter;
 import com.team7.eventticketing.ticket.dto.BatchTicketRequestDTO;
 
 import com.team7.eventticketing.ticket.dto.NearbyTicketDTO;
@@ -31,8 +32,13 @@ import java.util.Map;
 @Service
 public class TicketService implements EntitySubject {
 
-    @Autowired
-    private TicketRepository ticketRepository;
+    private final TicketRepository ticketRepository;
+    private final EventSummaryAdapter eventSummaryAdapter;
+
+    public TicketService(TicketRepository ticketRepository,EventSummaryAdapter eventSummaryAdapter) {
+        this.ticketRepository = ticketRepository;
+        this.eventSummaryAdapter = eventSummaryAdapter;
+    }
 
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
     private final CacheInvalidationService cacheInvalidationService;
@@ -127,35 +133,20 @@ public class TicketService implements EntitySubject {
     }
 
     public EventAttendanceSummaryDTO getEventSummary(Long eventId) {
-        List<Object[]> results = ticketRepository.getEventAttendanceSummary(eventId);
-        if (results == null || results.isEmpty()) {
-            throw new RuntimeException("No tickets found");
-        }
-        Object[] row = results.get(0);
-        long total = row[0] != null ? ((Number) row[0]).longValue() : 0;
-        if (total == 0) {
-            throw new RuntimeException("No tickets found");
-        }
-        long used = row[1] != null ? ((Number) row[1]).longValue() : 0;
-        long valid = row[2] != null ? ((Number) row[2]).longValue() : 0;
-        double attendanceRate = (used * 100.0) / total;
-        LocalDateTime lastCheckIn = null;
-        if (row[3] != null) {
-            if (row[3] instanceof java.sql.Timestamp ts) {
-                lastCheckIn = ts.toLocalDateTime();
-            } else if (row[3] instanceof LocalDateTime ldt) {
-                lastCheckIn = ldt;
-            }
-        }
-        return new EventAttendanceSummaryDTO(
-                eventId,
-                total,
-                used,
-                valid,
-                attendanceRate,
-                lastCheckIn
-        );
-    }
+      List<Object[]> results = ticketRepository.getEventAttendanceSummary(eventId);
+      if (results == null || results.isEmpty()) {
+          throw new RuntimeException("No tickets found");
+      }
+
+      Object[] row = results.get(0);
+      EventAttendanceSummaryDTO dto = eventSummaryAdapter.convert(row);
+      if (dto.getTotalTickets() == 0) {
+          throw new RuntimeException("No tickets found");
+      }
+      dto.setEventId(eventId);
+
+      return dto;
+  }
 
     @Transactional
     public int purgeOldTickets(int olderThanDays) {
