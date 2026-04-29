@@ -63,6 +63,7 @@ public class PromotionController {
         return ResponseEntity.notFound().build();
     }
 
+    @PreAuthorize("hasAuthority('ATTENDEE', 'ADMIN')")
     @GetMapping("/top-used")
     public List<PromotionUsageDTO> getTopUsedPromotions(@RequestParam(defaultValue = "10")  int limit) {
         if (limit <= 0) {

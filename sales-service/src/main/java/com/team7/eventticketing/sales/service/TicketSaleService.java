@@ -1,5 +1,8 @@
 package com.team7.eventticketing.sales.service;
 
+import com.team7.eventticketing.sales.util.CacheInvalidationService;
+import com.team7.eventticketing.sales.factory.EventFactory;
+import com.team7.eventticketing.sales.observer.EntitySubject;
 import com.team7.eventticketing.sales.dto.RevenueReportDTO;
 import com.team7.eventticketing.sales.dto.SaleDetailsDTO;
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
@@ -32,6 +35,12 @@ public class TicketSaleService {
     private SalePromotionRepository  salePromotionRepository;
     @Autowired
     private SalePromotionService salePromotionService;
+    @Autowired
+    private EntitySubject entitySubject;
+    @Autowired
+    private EventFactory eventFactory;
+    @Autowired
+    private CacheInvalidationService cacheInvalidationService;
 
     public TicketSaleDTO save(TicketSaleDTO ticketSaleDTO) {
         TicketSale ticketSale = convertToEntity(ticketSaleDTO);
@@ -335,12 +344,26 @@ public class TicketSaleService {
         if (details.get("retryAttempt") instanceof Number n) {
             retryAttempt = n.intValue();
         }
+
         details.put("retryAttempt", retryAttempt + 1);
         details.put("gatewayResponse", "approved");
+        details.put("retriedAt", LocalDateTime.now().toString());
 
         sale.setTransactionDetails(details);
 
-        return ticketSaleRepository.save(sale);
+        TicketSale savedSale = ticketSaleRepository.save(sale);
+
+        PaymentAuditEvent retryEvent =
+                eventFactory.createPaymentAuditEvent("RETRY_ATTEMPTED", savedSale);
+
+        entitySubject.notifyObservers("RETRY_ATTEMPTED", retryEvent);
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F6::*");
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F8::" + savedSale.getId());
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + savedSale.getId());
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::ticket-sale::" + savedSale.getId());
+
+        return savedSale;
     }
     public SaleDetailsDTO getSaleDetails(Long saleId) {
         TicketSale sale = ticketSaleRepository.findById(saleId)

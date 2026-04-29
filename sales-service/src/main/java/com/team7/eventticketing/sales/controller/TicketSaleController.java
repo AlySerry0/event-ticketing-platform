@@ -91,6 +91,7 @@ public class TicketSaleController {
         }
         return ResponseEntity.notFound().build();
     }
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PostMapping("/{saleId}/promotions/{promotionId}")
     public ResponseEntity<TicketSaleDTO> applyPromotion(
             @PathVariable Long saleId,
@@ -100,6 +101,7 @@ public class TicketSaleController {
         return ResponseEntity.ok(ticketSaleService.convertToDTO(updatedSale));
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PostMapping("/booking/{bookingId}")
     public ResponseEntity<TicketSaleDTO> processTicketSale(
             @PathVariable Long bookingId,
