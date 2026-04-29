@@ -508,29 +508,6 @@ public class EventService {
     // S2-F9 — Unverified sessions report (cached 10 min)
     // -----------------------------------------------------------------------
 
-    @Cacheable(value = "S2-F9", key = "'all'")
-    public List<EventSessionAlertDTO> getEventsWithUnverifiedSessions() {
-        // your existing implementation unchanged — annotation is the only addition
-        List<Event> eventsWithUnverifiedSessions = eventRepository.findEventsWithUnverifiedSessions();
-        return eventsWithUnverifiedSessions.stream()
-                .map(event -> {
-                    List<EventSessionDTO> unverifiedSessions = event.getEventSessions().stream()
-                            .filter(s -> !Boolean.TRUE.equals(s.getVerified()))
-                            .map(s -> new EventSessionDTO(
-                                    s.getId(), s.getTitle(), s.getSpeaker(),
-                                    s.getStartTime(), s.getEndTime(), s.getCapacity(),
-                                    s.getVerified(), s.getMetadata(), s.getCreatedAt()))
-                            .collect(Collectors.toList());
-
-                    return new EventSessionAlertDTO(
-                            event.getId(),
-                            event.getName(),
-                            event.getStatus().name(),
-                            unverifiedSessions,(long) unverifiedSessions.size());
-                })
-                .collect(Collectors.toList());
-    }
-
     // -----------------------------------------------------------------------
     // S2-F12 — Event Performance Dashboard
     // IMPORTANT: MongoDB log runs on EVERY call including cache hits.
