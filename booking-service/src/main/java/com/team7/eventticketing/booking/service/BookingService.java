@@ -24,15 +24,46 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
-
+import com.team7.eventticketing.booking.observer.EntityObserver;
+import com.team7.eventticketing.booking.observer.EntitySubject;
+import com.team7.eventticketing.booking.observer.MongoEventLogger;
+import com.team7.eventticketing.booking.util.CacheInvalidationService;
+import java.util.ArrayList;
+import java.util.Map;
 @Service
-public class BookingService {
+public class BookingService implements EntitySubject {
 
 	@Autowired
 	private BookingRepository bookingRepository;
 
 	@Autowired
 	private BookingItemService bookingItemService;
+
+	private final List<EntityObserver> observers = new ArrayList<>();
+	private final CacheInvalidationService cacheInvalidationService;
+
+	@Autowired
+	public BookingService(MongoEventLogger mongoEventLogger, CacheInvalidationService cacheInvalidationService) {
+		this.cacheInvalidationService = cacheInvalidationService;
+		this.register(mongoEventLogger);
+	}
+
+	@Override
+	public void register(EntityObserver o) {
+		observers.add(o);
+	}
+
+	@Override
+	public void unregister(EntityObserver o) {
+		observers.remove(o);
+	}
+
+	@Override
+	public void notifyObservers(String action, Object payload) {
+		for (EntityObserver observer : observers) {
+			observer.onEvent(action, payload);
+		}
+	}
 
 	public BookingDTO save(BookingDTO bookingDTO) {
 		Booking booking = convertToEntity(bookingDTO);
@@ -148,7 +179,13 @@ public class BookingService {
 		booking.setStatus(BookingStatus.CONFIRMED);
 		booking.setConfirmedAt(LocalDateTime.now());
 
-		return convertToDTO(bookingRepository.save(booking));
+		Booking savedBooking = bookingRepository.save(booking);
+
+		this.notifyObservers("BOOKING_CONFIRMED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::*");
+
+		return convertToDTO(savedBooking);
 	}
 
 	@Transactional
