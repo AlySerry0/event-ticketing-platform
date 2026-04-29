@@ -30,16 +30,14 @@ public class BookingController {
 	@Autowired
 	private BookingService bookingService;
 
-	@Autowired
-	private MongoEventLogger mongoEventLogger;
 
-	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
 	@PostMapping
 	public BookingDTO create(@RequestBody BookingDTO bookingDTO) {
 		return bookingService.save(bookingDTO);
 	}
 
-	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
 	@GetMapping("/{id}")
 	public ResponseEntity<BookingDTO> getById(@PathVariable Long id) {
 		return bookingService.findById(id)
@@ -47,7 +45,7 @@ public class BookingController {
 				.orElse(ResponseEntity.notFound().build());
 	}
 
-	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
 	@GetMapping
 	public List<BookingDTO> getAll() {
 		return bookingService.findAll();
@@ -56,7 +54,7 @@ public class BookingController {
 	/**
 	 * [S3-F1] Get Bookings by Status and Date Range
 	 */
-	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
 	@GetMapping("/search")
 	public ResponseEntity<List<BookingDTO>> searchBookings(
 			@RequestParam(required = false) String status,
@@ -71,7 +69,7 @@ public class BookingController {
 		}
 	}
 
-	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
 	@PutMapping("/{id}/confirm")
 	public ResponseEntity<BookingDTO> confirmBooking(@PathVariable Long id, @RequestParam Long eventId) {
 		try {
@@ -96,13 +94,13 @@ public class BookingController {
 		}
 	}
 
-	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
 	@PutMapping("/{id}/complete")
 	public ResponseEntity<BookingDTO> completeBooking(@PathVariable Long id) {
 		return ResponseEntity.ok(bookingService.completeBooking(id));
 	}
 
-	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
 	@PutMapping("/{id}")
 	public ResponseEntity<BookingDTO> update(@PathVariable Long id, @RequestBody BookingDTO bookingDetails) {
 		return bookingService.updateBooking(id, bookingDetails)
@@ -110,7 +108,7 @@ public class BookingController {
 				.orElse(ResponseEntity.notFound().build());
 	}
 
-	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> delete(@PathVariable Long id) {
 		if (bookingService.findById(id).isPresent()) {
@@ -120,7 +118,7 @@ public class BookingController {
 		return ResponseEntity.notFound().build();
 	}
 
-	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
 	@PostMapping("/estimate")
 	public ResponseEntity<?> estimateCost(@RequestBody BookingEstimateRequestDTO request) {
 		try {
@@ -135,7 +133,7 @@ public class BookingController {
 	 * [M1 S3-F6] Original Analytics Endpoint
 	 * GET /api/bookings/analytics?startDate={d}&endDate={d}
 	 */
-	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole(('ATTENDEE', 'ADMIN')")
 	@GetMapping("/analytics")
 	public ResponseEntity<BookingAnalyticsDTO> getAnalytics(
 			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -149,23 +147,17 @@ public class BookingController {
 	 * [M2 S3-F10] Analytics Dashboard Endpoint (NEW)
 	 * GET /api/bookings/analytics/dashboard?startDate={d}&endDate={d}
 	 */
-	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/analytics/dashboard")
 	public ResponseEntity<BookingAnalyticsDashboardDTO> getAnalyticsDashboard(
 			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
 			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
-		// Call the service (Caching will be handled INSIDE the service method in Phase 5)
+		// 1. Get the data (hits the cache if available)
 		BookingAnalyticsDashboardDTO report = bookingService.getAnalyticsDashboard(startDate, endDate);
 
-		// Because @Cacheable is removed from the Controller, this method always runs.
-		// This guarantees the Observability log fires even on cache hits.
-		mongoEventLogger.onEvent("ANALYTICS_VIEWED", Map.of(
-				"dashboardType", "BookingAnalytics",
-				"startDate", startDate.toString(),
-				"endDate", endDate.toString(),
-				"totalRevenueCalculated", report.getTotalRevenue()
-		));
+		// 2. Delegate the logging to the Service layer (runs even on cache hits!)
+		bookingService.recordAnalyticsView(startDate, endDate, report.getTotalRevenue());
 
 		return ResponseEntity.ok(report);
 	}
@@ -173,7 +165,7 @@ public class BookingController {
 	/**
 	 * [M1 S3-F5] Metadata Search
 	 */
-	@PreAuthorize("hasAnyAuthority('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/metadata/search")
 	public ResponseEntity<List<BookingDTO>> searchByMetadata(
 			@RequestParam String key,

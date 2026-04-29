@@ -500,5 +500,14 @@ public class BookingService implements EntitySubject {
 
 		return dto;
 	}
+	public void recordAnalyticsView(LocalDate startDate, LocalDate endDate, Double totalRevenueCalculated) {
+		Map<String, Object> payload = new HashMap<>();
+		payload.put("dashboardType", "BookingAnalytics");
+		payload.put("startDate", startDate.toString());
+		payload.put("endDate", endDate.toString());
+		payload.put("totalRevenueCalculated", totalRevenueCalculated);
+
+		notifyObservers("ANALYTICS_VIEWED", payload);
+	}
 }
 
