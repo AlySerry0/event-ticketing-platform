@@ -11,6 +11,7 @@ import com.team7.eventticketing.ticket.model.Ticket;
 import com.team7.eventticketing.ticket.model.TicketStatus;
 import com.team7.eventticketing.ticket.repository.TicketRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -132,6 +133,7 @@ public class TicketService implements EntitySubject {
         return ticket;
     }
 
+    @Cacheable(cacheNames = "S4-F8", key = "#eventId")
     public EventAttendanceSummaryDTO getEventSummary(Long eventId) {
       List<Object[]> results = ticketRepository.getEventAttendanceSummary(eventId);
       if (results == null || results.isEmpty()) {
@@ -211,6 +213,7 @@ public class TicketService implements EntitySubject {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No tickets found for booking"));
     }
 
+    @Cacheable(cacheNames = "S4-F9", key = "'upcoming-unused'")
     @Transactional(readOnly = true)
     public List<UnusedTicketDTO> getUnusedTicketsForUpcomingEvents() {
         return ticketRepository.findUnusedTicketsForUpcomingEvents();

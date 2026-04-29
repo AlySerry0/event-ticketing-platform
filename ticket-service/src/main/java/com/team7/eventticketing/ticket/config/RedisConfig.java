@@ -12,6 +12,8 @@ import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSeriali
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 
 @Configuration
 @EnableCaching
@@ -23,13 +25,33 @@ public class RedisConfig {
     @Bean
     public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
         RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofMinutes(10))
                 .computePrefixWith(cacheName -> serviceName + "::" + cacheName + "::")
                 .serializeValuesWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(new GenericJackson2JsonRedisSerializer()));
 
+        Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
+
+        cacheConfigs.put("S4-F1",
+                config.entryTtl(Duration.ofMinutes(5)));
+
+        cacheConfigs.put("S4-F3",
+                config.entryTtl(Duration.ofMinutes(10)));
+
+        cacheConfigs.put("S4-F5",
+                config.entryTtl(Duration.ofMinutes(5)));
+
+        cacheConfigs.put("S4-F6",
+                config.entryTtl(Duration.ofMinutes(10)));
+
+        cacheConfigs.put("S4-F8",
+                config.entryTtl(Duration.ofMinutes(15)));
+
+        cacheConfigs.put("S4-F9",
+                config.entryTtl(Duration.ofMinutes(10)));
+
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(config)
+                .withInitialCacheConfigurations(cacheConfigs)
                 .build();
     }
 
