@@ -28,6 +28,7 @@ public class TicketSaleController {
     public TicketSaleDTO create(@RequestBody TicketSaleDTO ticketSaleDTO) {
         return ticketSaleService.save(ticketSaleDTO);
     }
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/{saleId}/details")
     public ResponseEntity<SaleDetailsDTO> getSaleDetails(@PathVariable Long saleId) {
         return ResponseEntity.ok(ticketSaleService.getSaleDetails(saleId));
@@ -47,6 +48,7 @@ public class TicketSaleController {
         return ticketSaleService.findAll();
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/search")
     public List<TicketSaleDTO> searchTicketSales(
             @RequestParam(required = false) TicketSaleStatus status,
@@ -109,12 +111,14 @@ public class TicketSaleController {
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(ticketSaleService.convertToDTO(updatedSale));
     }
-    
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/user/{userId}/summary")
     public ResponseEntity<UserSaleSummaryDTO> getUserSaleSummary(@PathVariable Long userId) {
         return ResponseEntity.ok(ticketSaleService.getUserSaleSummary(userId));
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PutMapping("/{id}/refund")
     public ResponseEntity<TicketSaleDTO> processRefund(
             @PathVariable Long id,
@@ -124,6 +128,7 @@ public class TicketSaleController {
         return ResponseEntity.ok(refundedSale);
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/reports/revenue")
     public RevenueReportDTO getRevenueReport(
             @RequestParam LocalDate startDate,
@@ -140,6 +145,7 @@ public class TicketSaleController {
         return ticketSaleService.getRevenueReport(start, end);
 
     }
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PutMapping("/{id}/retry")
     public ResponseEntity<TicketSaleDTO> retryFailedSale(@PathVariable Long id) {
         TicketSale updatedSale = ticketSaleService.retryFailedSale(id);

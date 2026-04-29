@@ -1,6 +1,7 @@
 package com.team7.eventticketing.event.dto;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -26,8 +27,8 @@ public class EventDTO {
     }
 
     public EventDTO(Long id, String name, String venue, LocalDateTime eventDate,
-                   String category, String status, Double rating, Integer totalRatings,
-                   Map<String, Object> details, LocalDateTime createdAt, List<EventSessionDTO> eventSessions) {
+                    String category, String status, Double rating, Integer totalRatings,
+                    Map<String, Object> details, LocalDateTime createdAt, List<EventSessionDTO> eventSessions) {
         this.id = id;
         this.name = name;
         this.venue = venue;
@@ -41,7 +42,104 @@ public class EventDTO {
         this.eventSessions = eventSessions;
     }
 
-    // Getters and Setters
+    // --- Builder Pattern Implementation ---
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private Long id;
+        private String name;
+        private String venue;
+        private LocalDateTime eventDate;
+        private String category;
+        private String status;
+        private Double rating;
+        private Integer totalRatings;
+        private Map<String, Object> details;
+        private LocalDateTime createdAt;
+        private List<EventSessionDTO> eventSessions;
+
+        private Builder() {}
+
+        public Builder id(Long id) {
+            this.id = id;
+            return this;
+        }
+
+        public Builder name(String name) {
+            this.name = name;
+            return this;
+        }
+
+        public Builder venue(String venue) {
+            this.venue = venue;
+            return this;
+        }
+
+        public Builder eventDate(LocalDateTime eventDate) {
+            this.eventDate = eventDate;
+            return this;
+        }
+
+        public Builder category(String category) {
+            this.category = category;
+            return this;
+        }
+
+        public Builder status(String status) {
+            this.status = status;
+            return this;
+        }
+
+        public Builder rating(Double rating) {
+            this.rating = rating;
+            return this;
+        }
+
+        public Builder totalRatings(Integer totalRatings) {
+            this.totalRatings = totalRatings;
+            return this;
+        }
+
+        public Builder details(Map<String, Object> details) {
+            this.details = details;
+            return this;
+        }
+
+        /**
+         * Convenience method to map the description directly into the details map.
+         * This ensures compatibility with the ElasticsearchHitAdapter.
+         */
+        public Builder description(String description) {
+            if (this.details == null) {
+                this.details = new HashMap<>();
+            }
+            if (description != null) {
+                this.details.put("description", description);
+            }
+            return this;
+        }
+
+        public Builder createdAt(LocalDateTime createdAt) {
+            this.createdAt = createdAt;
+            return this;
+        }
+
+        public Builder eventSessions(List<EventSessionDTO> eventSessions) {
+            this.eventSessions = eventSessions;
+            return this;
+        }
+
+        public EventDTO build() {
+            return new EventDTO(id, name, venue, eventDate, category, status,
+                    rating, totalRatings, details, createdAt, eventSessions);
+        }
+    }
+
+    // --- Getters and Setters ---
+
     public Long getId() {
         return id;
     }
@@ -130,4 +228,3 @@ public class EventDTO {
         this.eventSessions = eventSessions;
     }
 }
-

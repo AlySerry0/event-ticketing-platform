@@ -28,6 +28,20 @@ public interface UserRepository extends JpaRepository<User, Long> {
                            @Param("email") String email,
                            @Param("roles") List<UserRole> roles);
 
+//    @Query(value = "SELECT " +
+//            "u.id AS userId, " +
+//            "u.name AS name, " +
+//            "COUNT(b.id) AS totalBookings, " +
+//            "COUNT(CASE WHEN b.status::text = 'COMPLETED' THEN 1 END) AS completedBookings, " +
+//            "COUNT(CASE WHEN b.status::text = 'CANCELLED' THEN 1 END) AS cancelledBookings, " +
+//            "COALESCE(SUM(CASE WHEN b.status::text = 'COMPLETED' THEN b.total_amount ELSE 0 END), 0) AS totalSpent, " +
+//            "COALESCE(AVG(CASE WHEN b.status::text = 'COMPLETED' THEN b.total_amount ELSE NULL END), 0) AS averageBookingAmount " +
+//            "FROM users u " +
+//            "LEFT JOIN bookings b ON u.id = b.user_id " +
+//            "WHERE u.id = :id " +
+//            "GROUP BY u.id, u.name", nativeQuery = true)
+//    BookingSummaryProjection getUserBookingSummary(@Param("id") Long id);
+
     @Query(value = "SELECT " +
             "u.id AS userId, " +
             "u.name AS name, " +
@@ -40,7 +54,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "LEFT JOIN bookings b ON u.id = b.user_id " +
             "WHERE u.id = :id " +
             "GROUP BY u.id, u.name", nativeQuery = true)
-    BookingSummaryProjection getUserBookingSummary(@Param("id") Long id);
+    List<Object[]> getUserBookingSummary(@Param("id") Long id);
 
     // Check if user has any active bookings
     @Query(value = "SELECT COUNT(*) > 0 FROM bookings " +

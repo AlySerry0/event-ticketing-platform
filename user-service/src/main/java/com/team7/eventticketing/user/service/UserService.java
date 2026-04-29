@@ -28,12 +28,15 @@ import java.util.stream.Collectors;
 import com.team7.eventticketing.user.dto.UserBookingSummaryDTO;
 import com.team7.eventticketing.user.repository.BookingSummaryProjection;
 
+import com.team7.eventticketing.user.adapter.ObjectArrayDtoAdapter;
+
 @Service
 @Transactional(readOnly = true)
 public class UserService {
 
     private final UserRepository userRepository;
     private final CacheInvalidationService cacheInvalidationService;
+    private final ObjectArrayDtoAdapter objectArrayDtoAdapter = new ObjectArrayDtoAdapter();
 
     private final List<EntityObserver> observers = new ArrayList<>();
 
@@ -336,24 +339,41 @@ public class UserService {
     /**
      * [S1-F3] Get User Booking Summary — cached (10 min)
      */
+//    @Cacheable(value = "S1-F3", key = "#id")
+//    public UserBookingSummaryDTO getBookingSummary(Long id) {
+//        userRepository.findById(id)
+//                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with ID: " + id));
+//
+//        BookingSummaryProjection projection = userRepository.getUserBookingSummary(id);
+//
+//        UserBookingSummaryDTO dto = new UserBookingSummaryDTO();
+//        dto.setUserId(projection.getUserId());
+//        dto.setName(projection.getName());
+//        dto.setTotalBookings(projection.getTotalBookings());
+//        dto.setCompletedBookings(projection.getCompletedBookings());
+//        dto.setCancelledBookings(projection.getCancelledBookings());
+//        dto.setTotalSpent(projection.getTotalSpent());
+//        dto.setAverageBookingAmount(projection.getAverageBookingAmount());
+//
+//        return dto;
+//    }
+    /**
+     * [S1-F3] Get User Booking Summary
+     * Native SQL Object[] row → UserBookingSummaryDTO via ObjectArrayDtoAdapter (PDF §3.8).
+     */
     @Cacheable(value = "S1-F3", key = "#id")
     public UserBookingSummaryDTO getBookingSummary(Long id) {
         userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with ID: " + id));
 
-        BookingSummaryProjection projection = userRepository.getUserBookingSummary(id);
-
-        UserBookingSummaryDTO dto = new UserBookingSummaryDTO();
-        dto.setUserId(projection.getUserId());
-        dto.setName(projection.getName());
-        dto.setTotalBookings(projection.getTotalBookings());
-        dto.setCompletedBookings(projection.getCompletedBookings());
-        dto.setCancelledBookings(projection.getCancelledBookings());
-        dto.setTotalSpent(projection.getTotalSpent());
-        dto.setAverageBookingAmount(projection.getAverageBookingAmount());
-
-        return dto;
+        List<Object[]> rows = userRepository.getUserBookingSummary(id);
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "No booking summary found for user ID: " + id);
+        }
+        return objectArrayDtoAdapter.toUserBookingSummaryDTO(rows.get(0));
     }
+
 
     /**
      * [S1-F5] Filter Users by Preference (JSONB Query) — cached (5 min)
@@ -388,15 +408,21 @@ public class UserService {
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
 
+//        List<Object[]> results = userRepository
+//                .findTopAttendeesBySpending(startDateTime, endDateTime, limit);
+//
+//        return results.stream().map(row -> new TopAttendeeDTO(
+//                ((Number) row[0]).longValue(),
+//                (String) row[1],
+//                ((Number) row[2]).doubleValue(),
+//                ((Number) row[3]).longValue()
+//        )).collect(Collectors.toList());
         List<Object[]> results = userRepository
                 .findTopAttendeesBySpending(startDateTime, endDateTime, limit);
 
-        return results.stream().map(row -> new TopAttendeeDTO(
-                ((Number) row[0]).longValue(),
-                (String) row[1],
-                ((Number) row[2]).doubleValue(),
-                ((Number) row[3]).longValue()
-        )).collect(Collectors.toList());
+        return results.stream()
+                .map(objectArrayDtoAdapter::toTopAttendeeDTO)
+                .collect(Collectors.toList());
     }
 
     /**
