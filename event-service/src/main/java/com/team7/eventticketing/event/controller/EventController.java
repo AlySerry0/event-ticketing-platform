@@ -1,11 +1,6 @@
 package com.team7.eventticketing.event.controller;
 
-import com.team7.eventticketing.event.dto.CreateEventDTO;
-import com.team7.eventticketing.event.dto.EventDashboardDTO;
-import com.team7.eventticketing.event.dto.EventDTO;
-import com.team7.eventticketing.event.dto.EventRevenueDTO;
-import com.team7.eventticketing.event.dto.TopEventDTO;
-import com.team7.eventticketing.event.dto.UpdateEventDTO;
+import com.team7.eventticketing.event.dto.*;
 import com.team7.eventticketing.event.service.EventIndexService;
 import com.team7.eventticketing.event.service.EventService;
 import org.springframework.format.annotation.DateTimeFormat;
