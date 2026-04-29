@@ -21,11 +21,11 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 import com.team7.eventticketing.ticket.observer.EntityObserver;
 import com.team7.eventticketing.ticket.observer.EntitySubject;
 import com.team7.eventticketing.ticket.observer.MongoEventLogger;
 import com.team7.eventticketing.ticket.util.CacheInvalidationService;
-import java.util.ArrayList;
 import java.util.Map;
 
 @Service
@@ -34,7 +34,7 @@ public class TicketService implements EntitySubject {
     @Autowired
     private TicketRepository ticketRepository;
 
-    private final List<EntityObserver> observers = new ArrayList<>();
+    private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
     private final CacheInvalidationService cacheInvalidationService;
 
     @Autowired
@@ -77,7 +77,7 @@ public class TicketService implements EntitySubject {
         Ticket ticket = convertToEntity(ticketDTO);
         Ticket savedTicket = ticketRepository.save(ticket);
         
-        this.notifyObservers("TICKET_SAVED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
+        this.notifyObservers("TICKET_CREATED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
 
@@ -96,6 +96,10 @@ public class TicketService implements EntitySubject {
 
     public void deleteById(Long id) {
         ticketRepository.deleteById(id);
+        
+        this.notifyObservers("TICKET_DELETED", Map.of("ticketId", id));
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::" + id);
     }
 
     public TicketDTO convertToDTO(Ticket ticket) {
@@ -159,7 +163,12 @@ public class TicketService implements EntitySubject {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "olderThanDays must be greater than 0");
         }
         LocalDateTime cutoff = LocalDateTime.now().minusDays(olderThanDays);
-        return ticketRepository.deleteOldExpiredOrCancelled(cutoff);
+        int deletedCount = ticketRepository.deleteOldExpiredOrCancelled(cutoff);
+        
+        this.notifyObservers("OLD_DATA_PURGED", Map.of("olderThanDays", olderThanDays, "deletedCount", deletedCount));
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        
+        return deletedCount;
     }
 
     public List<NearbyTicketDTO> getNearbyTickets(double lat, double lon, double radiusKm) {
@@ -197,7 +206,7 @@ public class TicketService implements EntitySubject {
         
         this.notifyObservers("TICKET_ISSUED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
-        cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::" + savedTicket.getId());
 
         return convertToDTO(savedTicket);
     }
@@ -267,9 +276,7 @@ public class TicketService implements EntitySubject {
 
         List<Ticket> savedTickets = ticketRepository.saveAll(ticketsToSave);
         
-        for (Ticket ticket : savedTickets) {
-            this.notifyObservers("TICKET_ISSUED", Map.of("ticketId", ticket.getId(), "status", ticket.getStatus().name()));
-        }
+        this.notifyObservers("BATCH_ISSUED", Map.of("bookingId", batchRequest.getBookingId(), "size", savedTickets.size()));
         
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
@@ -361,7 +368,7 @@ public class TicketService implements EntitySubject {
             
             this.notifyObservers("TICKET_UPDATED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
             cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
-            cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
+            cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::" + id);
 
             return convertToDTO(savedTicket);
         });
