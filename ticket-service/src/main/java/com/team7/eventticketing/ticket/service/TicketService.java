@@ -1,5 +1,6 @@
 package com.team7.eventticketing.ticket.service;
 import com.team7.eventticketing.ticket.adapter.EventSummaryAdapter;
+import com.team7.eventticketing.ticket.adapter.UnusedTicketAdapter;
 import com.team7.eventticketing.ticket.dto.BatchTicketRequestDTO;
 
 import com.team7.eventticketing.ticket.dto.NearbyTicketDTO;
@@ -32,20 +33,21 @@ import java.util.Map;
 @Service
 public class TicketService implements EntitySubject {
 
+    @Autowired
     private final TicketRepository ticketRepository;
-    private final EventSummaryAdapter eventSummaryAdapter;
 
-    public TicketService(TicketRepository ticketRepository,EventSummaryAdapter eventSummaryAdapter) {
-        this.ticketRepository = ticketRepository;
-        this.eventSummaryAdapter = eventSummaryAdapter;
-    }
 
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
     private final CacheInvalidationService cacheInvalidationService;
+    private final EventSummaryAdapter eventSummaryAdapter;
+    private final UnusedTicketAdapter unusedTicketAdapter;
 
     @Autowired
-    public TicketService(MongoEventLogger mongoEventLogger, CacheInvalidationService cacheInvalidationService) {
+    public TicketService(MongoEventLogger mongoEventLogger, TicketRepository ticketRepository, CacheInvalidationService cacheInvalidationService, EventSummaryAdapter eventSummaryAdapter, UnusedTicketAdapter unusedTicketAdapter) {
+        this.ticketRepository = ticketRepository;
         this.cacheInvalidationService = cacheInvalidationService;
+        this.eventSummaryAdapter = eventSummaryAdapter;
+        this.unusedTicketAdapter = unusedTicketAdapter;
         this.register(mongoEventLogger);
     }
 
@@ -137,16 +139,14 @@ public class TicketService implements EntitySubject {
       if (results == null || results.isEmpty()) {
           throw new RuntimeException("No tickets found");
       }
+      EventAttendanceSummaryDTO dto = eventSummaryAdapter.convert(results.get(0));
 
-      Object[] row = results.get(0);
-      EventAttendanceSummaryDTO dto = eventSummaryAdapter.convert(row);
       if (dto.getTotalTickets() == 0) {
           throw new RuntimeException("No tickets found");
       }
-      dto.setEventId(eventId);
 
       return dto;
-  }
+    }
 
     @Transactional
     public int purgeOldTickets(int olderThanDays) {
@@ -213,7 +213,14 @@ public class TicketService implements EntitySubject {
 
     @Transactional(readOnly = true)
     public List<UnusedTicketDTO> getUnusedTicketsForUpcomingEvents() {
-        return ticketRepository.findUnusedTicketsForUpcomingEvents();
+        List<Object[]> rows = ticketRepository.findUnusedTicketsForUpcomingEvents();
+        if (rows == null || rows.isEmpty()) {
+            return List.of(); // or throw if your spec requires 404
+        }
+
+        return rows.stream()
+                .map(unusedTicketAdapter::convert)
+                .toList();
     }
 
     public List<TicketDTO> filterTicketsByMetadata(String key, String operator, String value) {
