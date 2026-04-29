@@ -11,6 +11,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.team7.eventticketing.user.dto.TopAttendeeDTO;
 import org.springframework.format.annotation.DateTimeFormat;
+import com.team7.eventticketing.user.dto.ActivityFeedDTO;
+import com.team7.eventticketing.user.service.ActivityFeedService;
+import com.team7.eventticketing.user.service.JwtService;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -26,9 +30,15 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final ActivityFeedService activityFeedService;
+    private final JwtService jwtService;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService,
+                          ActivityFeedService activityFeedService,
+                          JwtService jwtService) {
         this.userService = userService;
+        this.activityFeedService = activityFeedService;
+        this.jwtService = jwtService;
     }
 
     /**
@@ -209,5 +219,44 @@ public class UserController {
     public ResponseEntity<UserDTO> changeRole(@PathVariable Long id,
                                            @RequestBody Map<String, String> body) {
         return ResponseEntity.ok(userService.changeRole(id, body.get("role")));
+    }
+
+    /**
+     * [S1-F12] Get User Activity Feed
+     * GET /api/users/{id}/activity?page={page}&size={size}
+     *
+     * Auth: Required (USER)
+     * Ownership: caller must be the target user OR an ADMIN
+     * Cache: S1-F12, 5 minutes TTL
+     */
+    @GetMapping("/{id}/activity")
+    public ResponseEntity<ActivityFeedDTO> getUserActivityFeed(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestHeader("Authorization") String authHeader) {
+
+        // Extract the raw token from "Bearer <token>"
+        String token = authHeader.substring(7);
+
+        // Ownership check per spec Section 10.1.3:
+        // caller must be the target user OR an ADMIN
+        Long callerUid  = jwtService.extractUserId(token);
+        String callerRole = jwtService.extractRole(token);
+
+        boolean isOwner = callerUid != null && callerUid.equals(id);
+        boolean isAdmin = "ADMIN".equals(callerRole);
+
+        if (!isOwner && !isAdmin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Access denied: you can only view your own activity feed");
+        }
+
+        // Clamp page/size defaults per spec
+        int safePage = Math.max(page, 0);
+        int safeSize = (size <= 0) ? 10 : size; // cap to 100 handled inside service
+
+        ActivityFeedDTO feed = activityFeedService.getActivityFeed(id, safePage, safeSize);
+        return ResponseEntity.ok(feed);
     }
 }
