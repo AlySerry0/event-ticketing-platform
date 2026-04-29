@@ -32,20 +32,20 @@ import java.util.Map;
 @Service
 public class TicketService implements EntitySubject {
 
-    private final TicketRepository ticketRepository;
-    private final EventSummaryAdapter eventSummaryAdapter;
 
-    public TicketService(TicketRepository ticketRepository,EventSummaryAdapter eventSummaryAdapter) {
-        this.ticketRepository = ticketRepository;
-        this.eventSummaryAdapter = eventSummaryAdapter;
-    }
+    @Autowired
+    private final TicketRepository ticketRepository;
+
 
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
     private final CacheInvalidationService cacheInvalidationService;
+    private final EventSummaryAdapter eventSummaryAdapter;
 
     @Autowired
-    public TicketService(MongoEventLogger mongoEventLogger, CacheInvalidationService cacheInvalidationService) {
+    public TicketService(MongoEventLogger mongoEventLogger, TicketRepository ticketRepository, CacheInvalidationService cacheInvalidationService, EventSummaryAdapter eventSummaryAdapter) {
+        this.ticketRepository = ticketRepository;
         this.cacheInvalidationService = cacheInvalidationService;
+        this.eventSummaryAdapter = eventSummaryAdapter;
         this.register(mongoEventLogger);
     }
 
