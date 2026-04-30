@@ -65,7 +65,7 @@ public class PromotionService {
         return promotion;
     }
 
-    @Cacheable(value = "top-used-promotions", key = "#limit")
+    @Cacheable(value = "sales-service::S5-F9", key = "#limit")
     public List<PromotionUsageDTO> getTopUsedPromotions(int limit) {
         List<Object[]> results = promotionRepository.getTopUsedPromotions(limit);
 
