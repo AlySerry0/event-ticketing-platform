@@ -277,7 +277,6 @@ public class TicketSaleService {
                 methodBreakdown
         );
     }
-
     @Transactional
     public TicketSaleDTO processRefund(Long saleId, String reason) {
         TicketSale ticketSale = ticketSaleRepository.findById(saleId)
@@ -304,10 +303,77 @@ public class TicketSaleService {
         ticketSale.setTransactionDetails(transactionDetails);
 
         TicketSale saved = ticketSaleRepository.save(ticketSale);
+        return convertToDTO(saved);
+    }
+    @Transactional
+    public TicketSaleDTO processRefundWithWindowPolicy(Long saleId, RefundRequestDTO request) {
+        TicketSale ticketSale = ticketSaleRepository.findById(saleId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Ticket sale not found"));
+
+        if (ticketSale.getStatus() != TicketSaleStatus.COMPLETED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Only COMPLETED ticket sales can be refunded"
+            );
+        }
+
+        LocalDateTime eventDate = ticketSaleRepository.findEventDateBySaleId(saleId);
+
+        if (eventDate == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "booking has no associated event"
+            );
+        }
+
+        long hoursUntilEvent = Duration.between(LocalDateTime.now(), eventDate).toHours();
+
+        RefundStrategy strategy = refundStrategySelector.select(ticketSale, eventDate);
+        RefundResult refundResult = strategy.calculateRefund(ticketSale, request, eventDate);
+
+        if (!refundResult.isApproved()) {
+            Map<String, Object> detailsPayload = new HashMap<>();
+            detailsPayload.put("strategyName", refundResult.getStrategyName());
+            detailsPayload.put("denialReason", "refund window expired");
+            detailsPayload.put("hoursUntilEvent", hoursUntilEvent);
+
+            Map<String, Object> eventPayload = new HashMap<>();
+            eventPayload.put("saleId", ticketSale.getId());
+            eventPayload.put("method", ticketSale.getMethod() != null ? ticketSale.getMethod().name() : null);
+            eventPayload.put("amount", ticketSale.getAmount());
+            eventPayload.put("details", detailsPayload);
+
+            notifyObservers("REFUND_DENIED", eventPayload);
+
+            cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
+            cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + ticketSale.getId());
+
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "refund window expired");
+        }
+
+        ticketSale.setStatus(TicketSaleStatus.REFUNDED);
+
+        Map<String, Object> transactionDetails = ticketSale.getTransactionDetails();
+        if (transactionDetails == null) {
+            transactionDetails = new HashMap<>();
+        }
+
+        transactionDetails.put("refundAmount", refundResult.getRefundAmount());
+        transactionDetails.put("refundPolicy", refundResult.getStrategyName());
+        transactionDetails.put("refundReason", request.getReason());
+        transactionDetails.put("refundedAt", LocalDateTime.now().toString());
+
+        ticketSale.setTransactionDetails(transactionDetails);
+
+        TicketSale saved = ticketSaleRepository.save(ticketSale);
 
         Map<String, Object> detailsPayload = new HashMap<>();
-        detailsPayload.put("refundReason", reason);
-        detailsPayload.put("refundedAt", saved.getTransactionDetails().get("refundedAt"));
+        detailsPayload.put("strategyName", refundResult.getStrategyName());
+        detailsPayload.put("reason", request.getReason());
+        detailsPayload.put("originalAmount", saved.getAmount());
+        detailsPayload.put("refundAmount", refundResult.getRefundAmount());
+        detailsPayload.put("hoursUntilEvent", hoursUntilEvent);
 
         Map<String, Object> eventPayload = new HashMap<>();
         eventPayload.put("saleId", saved.getId());
@@ -405,6 +471,9 @@ public class TicketSaleService {
 
         return dto;
     }
+
+    @Autowired
+    private RefundStrategySelector refundStrategySelector;
 
     @Autowired
     private MongoEventLogger mongoEventLogger;

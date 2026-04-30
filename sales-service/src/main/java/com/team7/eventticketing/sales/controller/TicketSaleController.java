@@ -28,6 +28,7 @@ public class TicketSaleController {
     public TicketSaleDTO create(@RequestBody TicketSaleDTO ticketSaleDTO) {
         return ticketSaleService.save(ticketSaleDTO);
     }
+
     @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/{saleId}/details")
     public ResponseEntity<SaleDetailsDTO> getSaleDetails(@PathVariable Long saleId) {
@@ -145,11 +146,22 @@ public class TicketSaleController {
         return ticketSaleService.getRevenueReport(start, end);
 
     }
+
     @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PutMapping("/{id}/retry")
     public ResponseEntity<TicketSaleDTO> retryFailedSale(@PathVariable Long id) {
         TicketSale updatedSale = ticketSaleService.retryFailedSale(id);
         return ResponseEntity.ok(ticketSaleService.convertToDTO(updatedSale));
+    }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+    @PostMapping("/{id}/refund-window-policy")
+    public ResponseEntity<TicketSaleDTO> processRefundWithWindowPolicy(
+            @PathVariable Long id,
+            @RequestBody RefundRequestDTO request
+    ) {
+        TicketSaleDTO refundedSale = ticketSaleService.processRefundWithWindowPolicy(id, request);
+        return ResponseEntity.ok(refundedSale);
     }
 }
 
