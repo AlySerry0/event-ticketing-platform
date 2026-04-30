@@ -13,8 +13,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
+import com.team7.eventticketing.ticket.dto.TicketScanDTO;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -169,6 +171,15 @@ public class TicketController {
             @RequestParam String endDate,
             @RequestParam(required = false) String status) {
         return ResponseEntity.ok(ticketService.getTicketsInDateRange(startDate, endDate, status));
+    }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+    @GetMapping("/{id}/scans")
+    public ResponseEntity<List<TicketScanDTO>> getTicketScanHistory(
+            @PathVariable Long id,
+            @RequestParam(required = false) LocalDateTime startTime,
+            @RequestParam(required = false) LocalDateTime endTime) {
+        return ResponseEntity.ok(ticketService.getTicketScanHistory(id, startTime, endTime));
     }
 }
 
