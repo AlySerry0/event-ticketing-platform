@@ -363,23 +363,31 @@ public class TicketService implements EntitySubject {
             return convertToDTO(savedTicket);
         });
     }
-
-
-
     public TicketAnalyticsDTO getAnalytics(LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dates are required");
+        }
         if (startDate.isAfter(endDate)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid date range");
         }
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.atTime(23, 59, 59, 999_000_000);
+        notifyObservers(
+                "ANALYTICS_VIEWED",
+                Map.of(
+                        "startDate", startDate.toString(),
+                        "endDate", endDate.toString()
+                )
+        );
+        return getAnalyticsCached(startDate, endDate, start, end);
+    }
+
+    @Cacheable(value = "S4-F10", key = "#startDate.toString() + '_' + #endDate.toString()")
+    public TicketAnalyticsDTO getAnalyticsCached(LocalDate startDate, LocalDate endDate, LocalDateTime start, LocalDateTime end) {
         Object[] row = ticketRepository.getTicketAnalytics(start, end);
         if (row == null) {
             row = new Object[]{0L, 0L, 0L, 0L, 0L};
         }
-        notifyObservers(
-                "ANALYTICS_VIEWED",
-                Map.of("startDate", startDate.toString(), "endDate", endDate.toString())
-        );
         return ticketAnalyticsAdapter.convert(row);
     }
 }
