@@ -532,7 +532,7 @@ CacheInvalidationService cacheInvalidationService) {
      * Never call this directly from the controller; call getEventDashboard() instead.
      */
     @Cacheable(value = "S2-F12", key = "#eventId")
-    public EventDashboardDTO getEventDashboard(Long eventId) {
+    public EventDashboardDTO getEventDashboardCached(Long eventId) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Event not found with id: " + eventId));
@@ -551,7 +551,6 @@ CacheInvalidationService cacheInvalidationService) {
         double averageAttendanceRate = totalTicketsSold == 0
                 ? 0.0
                 : (double) usedTickets / totalTicketsSold;
-        notifyObservers("DASHBOARD_VIEWED", buildPayload(eventId, Collections.emptyMap()));
         return EventDashboardDTO.builder()
                 .eventId(event.getId())
                 .name(event.getName())
@@ -561,6 +560,11 @@ CacheInvalidationService cacheInvalidationService) {
                 .averageAttendanceRate(averageAttendanceRate)
                 .averageRating(event.getRating() == null ? 0.0 : event.getRating())
                 .build();
+    }
+    public EventDashboardDTO getEventDashboard(Long eventId) {
+        EventDashboardDTO result = getEventDashboardCached(eventId);
+        notifyObservers("DASHBOARD_VIEWED", buildPayload(eventId, Collections.emptyMap()));
+        return result;
     }
 
     // -----------------------------------------------------------------------
