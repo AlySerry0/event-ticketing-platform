@@ -46,7 +46,7 @@ public class SalePromotionService {
 
         // CRUD get-by-ID cache
         cacheInvalidationService.invalidateCacheWildcard(
-                "sales-service::SalePromotion::" + salePromotionId
+                "sales-service::sale-promotion::" + salePromotionId
         );
 
         if (saleId != null) {
