@@ -11,7 +11,11 @@ import com.team7.eventticketing.sales.model.*;
 import com.team7.eventticketing.sales.repository.PromotionRepository;
 import com.team7.eventticketing.sales.repository.SalePromotionRepository;
 import com.team7.eventticketing.sales.repository.TicketSaleRepository;
+import com.team7.eventticketing.sales.adapter.MongoDocumentAdapter;
+import com.team7.eventticketing.sales.dto.SaleAuditTrailDTO;
+import com.team7.eventticketing.sales.repository.PaymentAuditEventRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +46,9 @@ public class TicketSaleService {
     @Autowired
     private SalePromotionService salePromotionService;
     @Autowired
+    private PaymentAuditEventRepository paymentAuditEventRepository;
+    @Autowired
+    private MongoDocumentAdapter mongoDocumentAdapter;
     private EntitySubject entitySubject;
     @Autowired
     private EventFactory eventFactory;
@@ -462,6 +469,15 @@ public class TicketSaleService {
 
         return dto;
     }
+    @Cacheable(value = "saleAuditTrail", key = "#saleId")
+    public SaleAuditTrailDTO getSaleAuditTrail(Long saleId) {
+
+        if (!ticketSaleRepository.existsById(saleId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Ticket sale not found"
+            );
+        }
     @Autowired
     private EventFactory eventFactory;
 
@@ -489,4 +505,13 @@ public class TicketSaleService {
         }
     }
 
+        List<PaymentAuditEvent> events =
+                paymentAuditEventRepository
+                        .findBySaleIdAndActionNotOrderByTimestampAsc(
+                                saleId,
+                                "ANALYTICS_VIEWED"
+                        );
+
+        return mongoDocumentAdapter.toSaleAuditTrailDTO(saleId, events);
+    }
 }
