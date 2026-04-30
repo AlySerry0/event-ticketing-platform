@@ -30,11 +30,12 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
         WHERE t.status = 'VALID'
         AND e.status = 'UPCOMING'
         """, nativeQuery = true)
-    List<UnusedTicketDTO> findUnusedTicketsForUpcomingEvents();
+    List<Object[]> findUnusedTicketsForUpcomingEvents();
 
     
     @Query(value = """
         SELECT 
+            b.event_id AS eventId,
             COUNT(*) AS totalTickets,
             SUM(CASE WHEN t.status = 'USED' THEN 1 ELSE 0 END) AS usedTickets,
             SUM(CASE WHEN t.status = 'VALID' THEN 1 ELSE 0 END) AS validTickets,
