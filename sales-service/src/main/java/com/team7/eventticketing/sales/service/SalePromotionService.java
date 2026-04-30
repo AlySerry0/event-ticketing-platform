@@ -33,15 +33,48 @@ public class SalePromotionService {
     @Autowired
     CacheInvalidationService cacheInvalidationService;
 
+    private void invalidateAfterSalePromotionWrite(SalePromotion salePromotion) {
+        Long salePromotionId = salePromotion.getId();
 
+        Long saleId = salePromotion.getTicketSale() != null
+                ? salePromotion.getTicketSale().getId()
+                : null;
+
+        Long promotionId = salePromotion.getPromotion() != null
+                ? salePromotion.getPromotion().getId()
+                : null;
+
+        // CRUD get-by-ID cache
+        cacheInvalidationService.invalidateCacheWildcard(
+                "sales-service::SalePromotion::" + salePromotionId
+        );
+
+        if (saleId != null) {
+            cacheInvalidationService.invalidateCacheWildcard("sales-service::ticket-sale::" + saleId);
+            cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F8::" + saleId);
+            cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + saleId);
+        }
+
+        if (promotionId != null) {
+            cacheInvalidationService.invalidateCacheWildcard("sales-service::promotion::" + promotionId);
+        }
+
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F9::*");
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
+    }
 
     public SalePromotionDTO save(SalePromotionDTO salePromotionDTO) {
         SalePromotion salePromotion = convertToEntity(salePromotionDTO);
+
         if (salePromotion.getAppliedAt() == null) {
             salePromotion.setAppliedAt(LocalDateTime.now());
         }
 
-        return convertToDTO(salePromotionRepository.save(salePromotion));
+        SalePromotion saved = salePromotionRepository.save(salePromotion);
+
+        invalidateAfterSalePromotionWrite(saved);
+
+        return convertToDTO(saved);
     }
     @Cacheable(value = "sale-promotion", key = "#id")
     public Optional<SalePromotionDTO> findById(Long id) {
@@ -55,7 +88,13 @@ public class SalePromotionService {
     }
 
     public void deleteById(Long id) {
+
+        SalePromotion salePromotion = salePromotionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Sale promotion not found"));
+
         salePromotionRepository.deleteById(id);
+
+        invalidateAfterSalePromotionWrite(salePromotion);
     }
 
     public SalePromotionDTO convertToDTO(SalePromotion salePromotion) {
