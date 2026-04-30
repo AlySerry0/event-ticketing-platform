@@ -79,13 +79,14 @@ public class TicketSaleService {
         if (ticketSale.getCreatedAt() == null) {
             ticketSale.setCreatedAt(LocalDateTime.now());
         }
-        return convertToDTO(ticketSaleRepository.save(ticketSale));
+        TicketSale saved = ticketSaleRepository.save(ticketSale);
+        invalidateAfterTicketSaleWrite(saved);
+        return convertToDTO(saved);
     }
-
+    @Cacheable(value = "ticket-sale", key = "#id")
     public Optional<TicketSaleDTO> findById(Long id) {
         return ticketSaleRepository.findById(id).map(this::convertToDTO);
     }
-
     public List<TicketSaleDTO> findAll() {
         return ticketSaleRepository.findAll().stream()
                 .map(this::convertToDTO)
@@ -93,7 +94,15 @@ public class TicketSaleService {
     }
 
     public void deleteById(Long id) {
+        TicketSale sale = ticketSaleRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Ticket sale not found"
+                ));
+
         ticketSaleRepository.deleteById(id);
+
+        invalidateAfterTicketSaleWrite(sale);
     }
 
     public TicketSaleDTO convertToDTO(TicketSale ticketSale) {
@@ -184,6 +193,33 @@ public class TicketSaleService {
         return payload;
     }
 
+    private void invalidateAfterTicketSaleWrite(TicketSale sale) {
+        Long saleId = sale.getId();
+        Long userId = sale.getUserId();
+
+        // CRUD / entity reads
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::ticket-sale::" + saleId);
+
+        // S5-F1: search ticket sales
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F1::*");
+
+        // S5-F3: user ticket sale summary
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F3::" + userId);
+
+        // S5-F6: revenue report
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F6::*");
+
+        // S5-F8: sale details
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F8::" + saleId);
+
+        // S5-F10:
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
+
+        // S5-F11: audit trail
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + saleId);
+    }
+
+
     @Transactional
     public TicketSale applyPromotionToSale(Long saleId, Long promotionId) {
         TicketSale sale = ticketSaleRepository.findById(saleId)
@@ -247,9 +283,7 @@ public class TicketSaleService {
 
         entitySubject.notifyObservers("PROMOTION_APPLIED", payload);
 
-        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
-        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + saved.getId());
-
+        invalidateAfterTicketSaleWrite(saved);
         return saved;
     }
 
@@ -318,10 +352,7 @@ public class TicketSaleService {
             TicketSale failedSale = ticketSaleRepository.saveAndFlush(pendingSale);
             entitySubject.notifyObservers("FAILED", buildAuditPayload(failedSale));
 
-            cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
-            cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + failedSale.getId());
-            cacheInvalidationService.invalidateCacheWildcard("sales-service::ticket-sale::" + failedSale.getId());
-
+            invalidateAfterTicketSaleWrite(failedSale);
             return failedSale;
         }
 
@@ -332,11 +363,7 @@ public class TicketSaleService {
 
         TicketSale completedSale = ticketSaleRepository.saveAndFlush(pendingSale);
         entitySubject.notifyObservers("COMPLETED", buildAuditPayload(completedSale));
-
-        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
-        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + completedSale.getId());
-        cacheInvalidationService.invalidateCacheWildcard("sales-service::ticket-sale::" + completedSale.getId());
-
+        invalidateAfterTicketSaleWrite(completedSale);
         return completedSale;
     }
     public UserSaleSummaryDTO getUserSaleSummary(Long userId) {
@@ -494,7 +521,7 @@ public class TicketSaleService {
 
         return dto;
     }
-    @Cacheable(value = "sales-service::S5-F11", key = "#saleId")
+    @Cacheable(value = "S5-F11", key = "#saleId")
     public SaleAuditTrailDTO getSaleAuditTrail(Long saleId) {
 
         if (!ticketSaleRepository.existsById(saleId)) {
