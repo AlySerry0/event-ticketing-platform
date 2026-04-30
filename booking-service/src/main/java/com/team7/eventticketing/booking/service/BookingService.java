@@ -322,13 +322,6 @@ public class BookingService implements EntitySubject {
 		Booking booking = bookingRepository.findById(bookingId)
 				.orElseThrow(() -> new NoSuchElementException("Booking not found"));
 
-		BookingDetailsDTO dto = new BookingDetailsDTO();
-		dto.setBookingId(booking.getId());
-		dto.setUserId(booking.getUserId());
-		dto.setEventId(booking.getEventId());
-		dto.setStatus(booking.getStatus());
-		dto.setTotalAmount(booking.getTotalAmount());
-		dto.setMetadata(booking.getMetadata());
 
 		List<BookingItem> bookingItems = booking.getBookingItems() == null ? List.of() : booking.getBookingItems();
 
@@ -341,11 +334,18 @@ public class BookingService implements EntitySubject {
 				.filter(item -> item.getStatus() == BookingItemStatus.CONFIRMED)
 				.count();
 
-		dto.setItems(itemDTOs);
-		dto.setTotalItems(itemDTOs.size());
-		dto.setConfirmedItems(confirmedItems);
 
-		return dto;
+        return BookingDetailsDTO.builder()
+                .bookingId(booking.getId())
+                .userId(booking.getUserId())
+                .eventId(booking.getEventId())
+                .status(booking.getStatus())
+                .totalAmount(booking.getTotalAmount())
+                .metadata(booking.getMetadata())
+                .items(itemDTOs)
+                .totalItems(itemDTOs.size())
+                .confirmedItems(confirmedItems)
+                .build();
 	}
 
     private void invalidateBookingCaches(Long bookingId) {
