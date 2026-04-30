@@ -1,30 +1,20 @@
-package com.team7.eventticketing.sales.model;
-
-import com.team7.eventticketing.sales.observer.MongoEvent;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
+package com.team7.eventticketing.sales.dto;
 
 import java.time.LocalDateTime;
 import java.util.Map;
 
-@Document(collection = "payment_audit_trail")
-public class PaymentAuditEvent implements MongoEvent {
+public class AuditEventDTO {
 
-    @Id
-    private String id;
-
-    private Long saleId;
     private String action;
     private LocalDateTime timestamp;
     private String method;
     private Double amount;
     private Map<String, Object> details;
 
-    public PaymentAuditEvent() {}
+    public AuditEventDTO() {}
 
-    public PaymentAuditEvent(Long saleId, String action, LocalDateTime timestamp,
-                             String method, Double amount, Map<String, Object> details) {
-        this.saleId = saleId;
+    public AuditEventDTO(String action, LocalDateTime timestamp, String method,
+                         Double amount, Map<String, Object> details) {
         this.action = action;
         this.timestamp = timestamp;
         this.method = method;
@@ -32,16 +22,12 @@ public class PaymentAuditEvent implements MongoEvent {
         this.details = details;
     }
 
-    public String getId() { return id; }
-    public Long getSaleId() { return saleId; }
     public String getAction() { return action; }
     public LocalDateTime getTimestamp() { return timestamp; }
     public String getMethod() { return method; }
     public Double getAmount() { return amount; }
     public Map<String, Object> getDetails() { return details; }
 
-    public void setId(String id) { this.id = id; }
-    public void setSaleId(Long saleId) { this.saleId = saleId; }
     public void setAction(String action) { this.action = action; }
     public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
     public void setMethod(String method) { this.method = method; }

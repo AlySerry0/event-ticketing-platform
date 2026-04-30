@@ -9,6 +9,9 @@ import com.team7.eventticketing.sales.model.TicketSale;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.stereotype.Component;
+
+import java.time.LocalDateTime;
 
 @Component
 public class ObjectArrayDtoAdapter {
