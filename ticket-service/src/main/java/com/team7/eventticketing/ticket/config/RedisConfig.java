@@ -49,6 +49,12 @@ public class RedisConfig {
         cacheConfigs.put("S4-F9",
                 config.entryTtl(Duration.ofMinutes(10)));
 
+        cacheConfigs.put("S4-F10",
+                config.entryTtl(Duration.ofMinutes(10)));
+
+        cacheConfigs.put("S4-F12",
+                config.entryTtl(Duration.ofMinutes(5)));
+
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(config)
                 .withInitialCacheConfigurations(cacheConfigs)
