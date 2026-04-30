@@ -234,7 +234,8 @@ public class TicketSaleService {
                 );
 
         notifyObservers("PROMOTION_APPLIED", event);
-
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::top-used-promotions::*");
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::saleAuditTrail::*");
         return saved;
     }
 
@@ -311,7 +312,8 @@ public class TicketSaleService {
             PaymentAuditEvent failedEvent =
                     eventFactory.createPaymentAuditEvent("FAILED", failedSale);
             notifyObservers("FAILED", failedEvent);
-
+            cacheInvalidationService.invalidateCacheWildcard("sales-service::top-used-promotions::*");
+            cacheInvalidationService.invalidateCacheWildcard("sales-service::saleAuditTrail::*");
             return failedSale;
         }
 
@@ -326,7 +328,8 @@ public class TicketSaleService {
         PaymentAuditEvent completedEvent =
                 eventFactory.createPaymentAuditEvent("COMPLETED", completedSale);
         notifyObservers("COMPLETED", completedEvent);
-
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::top-used-promotions::*");
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::saleAuditTrail::*");
         return completedSale;
     }
     public UserSaleSummaryDTO getUserSaleSummary(Long userId) {

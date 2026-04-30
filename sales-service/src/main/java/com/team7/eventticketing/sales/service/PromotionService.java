@@ -6,7 +6,7 @@ import com.team7.eventticketing.sales.model.Promotion;
 import com.team7.eventticketing.sales.repository.PromotionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
+import org.springframework.cache.annotation.Cacheable;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -65,6 +65,7 @@ public class PromotionService {
         return promotion;
     }
 
+    @Cacheable(value = "top-used-promotions", key = "#limit")
     public List<PromotionUsageDTO> getTopUsedPromotions(int limit) {
         List<Object[]> results = promotionRepository.getTopUsedPromotions(limit);
 
@@ -89,16 +90,16 @@ public class PromotionService {
                 }
             }
             Boolean expired = expiryDate != null && expiryDate.isBefore(LocalDateTime.now());
-            PromotionUsageDTO dto = new PromotionUsageDTO();
-            dto.setPromotionId(id);
-            dto.setCode(code);
-            dto.setDiscountType(discountType);
-            dto.setDiscountValue(discountValue);
-            dto.setTimesUsed(timesUsed);
-            dto.setTotalDiscountGiven(totalDiscountGiven);
-            dto.setActive(active);
-            dto.setExpired(expired);
-
+            PromotionUsageDTO dto = new PromotionUsageDTO.Builder()
+                    .promotionId(id)
+                    .code(code)
+                    .discountType(discountType)
+                    .discountValue(discountValue)
+                    .timesUsed(timesUsed)
+                    .totalDiscountGiven(totalDiscountGiven)
+                    .active(active)
+                    .expired(expired)
+                    .build();
             dtoList.add(dto);
         }
 
