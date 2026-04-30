@@ -21,7 +21,7 @@ import com.team7.eventticketing.booking.observer.EntityObserver;
 import com.team7.eventticketing.booking.observer.EntitySubject;
 import com.team7.eventticketing.booking.observer.MongoEventLogger;
 import com.team7.eventticketing.booking.util.CacheInvalidationService;
-
+import org.springframework.cache.annotation.Cacheable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -326,7 +326,7 @@ public class BookingService implements EntitySubject {
 				.toList();
 	}
 
-
+    @Cacheable(value = "S3-F9", key = "#bookingId")
 	public BookingDetailsDTO getBookingDetails(Long bookingId) {
 		Booking booking = bookingRepository.findById(bookingId)
 				.orElseThrow(() -> new NoSuchElementException("Booking not found"));
@@ -357,6 +357,7 @@ public class BookingService implements EntitySubject {
                 .build();
 	}
 
+    @Cacheable(value = "S3-F12", key = "#userId + '-' + (#limit == null ? 5 : #limit)")
     public List<ProviderRecommendationDTO> getEventRecommendations(Long userId, Integer limit, Long requesterId, String requesterRole) {
         if (!userId.equals(requesterId) && !"ADMIN".equals(requesterRole)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only view your own recommendations");
@@ -416,6 +417,7 @@ public class BookingService implements EntitySubject {
         cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + bookingId);
         cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F9::*");
         cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F12::*");
     }
 
 	@Transactional

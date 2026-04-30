@@ -30,6 +30,8 @@ public class RedisConfig {
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(config)
+                .withCacheConfiguration("S3-F12", config.entryTtl(Duration.ofMinutes(5)))
+                .withCacheConfiguration("S3-F9", config.entryTtl(Duration.ofMinutes(10)))
                 .build();
     }
 
