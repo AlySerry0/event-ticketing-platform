@@ -101,15 +101,19 @@ public class TicketSaleController {
     @PostMapping("/booking/{bookingId}")
     public ResponseEntity<TicketSaleDTO> processTicketSale(
             @PathVariable Long bookingId,
-            @RequestBody ProcessTicketDTO request
+            @RequestBody ProcessTicketDTO request,
+            @RequestParam(defaultValue = "false") boolean simulateFailure
     ) {
-
         TicketSale updatedSale = ticketSaleService.processTicketSale(
                 bookingId,
                 request.getMethod(),
-                request.getCardLastFour()
+                request.getCardLastFour(),
+                simulateFailure
         );
-        return ResponseEntity.status(HttpStatus.CREATED).body(ticketSaleService.convertToDTO(updatedSale));
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ticketSaleService.convertToDTO(updatedSale));
     }
 
     @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
@@ -150,6 +154,11 @@ public class TicketSaleController {
     public ResponseEntity<TicketSaleDTO> retryFailedSale(@PathVariable Long id) {
         TicketSale updatedSale = ticketSaleService.retryFailedSale(id);
         return ResponseEntity.ok(ticketSaleService.convertToDTO(updatedSale));
+    }
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+    @GetMapping("/{id}/audit-trail")
+    public ResponseEntity<SaleAuditTrailDTO> getSaleAuditTrail(@PathVariable Long id) {
+        return ResponseEntity.ok(ticketSaleService.getSaleAuditTrail(id));
     }
 }
 

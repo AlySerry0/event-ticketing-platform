@@ -1,9 +1,6 @@
 package com.team7.eventticketing.booking.service;
 
-import com.team7.eventticketing.booking.dto.BookingAnalyticsDTO;
-import com.team7.eventticketing.booking.dto.BookingCostEstimateDTO;
-import com.team7.eventticketing.booking.dto.BookingDTO;
-import com.team7.eventticketing.booking.dto.BookingEstimateRequestDTO;
+import com.team7.eventticketing.booking.dto.*;
 import com.team7.eventticketing.booking.model.Booking;
 import com.team7.eventticketing.booking.model.BookingItem;
 import com.team7.eventticketing.booking.model.BookingStatus;
@@ -13,22 +10,22 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
-import com.team7.eventticketing.booking.dto.BookingItemDTO;
 import com.team7.eventticketing.booking.model.BookingItemStatus;
-import java.util.Comparator;
+import org.springframework.cache.annotation.Cacheable;
+
+import java.util.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Optional;
+
 import com.team7.eventticketing.booking.observer.EntityObserver;
 import com.team7.eventticketing.booking.observer.EntitySubject;
 import com.team7.eventticketing.booking.observer.MongoEventLogger;
 import com.team7.eventticketing.booking.util.CacheInvalidationService;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+
 @Service
 public class BookingService implements EntitySubject {
 
@@ -458,6 +455,59 @@ public class BookingService implements EntitySubject {
 		this.notifyObservers("BOOKING_CANCELLED", Map.of("bookingId", bookingId, "status", booking.getStatus()));
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + bookingId);
+	}
+	@Cacheable(value = "booking-service::S3-F10", key = "#startDate.toString() + '_' + #endDate.toString()")
+	public BookingAnalyticsDashboardDTO getAnalyticsDashboard(LocalDate startDate, LocalDate endDate) {
+		if (startDate.isAfter(endDate)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be after end date");
+		}
+
+		LocalDateTime start = startDate.atStartOfDay();
+		LocalDateTime end = endDate.atTime(LocalTime.MAX);
+
+		List<Booking> bookings = bookingRepository.findByBookingDateBetweenOrderByBookingDateDesc(start, end);
+
+		long totalBookings = bookings.size();
+		double totalRevenue = 0.0;
+		long completedCount = 0;
+		long conversionCount = 0;
+		Map<String, Long> statusMap = new HashMap<>();
+
+		for(Booking b : bookings) {
+			String status = b.getStatus().name();
+			statusMap.put(status, statusMap.getOrDefault(status, 0L) + 1);
+
+			if (b.getStatus() == BookingStatus.COMPLETED) {
+				completedCount++;
+				if(b.getTotalAmount() != null) {
+					totalRevenue += b.getTotalAmount();
+				}
+			}
+			if (b.getStatus() == BookingStatus.CONFIRMED || b.getStatus() == BookingStatus.CHECKED_IN || b.getStatus() == BookingStatus.COMPLETED) {
+				conversionCount++;
+			}
+		}
+
+		double avgValue = completedCount > 0 ? totalRevenue / completedCount : 0.0;
+		double convRate = totalBookings > 0 ? (double) conversionCount / totalBookings : 0.0;
+
+		BookingAnalyticsDashboardDTO dto = new BookingAnalyticsDashboardDTO();
+		dto.setTotalBookings(totalBookings);
+		dto.setTotalRevenue(totalRevenue);
+		dto.setAverageBookingValue(avgValue);
+		dto.setConversionRate(convRate);
+		dto.setBookingsByStatus(statusMap);
+
+		return dto;
+	}
+	public void recordAnalyticsView(LocalDate startDate, LocalDate endDate, Double totalRevenueCalculated) {
+		Map<String, Object> payload = new HashMap<>();
+		payload.put("dashboardType", "BookingAnalytics");
+		payload.put("startDate", startDate.toString());
+		payload.put("endDate", endDate.toString());
+		payload.put("totalRevenueCalculated", totalRevenueCalculated);
+
+		notifyObservers("ANALYTICS_VIEWED", payload);
 	}
 }
 
