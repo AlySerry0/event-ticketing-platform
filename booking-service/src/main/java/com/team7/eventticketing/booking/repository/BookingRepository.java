@@ -59,4 +59,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE email = :email", nativeQuery = true)
     boolean userExistsByEmail(String email);
+
+    @Query(value = "SELECT name FROM users WHERE id = :userId", nativeQuery = true)
+    String findUserNameById(@Param("userId") Long userId);
+
+    @Query(value = "SELECT name, category, event_date FROM events WHERE id = :eventId", nativeQuery = true)
+    Object[] findEventDetailsById(@Param("eventId") Long eventId);
 }

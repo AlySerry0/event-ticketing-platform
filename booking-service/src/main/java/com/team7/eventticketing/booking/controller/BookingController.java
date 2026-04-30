@@ -203,4 +203,19 @@ public class BookingController {
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
 		}
 	}
+
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@PostMapping("/{bookingId}/record-attendance")
+	public ResponseEntity<String> recordAttendance(@PathVariable Long bookingId) {
+		try {
+			bookingService.recordAttendance(bookingId);
+			return ResponseEntity.ok("Attendance recorded successfully");
+		} catch (NoSuchElementException e) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+		} catch (ResponseStatusException e) {
+			throw e;
+		} catch (Exception e) {
+			throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error recording attendance: " + e.getMessage());
+		}
+	}
 }

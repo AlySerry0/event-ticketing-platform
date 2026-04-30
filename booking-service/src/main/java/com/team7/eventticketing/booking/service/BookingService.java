@@ -4,7 +4,12 @@ import com.team7.eventticketing.booking.dto.*;
 import com.team7.eventticketing.booking.model.Booking;
 import com.team7.eventticketing.booking.model.BookingItem;
 import com.team7.eventticketing.booking.model.BookingStatus;
+import com.team7.eventticketing.booking.model.neo4j.AttendedRelationship;
+import com.team7.eventticketing.booking.model.neo4j.EventNode;
+import com.team7.eventticketing.booking.model.neo4j.UserNode;
 import com.team7.eventticketing.booking.repository.BookingRepository;
+import com.team7.eventticketing.booking.repository.EventNodeRepository;
+import com.team7.eventticketing.booking.repository.UserNodeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,6 +39,12 @@ public class BookingService implements EntitySubject {
 
 	@Autowired
 	private BookingItemService bookingItemService;
+
+	@Autowired
+	private UserNodeRepository userNodeRepository;
+
+	@Autowired
+	private EventNodeRepository eventNodeRepository;
 
 	private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
 	private final CacheInvalidationService cacheInvalidationService;
@@ -456,6 +467,7 @@ public class BookingService implements EntitySubject {
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + bookingId);
 	}
+
 	@Cacheable(value = "booking-service::S3-F10", key = "#startDate.toString() + '_' + #endDate.toString()")
 	public BookingAnalyticsDashboardDTO getAnalyticsDashboard(LocalDate startDate, LocalDate endDate) {
 		if (startDate.isAfter(endDate)) {
@@ -500,6 +512,7 @@ public class BookingService implements EntitySubject {
 
 		return dto;
 	}
+
 	public void recordAnalyticsView(LocalDate startDate, LocalDate endDate, Double totalRevenueCalculated) {
 		Map<String, Object> payload = new HashMap<>();
 		payload.put("dashboardType", "BookingAnalytics");
@@ -509,5 +522,70 @@ public class BookingService implements EntitySubject {
 
 		notifyObservers("ANALYTICS_VIEWED", payload);
 	}
-}
 
+	@Transactional
+	public void recordAttendance(Long bookingId) {
+		Booking booking = bookingRepository.findById(bookingId)
+				.orElseThrow(() -> new NoSuchElementException("Booking not found"));
+
+		if (booking.getStatus() != BookingStatus.COMPLETED) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking is not completed");
+		}
+
+		if (booking.getEventId() == null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking has no assigned event");
+		}
+
+		// Look up user node or create it
+		UserNode userNode = userNodeRepository.findByUserId(booking.getUserId())
+				.orElseGet(() -> {
+					UserNode newNode = new UserNode();
+					newNode.setUserId(booking.getUserId());
+					String name = bookingRepository.findUserNameById(booking.getUserId());
+					newNode.setName(name != null ? name : "Unknown User");
+					return newNode;
+				});
+
+		// Check idempotency
+		Optional<AttendedRelationship> existingRel = userNode.getAttendedEvents().stream()
+				.filter(rel -> rel.getEvent() != null && rel.getEvent().getEventId().equals(booking.getEventId()))
+				.findFirst();
+
+		if (existingRel.isPresent() && existingRel.get().getRecordedBookingIds().contains(bookingId)) {
+			return; // Idempotent skip
+		}
+
+		if (existingRel.isPresent()) {
+			AttendedRelationship rel = existingRel.get();
+			rel.setAttendanceCount(rel.getAttendanceCount() + 1);
+			rel.setLastAttendedDate(LocalDateTime.now());
+			rel.getRecordedBookingIds().add(bookingId);
+		} else {
+			AttendedRelationship rel = new AttendedRelationship();
+			EventNode eventNode = eventNodeRepository.findByEventId(booking.getEventId())
+					.orElseGet(() -> {
+						EventNode newNode = new EventNode();
+						newNode.setEventId(booking.getEventId());
+						Object[] details = (Object[]) bookingRepository.findEventDetailsById(booking.getEventId())[0];
+						newNode.setName((String) details[0]);
+						newNode.setCategory(details[1] != null ? details[1].toString() : "UNSPECIFIED");
+						return newNode;
+					});
+			rel.setEvent(eventNode);
+			rel.setAttendanceCount(1);
+			rel.setLastAttendedDate(LocalDateTime.now());
+			rel.getRecordedBookingIds().add(bookingId);
+			userNode.getAttendedEvents().add(rel);
+		}
+
+		userNodeRepository.save(userNode);
+
+		// Notify observers (MongoDB logging)
+		this.notifyObservers("INTERACTION_RECORDED", Map.of(
+				"bookingId", bookingId,
+				"userId", booking.getUserId(),
+				"eventId", booking.getEventId(),
+				"action", "INTERACTION_RECORDED"
+		));
+	}
+}
