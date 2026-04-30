@@ -83,7 +83,7 @@ public class TicketSaleService {
         invalidateAfterTicketSaleWrite(saved);
         return convertToDTO(saved);
     }
-    @Cacheable(value = "TicketSale", key = "#id")
+    @Cacheable(value = "ticket-sale", key = "#id")
     public Optional<TicketSaleDTO> findById(Long id) {
         return ticketSaleRepository.findById(id).map(this::convertToDTO);
     }
@@ -198,7 +198,7 @@ public class TicketSaleService {
         Long userId = sale.getUserId();
 
         // CRUD / entity reads
-        cacheInvalidationService.invalidateCacheWildcard("sales-service::TicketSale::" + saleId);
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::ticket-sale::" + saleId);
 
         // S5-F1: search ticket sales
         cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F1::*");

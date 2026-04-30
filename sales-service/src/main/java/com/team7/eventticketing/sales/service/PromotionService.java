@@ -25,7 +25,7 @@ public class PromotionService {
         return convertToDTO(promotionRepository.save(promotion));
     }
 
-    @Cacheable(value = "Promotion", key = "#id")
+    @Cacheable(value = "promotion", key = "#id")
     public Optional<PromotionDTO> findById(Long id) {
         return promotionRepository.findById(id).map(this::convertToDTO);
     }
