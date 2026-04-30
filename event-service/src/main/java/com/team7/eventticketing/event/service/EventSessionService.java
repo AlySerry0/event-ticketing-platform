@@ -8,6 +8,8 @@ import com.team7.eventticketing.event.dto.UpdateEventSessionDTO;
 import com.team7.eventticketing.event.dto.VerifyEventSessionDTO;
 import com.team7.eventticketing.event.model.Event;
 import com.team7.eventticketing.event.model.EventSession;
+import com.team7.eventticketing.event.observer.EntityObserver;
+import com.team7.eventticketing.event.observer.MongoEventLogger;
 import com.team7.eventticketing.event.repository.EventRepository;
 import com.team7.eventticketing.event.repository.EventSessionRepository;
 import com.team7.eventticketing.event.util.CacheInvalidationService;
@@ -19,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,6 +29,7 @@ import java.util.Map;
 @Service
 @Transactional(readOnly = true)
 public class EventSessionService {
+    private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
 
     private final EventSessionRepository eventSessionRepository;
     private final EventRepository eventRepository;
@@ -35,11 +39,28 @@ public class EventSessionService {
     public EventSessionService(EventSessionRepository eventSessionRepository,
                                EventRepository eventRepository,
                                EventService eventService,
-                               CacheInvalidationService cacheInvalidationService) {
+                               MongoEventLogger mongoEventLogger,
+                              CacheInvalidationService cacheInvalidationService) {  // ← add this
         this.eventSessionRepository = eventSessionRepository;
-        this.eventRepository = eventRepository;
-        this.eventService = eventService;
+        this.eventRepository        = eventRepository;
+        this.eventService           = eventService;
+        this.register(mongoEventLogger);  // ← add this
         this.cacheInvalidationService = cacheInvalidationService;
+
+    }
+
+    public void register(EntityObserver observer) {
+        if (!observers.contains(observer)) observers.add(observer);
+    }
+
+    public void unregister(EntityObserver observer) {
+        observers.remove(observer);
+    }
+
+    private void notifyObservers(String action, Object payload) {
+        for (EntityObserver observer : observers) {
+            observer.onEvent(action, payload);
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -308,6 +329,11 @@ public class EventSessionService {
         session.setMetadata(metadata);
 
         eventSessionRepository.save(session);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("eventId", eventId);
+        payload.put("sessionId", sessionId);
+        payload.put("verifiedBy", verifiedBy);
+        notifyObservers("SESSION_VERIFIED", payload);
 
         // S2-F8 is a write — invalidate session detail + S2-F9
         invalidateSessionCaches(sessionId);

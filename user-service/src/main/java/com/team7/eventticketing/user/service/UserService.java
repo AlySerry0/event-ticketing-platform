@@ -28,12 +28,15 @@ import java.util.stream.Collectors;
 import com.team7.eventticketing.user.dto.UserBookingSummaryDTO;
 import com.team7.eventticketing.user.repository.BookingSummaryProjection;
 
+import com.team7.eventticketing.user.adapter.ObjectArrayDtoAdapter;
+
 @Service
 @Transactional(readOnly = true)
 public class UserService {
 
     private final UserRepository userRepository;
     private final CacheInvalidationService cacheInvalidationService;
+    private final ObjectArrayDtoAdapter objectArrayDtoAdapter = new ObjectArrayDtoAdapter();
 
     private final List<EntityObserver> observers = new ArrayList<>();
 
@@ -336,24 +339,41 @@ public class UserService {
     /**
      * [S1-F3] Get User Booking Summary — cached (10 min)
      */
+//    @Cacheable(value = "S1-F3", key = "#id")
+//    public UserBookingSummaryDTO getBookingSummary(Long id) {
+//        userRepository.findById(id)
+//                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with ID: " + id));
+//
+//        BookingSummaryProjection projection = userRepository.getUserBookingSummary(id);
+//
+//        UserBookingSummaryDTO dto = new UserBookingSummaryDTO();
+//        dto.setUserId(projection.getUserId());
+//        dto.setName(projection.getName());
+//        dto.setTotalBookings(projection.getTotalBookings());
+//        dto.setCompletedBookings(projection.getCompletedBookings());
+//        dto.setCancelledBookings(projection.getCancelledBookings());
+//        dto.setTotalSpent(projection.getTotalSpent());
+//        dto.setAverageBookingAmount(projection.getAverageBookingAmount());
+//
+//        return dto;
+//    }
+    /**
+     * [S1-F3] Get User Booking Summary
+     * Native SQL Object[] row → UserBookingSummaryDTO via ObjectArrayDtoAdapter (PDF §3.8).
+     */
     @Cacheable(value = "S1-F3", key = "#id")
     public UserBookingSummaryDTO getBookingSummary(Long id) {
         userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with ID: " + id));
 
-        BookingSummaryProjection projection = userRepository.getUserBookingSummary(id);
-
-        UserBookingSummaryDTO dto = new UserBookingSummaryDTO();
-        dto.setUserId(projection.getUserId());
-        dto.setName(projection.getName());
-        dto.setTotalBookings(projection.getTotalBookings());
-        dto.setCompletedBookings(projection.getCompletedBookings());
-        dto.setCancelledBookings(projection.getCancelledBookings());
-        dto.setTotalSpent(projection.getTotalSpent());
-        dto.setAverageBookingAmount(projection.getAverageBookingAmount());
-
-        return dto;
+        List<Object[]> rows = userRepository.getUserBookingSummary(id);
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "No booking summary found for user ID: " + id);
+        }
+        return objectArrayDtoAdapter.toUserBookingSummaryDTO(rows.get(0));
     }
+
 
     /**
      * [S1-F5] Filter Users by Preference (JSONB Query) — cached (5 min)
@@ -388,15 +408,21 @@ public class UserService {
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
 
+//        List<Object[]> results = userRepository
+//                .findTopAttendeesBySpending(startDateTime, endDateTime, limit);
+//
+//        return results.stream().map(row -> new TopAttendeeDTO(
+//                ((Number) row[0]).longValue(),
+//                (String) row[1],
+//                ((Number) row[2]).doubleValue(),
+//                ((Number) row[3]).longValue()
+//        )).collect(Collectors.toList());
         List<Object[]> results = userRepository
                 .findTopAttendeesBySpending(startDateTime, endDateTime, limit);
 
-        return results.stream().map(row -> new TopAttendeeDTO(
-                ((Number) row[0]).longValue(),
-                (String) row[1],
-                ((Number) row[2]).doubleValue(),
-                ((Number) row[3]).longValue()
-        )).collect(Collectors.toList());
+        return results.stream()
+                .map(objectArrayDtoAdapter::toTopAttendeeDTO)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -410,19 +436,18 @@ public class UserService {
                         "User not found with ID: " + id
                 ));
 
-        UserProfileDTO userProfileDTO = new UserProfileDTO();
-        userProfileDTO.setUserId(user.getId());
-        userProfileDTO.setName(user.getName());
-        userProfileDTO.setEmail(user.getEmail());
-        userProfileDTO.setPhone(user.getPhone());
-        userProfileDTO.setPreferences(user.getPreferences());
-        userProfileDTO.setFavoriteVenues(user.getFavoriteVenues()
-                .stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList()));
-        userProfileDTO.setTotalFavoriteVenues(user.getFavoriteVenues().size());
-
-        return userProfileDTO;
+        return UserProfileDTO.builder()
+                .userId(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .preferences(user.getPreferences())
+                .favoriteVenues(user.getFavoriteVenues()
+                        .stream()
+                        .map(this::convertToDTO)
+                        .collect(Collectors.toList()))
+                .totalFavoriteVenues(user.getFavoriteVenues().size())
+                .build();
     }
 
     /**
@@ -497,27 +522,27 @@ public class UserService {
      * Convert User entity to UserDTO
      */
     private UserDTO convertToDTO(User user) {
-        UserDTO userDTO = new UserDTO();
-        userDTO.setId(user.getId());
-        userDTO.setName(user.getName());
-        userDTO.setEmail(user.getEmail());
-        userDTO.setPhone(user.getPhone());
-        userDTO.setRole(user.getRole());
-        userDTO.setStatus(user.getStatus());
-        userDTO.setPreferences(user.getPreferences());
-        userDTO.setCreatedAt(user.getCreatedAt());
-        return userDTO;
+        return UserDTO.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .role(user.getRole())
+                .status(user.getStatus())
+                .preferences(user.getPreferences())
+                .createdAt(user.getCreatedAt())
+                .build();
     }
 
     private FavoriteVenueDTO convertToDTO(FavoriteVenue favoriteVenue) {
-        FavoriteVenueDTO dto = new FavoriteVenueDTO();
-        dto.setId(favoriteVenue.getId());
-        dto.setLabel(favoriteVenue.getLabel());
-        dto.setVenueName(favoriteVenue.getVenueName());
-        dto.setLocation(favoriteVenue.getLocation());
-        dto.setCapacity(favoriteVenue.getCapacity());
-        dto.setIsDefault(favoriteVenue.getIsDefault());
-        dto.setMetadata(favoriteVenue.getMetadata());
-        return dto;
+        return FavoriteVenueDTO.builder()
+                .id(favoriteVenue.getId())
+                .label(favoriteVenue.getLabel())
+                .venueName(favoriteVenue.getVenueName())
+                .location(favoriteVenue.getLocation())
+                .capacity(favoriteVenue.getCapacity())
+                .isDefault(favoriteVenue.getIsDefault())
+                .metadata(favoriteVenue.getMetadata())
+                .build();
     }
 }
