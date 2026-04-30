@@ -199,7 +199,6 @@ public class TicketSaleService {
 
         // CRUD / entity reads
         cacheInvalidationService.invalidateCacheWildcard("sales-service::TicketSale::" + saleId);
-        cacheInvalidationService.invalidateCacheWildcard("sales-service::TicketSale::*");
 
         // S5-F1: search ticket sales
         cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F1::*");
