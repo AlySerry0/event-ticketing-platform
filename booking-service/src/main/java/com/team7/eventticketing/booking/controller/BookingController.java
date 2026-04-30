@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
 import com.team7.eventticketing.booking.dto.BookingItemDTO;
-import com.team7.eventticketing.booking.dto.ProviderRecommendationDTO;
+import com.team7.eventticketing.booking.dto.EventRecommendationDTO;
 import com.team7.eventticketing.booking.service.JwtService;
 
 import java.time.LocalDate;
@@ -188,7 +188,7 @@ public class BookingController {
 
     @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/recommendations")
-    public ResponseEntity<List<ProviderRecommendationDTO>> getEventRecommendations(
+    public ResponseEntity<List<EventRecommendationDTO>> getEventRecommendations(
             @RequestParam Long userId,
             @RequestParam(required = false) Integer limit,
             @RequestHeader("Authorization") String authorizationHeader) {

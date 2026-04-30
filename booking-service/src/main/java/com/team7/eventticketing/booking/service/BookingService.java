@@ -33,7 +33,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import com.team7.eventticketing.booking.adapter.Neo4jRecordAdapter;
-import com.team7.eventticketing.booking.dto.ProviderRecommendationDTO;
+import com.team7.eventticketing.booking.dto.EventRecommendationDTO;
 import org.neo4j.driver.Driver;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -386,7 +386,7 @@ public class BookingService implements EntitySubject {
 	}
 
     @Cacheable(value = "S3-F12", key = "#userId + '-' + (#limit == null ? 5 : #limit)")
-    public List<ProviderRecommendationDTO> getEventRecommendations(Long userId, Integer limit, Long requesterId, String requesterRole) {
+    public List<EventRecommendationDTO> getEventRecommendations(Long userId, Integer limit, Long requesterId, String requesterRole) {
         if (!userId.equals(requesterId) && !"ADMIN".equals(requesterRole)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only view your own recommendations");
         }
@@ -409,13 +409,13 @@ public class BookingService implements EntitySubject {
             """;
 
         try (var session = neo4jDriver.session()) {
-            List<ProviderRecommendationDTO> recommendations = session.executeRead(tx ->
+            List<EventRecommendationDTO> recommendations = session.executeRead(tx ->
                     tx.run(cypher, Map.of("userId", userId, "limit", recommendationLimit))
                             .list(neo4jRecordAdapter::adapt)
             );
 
             List<Long> eventIds = recommendations.stream()
-                    .map(ProviderRecommendationDTO::getProviderId)
+                    .map(EventRecommendationDTO::getEventId)
                     .toList();
 
             if (eventIds.isEmpty()) {
@@ -429,12 +429,19 @@ public class BookingService implements EntitySubject {
                             row -> row
                     ));
 
-            for (ProviderRecommendationDTO recommendation : recommendations) {
-                Object[] row = eventDetails.get(recommendation.getProviderId());
+            for (EventRecommendationDTO recommendation : recommendations) {
+                Object[] row = eventDetails.get(recommendation.getEventId());
                 if (row != null) {
                     recommendation.setName((String) row[1]);
-                    recommendation.setSpecialty((String) row[2]);
+                    recommendation.setCategory((String) row[2]);
+
+                    if (row[3] instanceof java.sql.Timestamp timestamp) {
+                        recommendation.setEventDate(timestamp.toLocalDateTime());
+                    } else if (row[3] instanceof java.time.LocalDateTime dateTime) {
+                        recommendation.setEventDate(dateTime);
+                    }
                 }
+
             }
 
             return recommendations;

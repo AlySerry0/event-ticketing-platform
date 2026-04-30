@@ -1,17 +1,18 @@
 package com.team7.eventticketing.booking.adapter;
 
-import com.team7.eventticketing.booking.dto.ProviderRecommendationDTO;
+import com.team7.eventticketing.booking.dto.EventRecommendationDTO;
 import org.neo4j.driver.Record;
 import org.springframework.stereotype.Component;
 
 @Component
 public class Neo4jRecordAdapter {
 
-    public ProviderRecommendationDTO adapt(Record record) {
-        return new ProviderRecommendationDTO(
-                record.get("eventId").asLong(),     // temporarily mapped as providerId
+    public EventRecommendationDTO adapt(Record record) {
+        return new EventRecommendationDTO(
+                record.get("eventId").asLong(),
                 record.get("eventName").asString(""),
                 record.get("category").asString(""),
+                null, // will be filled later from PostgreSQL
                 record.get("score").asLong()
         );
     }
