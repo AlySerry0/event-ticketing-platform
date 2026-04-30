@@ -1,5 +1,6 @@
 package com.team7.eventticketing.sales.model;
 
+import com.team7.eventticketing.sales.observer.MongoEvent;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -7,7 +8,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 @Document(collection = "payment_audit_trail")
-public class PaymentAuditEvent {
+public class PaymentAuditEvent implements MongoEvent {
 
     @Id
     private String id;

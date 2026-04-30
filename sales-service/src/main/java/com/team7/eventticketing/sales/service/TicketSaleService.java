@@ -1,5 +1,6 @@
 package com.team7.eventticketing.sales.service;
 
+import com.team7.eventticketing.sales.observer.EntitySubject;
 import com.team7.eventticketing.sales.util.CacheInvalidationService;
 import com.team7.eventticketing.sales.factory.EventFactory;
 import com.team7.eventticketing.sales.dto.RevenueReportDTO;
@@ -47,11 +48,11 @@ public class TicketSaleService {
     @Autowired
     private MongoDocumentAdapter mongoDocumentAdapter;
     @Autowired
-    private EventFactory eventFactory;
-    @Autowired
     private CacheInvalidationService cacheInvalidationService;
     @Autowired
     private MongoEventLogger mongoEventLogger;
+    @Autowired
+    private EntitySubject entitySubject;
 
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
 
@@ -163,7 +164,25 @@ public class TicketSaleService {
                 .map(this::convertToDTO)
                 .toList();
     }
+    private Map<String, Object> buildAuditPayload(TicketSale sale) {
+        Map<String, Object> details = new HashMap<>();
 
+        if (sale.getTransactionDetails() != null) {
+            details.putAll(sale.getTransactionDetails());
+        }
+
+        details.put("status", sale.getStatus() != null ? sale.getStatus().name() : null);
+        details.put("bookingId", sale.getBookingId());
+        details.put("userId", sale.getUserId());
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("saleId", sale.getId());
+        payload.put("method", sale.getMethod() != null ? sale.getMethod().name() : null);
+        payload.put("amount", sale.getAmount());
+        payload.put("details", details);
+
+        return payload;
+    }
 
     @Transactional
     public TicketSale applyPromotionToSale(Long saleId, Long promotionId) {
@@ -185,7 +204,7 @@ public class TicketSaleService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion is expired");
         }
 
-        int currentUses = (promo.getCurrentUses() != null) ? promo.getCurrentUses() : 0;
+        int currentUses = promo.getCurrentUses() != null ? promo.getCurrentUses() : 0;
         if (currentUses >= promo.getMaxUses()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion usage limit reached");
         }
@@ -194,12 +213,9 @@ public class TicketSaleService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "promotion already applied");
         }
 
-        double discount;
-        if (promo.getDiscountType() == DiscountType.PERCENTAGE) {
-            discount = sale.getAmount() * (promo.getDiscountValue() / 100.0);
-        } else {
-            discount = promo.getDiscountValue();
-        }
+        double discount = promo.getDiscountType() == DiscountType.PERCENTAGE
+                ? sale.getAmount() * (promo.getDiscountValue() / 100.0)
+                : promo.getDiscountValue();
 
         double alreadyAppliedDiscount = 0.0;
         if (sale.getSalePromotions() != null) {
@@ -207,41 +223,38 @@ public class TicketSaleService {
                     .mapToDouble(SalePromotion::getDiscountApplied)
                     .sum();
         }
-        
-        double maxAvailableDiscount = Math.max(0.0, sale.getAmount() - alreadyAppliedDiscount);
-        if (discount > maxAvailableDiscount) {
-            discount = maxAvailableDiscount;
-        }
 
+        double maxAvailableDiscount = Math.max(0.0, sale.getAmount() - alreadyAppliedDiscount);
+        discount = Math.min(discount, maxAvailableDiscount);
         discount = Math.round(discount * 100.0) / 100.0;
 
         SalePromotion salePromo = new SalePromotion();
         salePromo.setPromotion(promo);
         salePromo.setDiscountApplied(discount);
         salePromo.setAppliedAt(LocalDateTime.now());
-        
+
         sale.addSalePromotion(salePromo);
-        
+
         promo.setCurrentUses(currentUses + 1);
         promotionRepository.saveAndFlush(promo);
+
         TicketSale saved = ticketSaleRepository.saveAndFlush(sale);
 
-        PaymentAuditEvent event =
-                eventFactory.createPromotionAppliedEvent(
-                        saved,
-                        promo.getCode(),
-                        discount
-                );
+        Map<String, Object> payload = buildAuditPayload(saved);
+        Map<String, Object> details = (Map<String, Object>) payload.get("details");
+        details.put("promotionCode", promo.getCode());
+        details.put("discountApplied", discount);
 
-        notifyObservers("PROMOTION_APPLIED", event);
-        cacheInvalidationService.invalidateCacheWildcard("sales-service::top-used-promotions::*");
-        cacheInvalidationService.invalidateCacheWildcard("sales-service::saleAuditTrail::*");
+        entitySubject.notifyObservers("PROMOTION_APPLIED", payload);
+
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + saved.getId());
+
         return saved;
     }
 
     @Transactional
     public TicketSale processTicketSale(Long bookingId, String methodStr, String cardLastFour, boolean simulateFailure) {
-
         boolean doesExist = ticketSaleRepository.bookingExists(bookingId);
         if (!doesExist) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
@@ -289,17 +302,12 @@ public class TicketSaleService {
             transactionDetails.put("cardLastFour", cardLastFour);
         }
 
-        // First log CREATED
         ticketSale.setStatus(TicketSaleStatus.PENDING);
         ticketSale.setTransactionDetails(transactionDetails);
 
         TicketSale pendingSale = ticketSaleRepository.saveAndFlush(ticketSale);
+        entitySubject.notifyObservers("CREATED", buildAuditPayload(pendingSale));
 
-        PaymentAuditEvent createdEvent =
-                eventFactory.createPaymentAuditEvent("CREATED", pendingSale);
-        notifyObservers("CREATED", createdEvent);
-
-        // Simulated failure path
         if (simulateFailure) {
             transactionDetails.put("gatewayResponse", "declined");
             transactionDetails.put("failureReason", "Simulated payment failure");
@@ -308,28 +316,27 @@ public class TicketSaleService {
             pendingSale.setTransactionDetails(transactionDetails);
 
             TicketSale failedSale = ticketSaleRepository.saveAndFlush(pendingSale);
+            entitySubject.notifyObservers("FAILED", buildAuditPayload(failedSale));
 
-            PaymentAuditEvent failedEvent =
-                    eventFactory.createPaymentAuditEvent("FAILED", failedSale);
-            notifyObservers("FAILED", failedEvent);
-            cacheInvalidationService.invalidateCacheWildcard("sales-service::top-used-promotions::*");
-            cacheInvalidationService.invalidateCacheWildcard("sales-service::saleAuditTrail::*");
+            cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
+            cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + failedSale.getId());
+            cacheInvalidationService.invalidateCacheWildcard("sales-service::ticket-sale::" + failedSale.getId());
+
             return failedSale;
         }
 
-        // Success path
         transactionDetails.put("gatewayResponse", "approved");
 
         pendingSale.setStatus(TicketSaleStatus.COMPLETED);
         pendingSale.setTransactionDetails(transactionDetails);
 
         TicketSale completedSale = ticketSaleRepository.saveAndFlush(pendingSale);
+        entitySubject.notifyObservers("COMPLETED", buildAuditPayload(completedSale));
 
-        PaymentAuditEvent completedEvent =
-                eventFactory.createPaymentAuditEvent("COMPLETED", completedSale);
-        notifyObservers("COMPLETED", completedEvent);
-        cacheInvalidationService.invalidateCacheWildcard("sales-service::top-used-promotions::*");
-        cacheInvalidationService.invalidateCacheWildcard("sales-service::saleAuditTrail::*");
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + completedSale.getId());
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::ticket-sale::" + completedSale.getId());
+
         return completedSale;
     }
     public UserSaleSummaryDTO getUserSaleSummary(Long userId) {
@@ -445,10 +452,7 @@ public class TicketSaleService {
 
         TicketSale savedSale = ticketSaleRepository.save(sale);
 
-        PaymentAuditEvent retryEvent =
-                eventFactory.createPaymentAuditEvent("RETRY_ATTEMPTED", savedSale);
-
-        notifyObservers("RETRY_ATTEMPTED", retryEvent);
+        entitySubject.notifyObservers("RETRY_ATTEMPTED", buildAuditPayload(savedSale));
         cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F6::*");
         cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F8::" + savedSale.getId());
         cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
@@ -490,7 +494,7 @@ public class TicketSaleService {
 
         return dto;
     }
-    @Cacheable(value = "saleAuditTrail", key = "#saleId")
+    @Cacheable(value = "sales-service::S5-F11", key = "#saleId")
     public SaleAuditTrailDTO getSaleAuditTrail(Long saleId) {
 
         if (!ticketSaleRepository.existsById(saleId)) {
@@ -506,6 +510,6 @@ public class TicketSaleService {
                         "ANALYTICS_VIEWED"
                 );
 
-        return mongoDocumentAdapter.toSaleAuditTrailDTO(saleId, events);
+        return mongoDocumentAdapter.adapt(saleId, events);
     }
 }

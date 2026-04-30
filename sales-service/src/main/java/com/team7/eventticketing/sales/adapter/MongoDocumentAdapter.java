@@ -10,7 +10,7 @@ import java.util.List;
 @Component
 public class MongoDocumentAdapter {
 
-    public SaleAuditTrailDTO toSaleAuditTrailDTO(Long saleId, List<PaymentAuditEvent> events) {
+    public SaleAuditTrailDTO adapt(Long saleId, List<PaymentAuditEvent> events) {
         List<AuditEventDTO> auditEvents = events.stream()
                 .map(event -> new AuditEventDTO(
                         event.getAction(),
