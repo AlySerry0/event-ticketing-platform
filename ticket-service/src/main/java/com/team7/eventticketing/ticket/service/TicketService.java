@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.cache.annotation.Cacheable;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -215,7 +216,7 @@ public class TicketService implements EntitySubject {
     public List<UnusedTicketDTO> getUnusedTicketsForUpcomingEvents() {
         return ticketRepository.findUnusedTicketsForUpcomingEvents();
     }
-
+    @Cacheable(value = "S4-F5", key = "#key + '|' + #operator + '|' + #value") 
     public List<TicketDTO> filterTicketsByMetadata(String key, String operator, String value) {
         List<String> validOperators = List.of("eq", "gt", "lt");
         if (!validOperators.contains(operator)) {
@@ -274,7 +275,7 @@ public class TicketService implements EntitySubject {
         
         return savedTickets.size();
     }
-
+    @Cacheable(value = "S4-F6", key = "#startDate + '|' + #endDate + '|' + #ticketStatusInput")
     public List<TicketDTO> getTicketsInDateRange(String startDate, String endDate, String ticketStatusInput) {
 
         LocalDateTime startDateTime = parseFlexibleDate(startDate, true);
