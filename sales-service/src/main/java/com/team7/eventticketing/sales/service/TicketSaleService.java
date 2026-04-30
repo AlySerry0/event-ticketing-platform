@@ -2,7 +2,6 @@ package com.team7.eventticketing.sales.service;
 
 import com.team7.eventticketing.sales.util.CacheInvalidationService;
 import com.team7.eventticketing.sales.factory.EventFactory;
-import com.team7.eventticketing.sales.observer.EntitySubject;
 import com.team7.eventticketing.sales.dto.RevenueReportDTO;
 import com.team7.eventticketing.sales.dto.SaleDetailsDTO;
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
@@ -20,12 +19,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import com.team7.eventticketing.sales.factory.EventFactory;
 import com.team7.eventticketing.sales.model.PaymentAuditEvent;
 import com.team7.eventticketing.sales.observer.EntityObserver;
 import com.team7.eventticketing.sales.observer.MongoEventLogger;
 import jakarta.annotation.PostConstruct;
-import java.util.ArrayList;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -49,12 +46,33 @@ public class TicketSaleService {
     private PaymentAuditEventRepository paymentAuditEventRepository;
     @Autowired
     private MongoDocumentAdapter mongoDocumentAdapter;
-    private EntitySubject entitySubject;
     @Autowired
     private EventFactory eventFactory;
     @Autowired
     private CacheInvalidationService cacheInvalidationService;
+    @Autowired
+    private MongoEventLogger mongoEventLogger;
 
+    private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
+
+    @PostConstruct
+    public void initObservers() {
+        registerObserver(mongoEventLogger);
+    }
+
+    public void registerObserver(EntityObserver observer) {
+        observers.add(observer);
+    }
+
+    public void unregisterObserver(EntityObserver observer) {
+        observers.remove(observer);
+    }
+
+    private void notifyObservers(String eventType, Object payload) {
+        for (EntityObserver observer : observers) {
+            observer.onEvent(eventType, payload);
+        }
+    }
     public TicketSaleDTO save(TicketSaleDTO ticketSaleDTO) {
         TicketSale ticketSale = convertToEntity(ticketSaleDTO);
         if (ticketSale.getCreatedAt() == null) {
@@ -427,7 +445,7 @@ public class TicketSaleService {
         PaymentAuditEvent retryEvent =
                 eventFactory.createPaymentAuditEvent("RETRY_ATTEMPTED", savedSale);
 
-        entitySubject.notifyObservers("RETRY_ATTEMPTED", retryEvent);
+        notifyObservers("RETRY_ATTEMPTED", retryEvent);
         cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F6::*");
         cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F8::" + savedSale.getId());
         cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
@@ -478,39 +496,12 @@ public class TicketSaleService {
                     "Ticket sale not found"
             );
         }
-    @Autowired
-    private EventFactory eventFactory;
-
-    @Autowired
-    private MongoEventLogger mongoEventLogger;
-
-    private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
-
-    @PostConstruct
-    public void initObservers() {
-        registerObserver(mongoEventLogger);
-    }
-
-    public void registerObserver(EntityObserver observer) {
-        observers.add(observer);
-    }
-
-    public void unregisterObserver(EntityObserver observer) {
-        observers.remove(observer);
-    }
-
-    private void notifyObservers(String eventType, Object payload) {
-        for (EntityObserver observer : observers) {
-            observer.onEvent(eventType, payload);
-        }
-    }
 
         List<PaymentAuditEvent> events =
-                paymentAuditEventRepository
-                        .findBySaleIdAndActionNotOrderByTimestampAsc(
-                                saleId,
-                                "ANALYTICS_VIEWED"
-                        );
+                paymentAuditEventRepository.findBySaleIdAndActionNotOrderByTimestampAsc(
+                        saleId,
+                        "ANALYTICS_VIEWED"
+                );
 
         return mongoDocumentAdapter.toSaleAuditTrailDTO(saleId, events);
     }
