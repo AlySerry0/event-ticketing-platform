@@ -33,7 +33,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import com.team7.eventticketing.booking.adapter.Neo4jRecordAdapter;
-import com.team7.eventticketing.booking.dto.EventRecommendationDTO;
+import com.team7.eventticketing.booking.dto.ProviderRecommendationDTO;
 import org.neo4j.driver.Driver;
 
 @Service
@@ -357,10 +357,16 @@ public class BookingService implements EntitySubject {
                 .build();
 	}
 
-    public List<EventRecommendationDTO> getEventRecommendations(Long userId, Long requesterId, String requesterRole) {
+    public List<ProviderRecommendationDTO> getEventRecommendations(Long userId, Integer limit, Long requesterId, String requesterRole) {
         if (!userId.equals(requesterId) && !"ADMIN".equals(requesterRole)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only view your own recommendations");
         }
+
+        if (!bookingRepository.userExistsById(userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+        }
+
+        int recommendationLimit = limit == null ? 5 : limit;
 
         String cypher = """
             MATCH (target:User {userId: $userId})-[:ATTENDED]->(shared:Event)<-[:ATTENDED]-(similar:User)-[:ATTENDED]->(recommended:Event)
@@ -370,17 +376,17 @@ public class BookingService implements EntitySubject {
                    recommended.category AS category,
                    count(similar) AS score
             ORDER BY score DESC
-            LIMIT 10
+            LIMIT $limit
             """;
 
         try (var session = neo4jDriver.session()) {
-            List<EventRecommendationDTO> recommendations = session.executeRead(tx ->
-                    tx.run(cypher, Map.of("userId", userId))
+            List<ProviderRecommendationDTO> recommendations = session.executeRead(tx ->
+                    tx.run(cypher, Map.of("userId", userId, "limit", recommendationLimit))
                             .list(neo4jRecordAdapter::adapt)
             );
 
             List<Long> eventIds = recommendations.stream()
-                    .map(EventRecommendationDTO::getEventId)
+                    .map(ProviderRecommendationDTO::getProviderId)
                     .toList();
 
             if (eventIds.isEmpty()) {
@@ -394,11 +400,11 @@ public class BookingService implements EntitySubject {
                             row -> row
                     ));
 
-            for (EventRecommendationDTO recommendation : recommendations) {
-                Object[] row = eventDetails.get(recommendation.getEventId());
+            for (ProviderRecommendationDTO recommendation : recommendations) {
+                Object[] row = eventDetails.get(recommendation.getProviderId());
                 if (row != null) {
-                    recommendation.setEventName((String) row[1]);
-                    recommendation.setCategory((String) row[2]);
+                    recommendation.setName((String) row[1]);
+                    recommendation.setSpecialty((String) row[2]);
                 }
             }
 

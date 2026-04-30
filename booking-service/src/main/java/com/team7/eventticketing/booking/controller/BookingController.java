@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
 import com.team7.eventticketing.booking.dto.BookingItemDTO;
-import com.team7.eventticketing.booking.dto.EventRecommendationDTO;
+import com.team7.eventticketing.booking.dto.ProviderRecommendationDTO;
 import com.team7.eventticketing.booking.service.JwtService;
 
 import java.time.LocalDate;
@@ -187,17 +187,22 @@ public class BookingController {
     }
 
     @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
-    @GetMapping("/users/{userId}/recommendations")
-    public ResponseEntity<List<EventRecommendationDTO>> getEventRecommendations(
-            @PathVariable Long userId,
+    @GetMapping("/recommendations")
+    public ResponseEntity<List<ProviderRecommendationDTO>> getEventRecommendations(
+            @RequestParam Long userId,
+            @RequestParam(required = false) Integer limit,
             @RequestHeader("Authorization") String authorizationHeader) {
+
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing or invalid token");
+        }
 
         String token = authorizationHeader.substring(7);
         Long requesterId = jwtService.extractUserId(token);
         String requesterRole = jwtService.extractRole(token);
 
         return ResponseEntity.ok(
-                bookingService.getEventRecommendations(userId, requesterId, requesterRole)
+                bookingService.getEventRecommendations(userId, limit, requesterId, requesterRole)
         );
     }
 }
