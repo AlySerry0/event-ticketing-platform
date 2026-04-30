@@ -1,5 +1,6 @@
 package com.team7.eventticketing.sales.service;
 
+import com.team7.eventticketing.sales.adapter.ObjectArrayDtoAdapter;
 import com.team7.eventticketing.sales.dto.TierRevenueDTO;
 import com.team7.eventticketing.sales.util.CacheInvalidationService;
 import com.team7.eventticketing.sales.factory.EventFactory;
@@ -44,6 +45,8 @@ public class TicketSaleService {
     private EventFactory eventFactory;
     @Autowired
     private CacheInvalidationService cacheInvalidationService;
+    @Autowired
+    private ObjectArrayDtoAdapter objectArrayDtoAdapter;
 
     public TicketSaleDTO save(TicketSaleDTO ticketSaleDTO) {
         TicketSale ticketSale = convertToEntity(ticketSaleDTO);
@@ -306,21 +309,20 @@ public class TicketSaleService {
         return convertToDTO(saved);
     }
 
+    @Cacheable(
+            value = "S5-F6",
+            key = "#start.toString() + '_' + #end.toString()",
+            unless = "#result == null"
+    )
     public RevenueReportDTO getRevenueReport(LocalDateTime start, LocalDateTime end) {
-
         Double totalRevenue = ticketSaleRepository.getTotalRevenue(start, end);
         Long totalTransactions = ticketSaleRepository.getTotalTransactions(start, end);
         Double refundedAmount = ticketSaleRepository.getRefundedAmount(start, end);
         Long refundCount = ticketSaleRepository.getRefundCount(start, end);
 
-        Double averageSale = (totalTransactions != 0)
-                ? totalRevenue / totalTransactions
-                : 0.0;
-
-        return new RevenueReportDTO(
+        return objectArrayDtoAdapter.toRevenueReportDTO(
                 totalRevenue,
                 totalTransactions,
-                averageSale,
                 refundedAmount,
                 refundCount
         );
@@ -368,38 +370,17 @@ public class TicketSaleService {
 
         return savedSale;
     }
+    @Cacheable(
+            value = "S5-F8",
+            key = "#saleId",
+            unless = "#result == null"
+    )
     public SaleDetailsDTO getSaleDetails(Long saleId) {
         TicketSale sale = ticketSaleRepository.findById(saleId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Ticket sale not found"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Ticket sale not found"));
 
-        List<SaleDetailsDTO.AppliedPromotionDTO> appliedPromotions = sale.getSalePromotions()
-                .stream()
-                .map(sp -> new SaleDetailsDTO.AppliedPromotionDTO(
-                        sp.getPromotion().getCode(),
-                        sp.getPromotion().getDiscountType().name(),
-                        sp.getDiscountApplied(),
-                        sp.getAppliedAt()
-                ))
-                .toList();
-
-        double totalDiscount = appliedPromotions.stream()
-                .mapToDouble(SaleDetailsDTO.AppliedPromotionDTO::getDiscountApplied)
-                .sum();
-
-        SaleDetailsDTO dto = new SaleDetailsDTO();
-        dto.setSaleId(sale.getId());
-        dto.setBookingId(sale.getBookingId());
-        dto.setUserId(sale.getUserId());
-        dto.setOriginalAmount(sale.getAmount());
-        dto.setMethod(sale.getMethod());
-        dto.setStatus(sale.getStatus());
-        dto.setTransactionDetails(sale.getTransactionDetails());
-        dto.setAppliedPromotions(appliedPromotions);
-        dto.setTotalDiscount(totalDiscount);
-        dto.setFinalAmount(sale.getAmount() - totalDiscount);
-
-        return dto;
+        return objectArrayDtoAdapter.toSaleDetailsDTO(sale);
     }
     @Cacheable(
             value  = "S5-F10",
@@ -413,21 +394,7 @@ public class TicketSaleService {
         List<Object[]> rows = ticketSaleRepository.findTierRevenue(startDateTime, endDateTime);
 
         return rows.stream()
-                .map(row -> {
-                    String tier    = (String) row[0];
-                    double revenue = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
-                    long   count   = row[2] != null ? ((Number) row[2]).longValue()   : 0L;
-                    long   tickets = row[3] != null ? ((Number) row[3]).longValue()   : 0L;
-                    double avg     = count > 0 ? revenue / count : 0.0;
-
-                    return TierRevenueDTO.builder()
-                            .tier(tier)
-                            .totalRevenue(revenue)
-                            .saleCount(count)
-                            .ticketsSold(tickets)
-                            .averageRevenuePerSale(avg)
-                            .build();
-                })
+                .map(objectArrayDtoAdapter::toTierRevenueDTO)
                 .toList();
     }
 
