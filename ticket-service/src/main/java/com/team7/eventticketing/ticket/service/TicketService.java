@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+
 import com.team7.eventticketing.ticket.adapter.CassandraRowAdapter;
 import com.team7.eventticketing.ticket.dto.TicketScanDTO;
 import com.team7.eventticketing.ticket.model.cassandra.TicketScanEvent;
@@ -94,6 +95,8 @@ public class TicketService implements EntitySubject {
         
         this.notifyObservers("TICKET_CREATED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
 
         return convertToDTO(savedTicket);
@@ -114,6 +117,8 @@ public class TicketService implements EntitySubject {
         
         this.notifyObservers("TICKET_DELETED", Map.of("ticketId", id));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::" + id);
     }
 
@@ -167,6 +172,8 @@ public class TicketService implements EntitySubject {
         
         this.notifyObservers("OLD_DATA_PURGED", Map.of("olderThanDays", olderThanDays, "deletedCount", deletedCount));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         
         return deletedCount;
     }
@@ -206,6 +213,8 @@ public class TicketService implements EntitySubject {
         
         this.notifyObservers("TICKET_ISSUED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::" + savedTicket.getId());
 
         return convertToDTO(savedTicket);
@@ -224,7 +233,7 @@ public class TicketService implements EntitySubject {
     public List<UnusedTicketDTO> getUnusedTicketsForUpcomingEvents() {
         return ticketRepository.findUnusedTicketsForUpcomingEvents();
     }
-
+    @Cacheable(value = "S4-F5", key = "#key + '|' + #operator + '|' + #value") 
     public List<TicketDTO> filterTicketsByMetadata(String key, String operator, String value) {
         List<String> validOperators = List.of("eq", "gt", "lt");
         if (!validOperators.contains(operator)) {
@@ -279,11 +288,13 @@ public class TicketService implements EntitySubject {
         this.notifyObservers("BATCH_ISSUED", Map.of("bookingId", batchRequest.getBookingId(), "size", savedTickets.size()));
         
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
         
         return savedTickets.size();
     }
-
+    @Cacheable(value = "S4-F6", key = "#startDate + '|' + #endDate + '|' + #ticketStatusInput")
     public List<TicketDTO> getTicketsInDateRange(String startDate, String endDate, String ticketStatusInput) {
 
         LocalDateTime startDateTime = parseFlexibleDate(startDate, true);
@@ -368,6 +379,8 @@ public class TicketService implements EntitySubject {
             
             this.notifyObservers("TICKET_UPDATED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
             cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+            cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+            cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
             cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::" + id);
 
             return convertToDTO(savedTicket);
