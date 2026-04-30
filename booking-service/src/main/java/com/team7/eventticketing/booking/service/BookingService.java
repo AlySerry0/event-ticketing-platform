@@ -32,6 +32,9 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import com.team7.eventticketing.booking.adapter.Neo4jRecordAdapter;
+import com.team7.eventticketing.booking.dto.EventRecommendationDTO;
+import org.neo4j.driver.Driver;
 
 @Service
 public class BookingService implements EntitySubject {
@@ -51,6 +54,12 @@ public class BookingService implements EntitySubject {
     public void registerMongoLogger(MongoEventLogger mongoEventLogger) {
         register(mongoEventLogger);
     }
+
+    @Autowired
+    private Driver neo4jDriver;
+
+    @Autowired
+    private Neo4jRecordAdapter neo4jRecordAdapter;
 
 	public BookingDTO save(BookingDTO bookingDTO) {
 		Booking booking = convertToEntity(bookingDTO);
@@ -347,6 +356,55 @@ public class BookingService implements EntitySubject {
                 .confirmedItems(confirmedItems)
                 .build();
 	}
+
+    public List<EventRecommendationDTO> getEventRecommendations(Long userId, Long requesterId, String requesterRole) {
+        if (!userId.equals(requesterId) && !"ADMIN".equals(requesterRole)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only view your own recommendations");
+        }
+
+        String cypher = """
+            MATCH (target:User {userId: $userId})-[:ATTENDED]->(shared:Event)<-[:ATTENDED]-(similar:User)-[:ATTENDED]->(recommended:Event)
+            WHERE NOT (target)-[:ATTENDED]->(recommended)
+            RETURN recommended.eventId AS eventId,
+                   recommended.name AS eventName,
+                   recommended.category AS category,
+                   count(similar) AS score
+            ORDER BY score DESC
+            LIMIT 10
+            """;
+
+        try (var session = neo4jDriver.session()) {
+            List<EventRecommendationDTO> recommendations = session.executeRead(tx ->
+                    tx.run(cypher, Map.of("userId", userId))
+                            .list(neo4jRecordAdapter::adapt)
+            );
+
+            List<Long> eventIds = recommendations.stream()
+                    .map(EventRecommendationDTO::getEventId)
+                    .toList();
+
+            if (eventIds.isEmpty()) {
+                return recommendations;
+            }
+
+            Map<Long, Object[]> eventDetails = bookingRepository.findEventRecommendationDetails(eventIds)
+                    .stream()
+                    .collect(java.util.stream.Collectors.toMap(
+                            row -> ((Number) row[0]).longValue(),
+                            row -> row
+                    ));
+
+            for (EventRecommendationDTO recommendation : recommendations) {
+                Object[] row = eventDetails.get(recommendation.getEventId());
+                if (row != null) {
+                    recommendation.setEventName((String) row[1]);
+                    recommendation.setCategory((String) row[2]);
+                }
+            }
+
+            return recommendations;
+        }
+    }
 
     private void invalidateBookingCaches(Long bookingId) {
         cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + bookingId);

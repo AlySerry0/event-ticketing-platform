@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
 import com.team7.eventticketing.booking.dto.BookingItemDTO;
+import com.team7.eventticketing.booking.dto.EventRecommendationDTO;
+import com.team7.eventticketing.booking.service.JwtService;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -26,6 +28,9 @@ public class BookingController {
 
 	@Autowired
 	private BookingService bookingService;
+
+    @Autowired
+    private JwtService jwtService;
 
 	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PostMapping
@@ -179,5 +184,20 @@ public class BookingController {
         } catch (NoSuchElementException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         }
+    }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+    @GetMapping("/users/{userId}/recommendations")
+    public ResponseEntity<List<EventRecommendationDTO>> getEventRecommendations(
+            @PathVariable Long userId,
+            @RequestHeader("Authorization") String authorizationHeader) {
+
+        String token = authorizationHeader.substring(7);
+        Long requesterId = jwtService.extractUserId(token);
+        String requesterRole = jwtService.extractRole(token);
+
+        return ResponseEntity.ok(
+                bookingService.getEventRecommendations(userId, requesterId, requesterRole)
+        );
     }
 }
