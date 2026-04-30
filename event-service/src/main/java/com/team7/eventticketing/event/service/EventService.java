@@ -11,6 +11,7 @@ import com.team7.eventticketing.event.observer.EntityObserver;
 import com.team7.eventticketing.event.observer.MongoEventLogger;
 import com.team7.eventticketing.event.repository.EventRepository;
 import com.team7.eventticketing.event.util.CacheInvalidationService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
@@ -39,7 +40,8 @@ public class EventService {
     private final  EventIndexService eventIndexService;  // needed to trigger re-indexing on updates
     private final ElasticsearchOperations elasticsearchOperations;
     private final ElasticsearchHitAdapter elasticsearchHitAdapter;
-
+    @Autowired
+    private EventService self;
 
     public void register(EntityObserver observer) {
         if (!observers.contains(observer)) {
@@ -539,30 +541,15 @@ CacheInvalidationService cacheInvalidationService) {
 
         Object[] row = eventRepository.findEventDashboardMetrics(eventId);
 
-        long totalBookings = row != null && row.length > 0 && row[0] != null
-                ? ((Number) row[0]).longValue() : 0L;
-        double totalRevenue = row != null && row.length > 1 && row[1] != null
-                ? ((Number) row[1]).doubleValue() : 0.0;
-        long totalTicketsSold = row != null && row.length > 2 && row[2] != null
-                ? ((Number) row[2]).longValue() : 0L;
-        long usedTickets = row != null && row.length > 3 && row[3] != null
-                ? ((Number) row[3]).longValue() : 0L;
-
-        double averageAttendanceRate = totalTicketsSold == 0
-                ? 0.0
-                : (double) usedTickets / totalTicketsSold;
-        return EventDashboardDTO.builder()
-                .eventId(event.getId())
-                .name(event.getName())
-                .totalBookings(totalBookings)
-                .totalTicketsSold(totalTicketsSold)
-                .totalRevenue(totalRevenue)
-                .averageAttendanceRate(averageAttendanceRate)
-                .averageRating(event.getRating() == null ? 0.0 : event.getRating())
-                .build();
+        return objectArrayDtoAdapter.toEventDashboardDTO(
+                row,
+                event.getId(),
+                event.getName(),
+                event.getRating()
+        );
     }
     public EventDashboardDTO getEventDashboard(Long eventId) {
-        EventDashboardDTO result = getEventDashboardCached(eventId);
+        EventDashboardDTO result = self.getEventDashboardCached(eventId); // ← was getEventDashboardCached()
         notifyObservers("DASHBOARD_VIEWED", buildPayload(eventId, Collections.emptyMap()));
         return result;
     }
