@@ -13,7 +13,6 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-
   data:
     mongodb:
       uri: ${SPRING_DATA_MONGODB_URI:mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin}
@@ -21,12 +20,11 @@ spring:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: 6379
       password: ${SPRING_DATA_REDIS_PASSWORD:redispass}
-
   elasticsearch:
     uris: ${SPRING_ELASTICSEARCH_URIS:http://localhost:9200}
 
   mongodb:
-    uri: ${SPRING_MONGODB_URI:mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin}
+    uri: ${SPRING_DATA_MONGODB_URI:mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin}
   web:
     error:
       include-message: always

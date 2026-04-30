@@ -47,6 +47,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             new EndpointRule("PUT",    "^/api/users/\\d+/preferences$",                 BOTH),
             new EndpointRule("GET",    "^/api/users/\\d+/booking-summary$",             BOTH),
             new EndpointRule("GET",    "^/api/users/\\d+/profile$",                     BOTH),
+            new EndpointRule("GET",    "^/api/users/\\d+/activity",                 BOTH),
 
             // --- FavoriteVenueController (nested under /api/users/{userId}/venues) ---
             new EndpointRule("PUT",    "^/api/users/\\d+/venues/\\d+/default$",         BOTH),

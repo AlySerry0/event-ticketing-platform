@@ -1,22 +1,16 @@
 package com.team7.eventticketing.sales.controller;
 
-import com.team7.eventticketing.sales.dto.ProcessTicketDTO;
-import com.team7.eventticketing.sales.dto.RefundRequestDTO;
-import com.team7.eventticketing.sales.dto.RevenueReportDTO;
-import com.team7.eventticketing.sales.dto.SaleDetailsDTO;
-import com.team7.eventticketing.sales.dto.TicketSaleDTO;
-import com.team7.eventticketing.sales.model.PaymentMethod;
+import com.team7.eventticketing.sales.dto.*;
 import com.team7.eventticketing.sales.model.TicketSale;
 import com.team7.eventticketing.sales.model.TicketSaleStatus;
 import com.team7.eventticketing.sales.service.TicketSaleService;
-import com.team7.eventticketing.sales.dto.UserSaleSummaryDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -34,6 +28,7 @@ public class TicketSaleController {
     public TicketSaleDTO create(@RequestBody TicketSaleDTO ticketSaleDTO) {
         return ticketSaleService.save(ticketSaleDTO);
     }
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/{saleId}/details")
     public ResponseEntity<SaleDetailsDTO> getSaleDetails(@PathVariable Long saleId) {
         return ResponseEntity.ok(ticketSaleService.getSaleDetails(saleId));
@@ -53,6 +48,7 @@ public class TicketSaleController {
         return ticketSaleService.findAll();
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/search")
     public List<TicketSaleDTO> searchTicketSales(
             @RequestParam(required = false) TicketSaleStatus status,
@@ -90,6 +86,8 @@ public class TicketSaleController {
         }
         return ResponseEntity.notFound().build();
     }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PostMapping("/{saleId}/promotions/{promotionId}")
     public ResponseEntity<TicketSaleDTO> applyPromotion(
             @PathVariable Long saleId,
@@ -99,6 +97,7 @@ public class TicketSaleController {
         return ResponseEntity.ok(ticketSaleService.convertToDTO(updatedSale));
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PostMapping("/booking/{bookingId}")
     public ResponseEntity<TicketSaleDTO> processTicketSale(
             @PathVariable Long bookingId,
@@ -112,12 +111,14 @@ public class TicketSaleController {
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(ticketSaleService.convertToDTO(updatedSale));
     }
-    
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/user/{userId}/summary")
     public ResponseEntity<UserSaleSummaryDTO> getUserSaleSummary(@PathVariable Long userId) {
         return ResponseEntity.ok(ticketSaleService.getUserSaleSummary(userId));
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PutMapping("/{id}/refund")
     public ResponseEntity<TicketSaleDTO> processRefund(
             @PathVariable Long id,
@@ -127,6 +128,7 @@ public class TicketSaleController {
         return ResponseEntity.ok(refundedSale);
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/reports/revenue")
     public RevenueReportDTO getRevenueReport(
             @RequestParam LocalDate startDate,
@@ -143,6 +145,7 @@ public class TicketSaleController {
         return ticketSaleService.getRevenueReport(start, end);
 
     }
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PutMapping("/{id}/retry")
     public ResponseEntity<TicketSaleDTO> retryFailedSale(@PathVariable Long id) {
         TicketSale updatedSale = ticketSaleService.retryFailedSale(id);

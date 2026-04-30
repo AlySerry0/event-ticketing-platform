@@ -4,6 +4,7 @@ import com.team7.eventticketing.event.dto.*;
 import com.team7.eventticketing.event.service.EventSessionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -28,6 +29,7 @@ public class EventSessionController {
      * POST /api/events/{eventId}/sessions
      */
     @PostMapping
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<EventSessionDTO> createEventSession(
             @PathVariable Long eventId,
             @RequestBody CreateEventSessionDTO request) {
@@ -40,6 +42,7 @@ public class EventSessionController {
      * GET /api/events/{eventId}/sessions/{sessionId}
      */
     @GetMapping("/{sessionId}")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<EventSessionDTO> getEventSessionById(
             @PathVariable Long eventId,
             @PathVariable Long sessionId) {
@@ -52,6 +55,7 @@ public class EventSessionController {
      * GET /api/events/{eventId}/sessions
      */
     @GetMapping
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventSessionDTO>> getSessionsByEventId(@PathVariable Long eventId) {
         List<EventSessionDTO> sessions = eventSessionService.getSessionsByEventId(eventId);
         return ResponseEntity.ok(sessions);
@@ -62,6 +66,7 @@ public class EventSessionController {
      * GET /api/events/{eventId}/sessions/verified
      */
     @GetMapping("/verified")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventSessionDTO>> getVerifiedSessionsByEventId(@PathVariable Long eventId) {
         List<EventSessionDTO> sessions = eventSessionService.getVerifiedSessionsByEventId(eventId);
         return ResponseEntity.ok(sessions);
@@ -72,6 +77,7 @@ public class EventSessionController {
      * PUT /api/events/{eventId}/sessions/{sessionId}
      */
     @PutMapping("/{sessionId}")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<EventSessionDTO> updateEventSession(
             @PathVariable Long eventId,
             @PathVariable Long sessionId,
@@ -85,6 +91,7 @@ public class EventSessionController {
      * PUT /api/events/{eventId}/sessions/{sessionId}/verify
      */
     @PutMapping("/{sessionId}/verify")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<EventDTO> verifyEventSession(
             @PathVariable Long eventId,
             @PathVariable Long sessionId,
@@ -98,6 +105,7 @@ public class EventSessionController {
      * PUT /api/events/{eventId}/sessions/{sessionId}/unverify
      */
     @PutMapping("/{sessionId}/unverify")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<EventSessionDTO> unverifyEventSession(
             @PathVariable Long eventId,
             @PathVariable Long sessionId,
@@ -111,6 +119,7 @@ public class EventSessionController {
      * DELETE /api/events/{eventId}/sessions/{sessionId}
      */
     @DeleteMapping("/{sessionId}")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<Void> deleteEventSession(
             @PathVariable Long eventId,
             @PathVariable Long sessionId) {

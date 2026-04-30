@@ -7,14 +7,9 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface PaymentAuditEventRepository
-        extends MongoRepository<PaymentAuditEvent, String> {
+public interface PaymentAuditEventRepository extends MongoRepository<PaymentAuditEvent, String> {
 
     List<PaymentAuditEvent> findBySaleIdOrderByTimestampAsc(Long saleId);
 
-    List<PaymentAuditEvent> findBySaleIdAndActionNotOrderByTimestampAsc(
-            Long saleId,
-            String action
-    );
+    List<PaymentAuditEvent> findBySaleIdAndActionNotOrderByTimestampAsc(Long saleId, String action);
 }
-
