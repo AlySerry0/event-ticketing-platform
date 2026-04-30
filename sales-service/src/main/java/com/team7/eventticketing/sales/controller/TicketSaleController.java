@@ -157,8 +157,8 @@ public class TicketSaleController {
     }
     @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/{id}/audit-trail")
-    public ResponseEntity<SaleAuditTrailDTO> getSaleAuditTrail(@PathVariable Long id) {
-        return ResponseEntity.ok(ticketSaleService.getSaleAuditTrail(id));
+    public ResponseEntity<SaleAuditTrailDTO> getSaleAuditTrail(@PathVariable Long saleId) {
+        return ResponseEntity.ok(ticketSaleService.getSaleAuditTrail(saleId));
     }
 }
 
