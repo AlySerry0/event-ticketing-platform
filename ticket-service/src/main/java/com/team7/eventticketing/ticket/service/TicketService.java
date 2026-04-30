@@ -86,6 +86,8 @@ public class TicketService implements EntitySubject {
         
         this.notifyObservers("TICKET_CREATED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
 
         return convertToDTO(savedTicket);
@@ -106,6 +108,8 @@ public class TicketService implements EntitySubject {
         
         this.notifyObservers("TICKET_DELETED", Map.of("ticketId", id));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::" + id);
     }
 
@@ -159,6 +163,8 @@ public class TicketService implements EntitySubject {
         
         this.notifyObservers("OLD_DATA_PURGED", Map.of("olderThanDays", olderThanDays, "deletedCount", deletedCount));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         
         return deletedCount;
     }
@@ -198,6 +204,8 @@ public class TicketService implements EntitySubject {
         
         this.notifyObservers("TICKET_ISSUED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::" + savedTicket.getId());
 
         return convertToDTO(savedTicket);
@@ -271,6 +279,8 @@ public class TicketService implements EntitySubject {
         this.notifyObservers("BATCH_ISSUED", Map.of("bookingId", batchRequest.getBookingId(), "size", savedTickets.size()));
         
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
         
         return savedTickets.size();
@@ -360,6 +370,8 @@ public class TicketService implements EntitySubject {
             
             this.notifyObservers("TICKET_UPDATED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
             cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+            cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+            cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
             cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::" + id);
 
             return convertToDTO(savedTicket);
