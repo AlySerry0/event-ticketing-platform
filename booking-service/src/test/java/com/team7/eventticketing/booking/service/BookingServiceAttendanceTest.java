@@ -86,7 +86,7 @@ class BookingServiceAttendanceTest {
         when(userNodeRepository.findByUserId(userId)).thenReturn(Optional.empty());
         when(bookingRepository.findUserNameById(userId)).thenReturn("John Doe");
         when(eventNodeRepository.findByEventId(eventId)).thenReturn(Optional.empty());
-        when(bookingRepository.findEventDetailsById(eventId)).thenReturn(new Object[][]{{"Concert", "MUSIC", LocalDateTime.now()}});
+        when(bookingRepository.findEventDetailsById(eventId)).thenReturn(new Object[]{"Concert", "MUSIC", LocalDateTime.now()});
 
         bookingService.recordAttendance(bookingId);
 

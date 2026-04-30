@@ -566,9 +566,14 @@ public class BookingService implements EntitySubject {
 					.orElseGet(() -> {
 						EventNode newNode = new EventNode();
 						newNode.setEventId(booking.getEventId());
-						Object[] details = (Object[]) bookingRepository.findEventDetailsById(booking.getEventId())[0];
-						newNode.setName((String) details[0]);
-						newNode.setCategory(details[1] != null ? details[1].toString() : "UNSPECIFIED");
+						Object[] details = (Object[]) bookingRepository.findEventDetailsById(booking.getEventId());
+						if (details != null && details.length > 0) {
+							newNode.setName((String) details[0]);
+							newNode.setCategory(details[1] != null ? details[1].toString() : "UNSPECIFIED");
+						} else {
+							newNode.setName("Unknown Event");
+							newNode.setCategory("UNSPECIFIED");
+						}
 						return newNode;
 					});
 			rel.setEvent(eventNode);
