@@ -15,6 +15,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+
+import com.team7.eventticketing.ticket.adapter.CassandraRowAdapter;
+import com.team7.eventticketing.ticket.dto.TicketScanDTO;
+import com.team7.eventticketing.ticket.model.cassandra.TicketScanEvent;
+import com.team7.eventticketing.ticket.repository.cassandra.TicketScanEventRepository;
 import org.springframework.cache.annotation.Cacheable;
 
 import java.time.LocalDate;
@@ -41,12 +46,16 @@ public class TicketService implements EntitySubject {
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
     private final CacheInvalidationService cacheInvalidationService;
     private final EventSummaryAdapter eventSummaryAdapter;
+    private final TicketScanEventRepository ticketScanEventRepository;
+    private final CassandraRowAdapter cassandraRowAdapter;
 
     @Autowired
-    public TicketService(MongoEventLogger mongoEventLogger, TicketRepository ticketRepository, CacheInvalidationService cacheInvalidationService, EventSummaryAdapter eventSummaryAdapter) {
+    public TicketService(MongoEventLogger mongoEventLogger, TicketRepository ticketRepository, CacheInvalidationService cacheInvalidationService, EventSummaryAdapter eventSummaryAdapter, TicketScanEventRepository ticketScanEventRepository, CassandraRowAdapter cassandraRowAdapter) {
         this.ticketRepository = ticketRepository;
         this.cacheInvalidationService = cacheInvalidationService;
         this.eventSummaryAdapter = eventSummaryAdapter;
+        this.ticketScanEventRepository = ticketScanEventRepository;
+        this.cassandraRowAdapter = cassandraRowAdapter;
         this.register(mongoEventLogger);
     }
 
@@ -376,6 +385,23 @@ public class TicketService implements EntitySubject {
 
             return convertToDTO(savedTicket);
         });
+    }
+
+    @Cacheable(value = "S4-F12", key = "#ticketId")
+    public List<TicketScanDTO> getTicketScanHistory(Long ticketId, LocalDateTime startTime, LocalDateTime endTime) {
+        ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket not found"));
+
+        List<TicketScanEvent> events;
+        if (startTime != null && endTime != null) {
+            events = ticketScanEventRepository.findByTicketIdAndTimestampBetween(ticketId, startTime, endTime);
+        } else {
+            events = ticketScanEventRepository.findByTicketId(ticketId);
+        }
+
+        return events.stream()
+                .map(cassandraRowAdapter::adapt)
+                .toList();
     }
 }
 
