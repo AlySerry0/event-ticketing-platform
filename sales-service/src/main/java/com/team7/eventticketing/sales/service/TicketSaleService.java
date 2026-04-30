@@ -1,5 +1,6 @@
 package com.team7.eventticketing.sales.service;
 
+import com.team7.eventticketing.sales.dto.TierRevenueDTO;
 import com.team7.eventticketing.sales.util.CacheInvalidationService;
 import com.team7.eventticketing.sales.factory.EventFactory;
 import com.team7.eventticketing.sales.observer.EntitySubject;
@@ -12,6 +13,7 @@ import com.team7.eventticketing.sales.repository.PromotionRepository;
 import com.team7.eventticketing.sales.repository.SalePromotionRepository;
 import com.team7.eventticketing.sales.repository.TicketSaleRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -397,6 +400,41 @@ public class TicketSaleService {
         dto.setFinalAmount(sale.getAmount() - totalDiscount);
 
         return dto;
+    }
+    @Cacheable(
+            value  = "S5-F10",
+            key    = "#startDate.toString() + '_' + #endDate.toString()",
+            unless = "#result == null"
+    )
+    public List<TierRevenueDTO> getTierRevenue(LocalDate startDate, LocalDate endDate) {
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime   = endDate.atTime(LocalTime.of(23, 59, 59, 999_000_000));
+
+        List<Object[]> rows = ticketSaleRepository.findTierRevenue(startDateTime, endDateTime);
+
+        return rows.stream()
+                .map(row -> {
+                    String tier    = (String) row[0];
+                    double revenue = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
+                    long   count   = row[2] != null ? ((Number) row[2]).longValue()   : 0L;
+                    long   tickets = row[3] != null ? ((Number) row[3]).longValue()   : 0L;
+                    double avg     = count > 0 ? revenue / count : 0.0;
+
+                    return TierRevenueDTO.builder()
+                            .tier(tier)
+                            .totalRevenue(revenue)
+                            .saleCount(count)
+                            .ticketsSold(tickets)
+                            .averageRevenuePerSale(avg)
+                            .build();
+                })
+                .toList();
+    }
+
+    public void logTierAnalyticsViewed(LocalDate startDate, LocalDate endDate) {
+        PaymentAuditEvent event = eventFactory.createAnalyticsViewedEvent(
+                "ANALYTICS_VIEWED", startDate, endDate);
+        entitySubject.notifyObservers("ANALYTICS_VIEWED", event);
     }
 
 }

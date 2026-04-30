@@ -4,6 +4,7 @@ import com.team7.eventticketing.sales.model.PaymentAuditEvent;
 import com.team7.eventticketing.sales.model.TicketSale;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -55,6 +56,25 @@ public class EventFactory {
                 LocalDateTime.now(),
                 sale.getMethod() != null ? sale.getMethod().name() : null,
                 sale.getAmount(),
+                details
+        );
+    }
+    public PaymentAuditEvent createAnalyticsViewedEvent(
+            String action,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("feature", "S5-F10");
+        details.put("startDate", startDate.toString());
+        details.put("endDate", endDate.toString());
+
+        return new PaymentAuditEvent(
+                null,
+                action,
+                LocalDateTime.now(),
+                null,
+                null,
                 details
         );
     }
