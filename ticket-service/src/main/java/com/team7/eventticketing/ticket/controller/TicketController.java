@@ -136,7 +136,7 @@ public class TicketController {
                     org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
         }
     }
-    
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/metadata/search")
     public ResponseEntity<?> filterTicketsByMetadata(
             @RequestParam String key,
@@ -150,7 +150,7 @@ public class TicketController {
             return ResponseEntity.status(500).body(e.getMessage());
         }
     }
-
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PostMapping("/batch")
     public ResponseEntity<?> issueBatchTickets(@RequestBody BatchTicketRequestDTO batchRequest) {
         try {
@@ -162,7 +162,7 @@ public class TicketController {
             return ResponseEntity.status(500).body(e.getMessage());
         }
     }
-
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/history")
     public ResponseEntity<List<TicketDTO>> getTicketsInDateRange(
             @RequestParam String startDate,
