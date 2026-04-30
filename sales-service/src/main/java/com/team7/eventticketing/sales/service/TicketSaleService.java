@@ -1,5 +1,8 @@
 package com.team7.eventticketing.sales.service;
 
+import com.team7.eventticketing.sales.util.CacheInvalidationService;
+import com.team7.eventticketing.sales.factory.EventFactory;
+import com.team7.eventticketing.sales.observer.EntitySubject;
 import com.team7.eventticketing.sales.dto.RevenueReportDTO;
 import com.team7.eventticketing.sales.dto.SaleDetailsDTO;
 import com.team7.eventticketing.sales.dto.TicketSaleDTO;
@@ -17,12 +20,19 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.team7.eventticketing.sales.factory.EventFactory;
+import com.team7.eventticketing.sales.model.PaymentAuditEvent;
+import com.team7.eventticketing.sales.observer.EntityObserver;
+import com.team7.eventticketing.sales.observer.MongoEventLogger;
+import jakarta.annotation.PostConstruct;
+import java.util.ArrayList;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @Service
 public class TicketSaleService {
@@ -39,6 +49,12 @@ public class TicketSaleService {
     private PaymentAuditEventRepository paymentAuditEventRepository;
     @Autowired
     private MongoDocumentAdapter mongoDocumentAdapter;
+    private EntitySubject entitySubject;
+    @Autowired
+    private EventFactory eventFactory;
+    @Autowired
+    private CacheInvalidationService cacheInvalidationService;
+
     public TicketSaleDTO save(TicketSaleDTO ticketSaleDTO) {
         TicketSale ticketSale = convertToEntity(ticketSaleDTO);
         if (ticketSale.getCreatedAt() == null) {
@@ -190,52 +206,110 @@ public class TicketSaleService {
         
         promo.setCurrentUses(currentUses + 1);
         promotionRepository.saveAndFlush(promo);
-        return ticketSaleRepository.saveAndFlush(sale);
+        TicketSale saved = ticketSaleRepository.saveAndFlush(sale);
+
+        PaymentAuditEvent event =
+                eventFactory.createPromotionAppliedEvent(
+                        saved,
+                        promo.getCode(),
+                        discount
+                );
+
+        notifyObservers("PROMOTION_APPLIED", event);
+
+        return saved;
     }
 
     @Transactional
-    public TicketSale processTicketSale(Long bookingId, String methodStr, String cardLastFour){
+    public TicketSale processTicketSale(Long bookingId, String methodStr, String cardLastFour, boolean simulateFailure) {
+
         boolean doesExist = ticketSaleRepository.bookingExists(bookingId);
-        if (!doesExist){
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");        }
+        if (!doesExist) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
+        }
+
         String bookingStatus = ticketSaleRepository.getBookingStatus(bookingId);
-        if (!"COMPLETED".equalsIgnoreCase(bookingStatus)){
+        if (!"COMPLETED".equalsIgnoreCase(bookingStatus)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking must be COMPLETED");
         }
+
         TicketSale ticketSale = ticketSaleRepository.findByBookingId(bookingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket sale not found"));
 
         if (ticketSale.getStatus() == TicketSaleStatus.COMPLETED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "already paid");
         }
-        if (methodStr == null||methodStr.isBlank()) {
+
+        if (methodStr == null || methodStr.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment method is required");
         }
+
         PaymentMethod method;
         try {
-            method = PaymentMethod.valueOf(methodStr. toUpperCase());
+            method = PaymentMethod.valueOf(methodStr.toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid payment method");
         }
-        if (method == PaymentMethod. CREDIT_CARD &&
-                (cardLastFour == null || !cardLastFour.matches("\\d{4}"))){
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"cardLastFour must be 4 digits");
-        }
-        ticketSale.setMethod(method);
-        ticketSale.setStatus(TicketSaleStatus.COMPLETED);
-        java.util.Map<String, Object> transactionDetails = ticketSale.getTransactionDetails();
 
+        if (method == PaymentMethod.CREDIT_CARD &&
+                (cardLastFour == null || !cardLastFour.matches("\\d{4}"))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cardLastFour must be 4 digits");
+        }
+
+        ticketSale.setMethod(method);
+
+        Map<String, Object> transactionDetails = ticketSale.getTransactionDetails();
         if (transactionDetails == null) {
             transactionDetails = new HashMap<>();
         }
-        transactionDetails.put("gatewayResponse", "approved");
+
         transactionDetails.put("bookingReference", bookingId);
+        transactionDetails.put("method", method.name());
+
         if (cardLastFour != null) {
             transactionDetails.put("cardLastFour", cardLastFour);
         }
-        transactionDetails.put("method", method.name());
+
+        // First log CREATED
+        ticketSale.setStatus(TicketSaleStatus.PENDING);
         ticketSale.setTransactionDetails(transactionDetails);
-        return ticketSaleRepository.save(ticketSale);
+
+        TicketSale pendingSale = ticketSaleRepository.saveAndFlush(ticketSale);
+
+        PaymentAuditEvent createdEvent =
+                eventFactory.createPaymentAuditEvent("CREATED", pendingSale);
+        notifyObservers("CREATED", createdEvent);
+
+        // Simulated failure path
+        if (simulateFailure) {
+            transactionDetails.put("gatewayResponse", "declined");
+            transactionDetails.put("failureReason", "Simulated payment failure");
+
+            pendingSale.setStatus(TicketSaleStatus.FAILED);
+            pendingSale.setTransactionDetails(transactionDetails);
+
+            TicketSale failedSale = ticketSaleRepository.saveAndFlush(pendingSale);
+
+            PaymentAuditEvent failedEvent =
+                    eventFactory.createPaymentAuditEvent("FAILED", failedSale);
+            notifyObservers("FAILED", failedEvent);
+
+            return failedSale;
+        }
+
+        // Success path
+        transactionDetails.put("gatewayResponse", "approved");
+
+        pendingSale.setStatus(TicketSaleStatus.COMPLETED);
+        pendingSale.setTransactionDetails(transactionDetails);
+
+        TicketSale completedSale = ticketSaleRepository.saveAndFlush(pendingSale);
+
+        PaymentAuditEvent completedEvent =
+                eventFactory.createPaymentAuditEvent("COMPLETED", completedSale);
+        notifyObservers("COMPLETED", completedEvent);
+
+        return completedSale;
     }
     public UserSaleSummaryDTO getUserSaleSummary(Long userId) {
        boolean userExists = ticketSaleRepository.userExists(userId);
@@ -341,12 +415,26 @@ public class TicketSaleService {
         if (details.get("retryAttempt") instanceof Number n) {
             retryAttempt = n.intValue();
         }
+
         details.put("retryAttempt", retryAttempt + 1);
         details.put("gatewayResponse", "approved");
+        details.put("retriedAt", LocalDateTime.now().toString());
 
         sale.setTransactionDetails(details);
 
-        return ticketSaleRepository.save(sale);
+        TicketSale savedSale = ticketSaleRepository.save(sale);
+
+        PaymentAuditEvent retryEvent =
+                eventFactory.createPaymentAuditEvent("RETRY_ATTEMPTED", savedSale);
+
+        entitySubject.notifyObservers("RETRY_ATTEMPTED", retryEvent);
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F6::*");
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F8::" + savedSale.getId());
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + savedSale.getId());
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::ticket-sale::" + savedSale.getId());
+
+        return savedSale;
     }
     public SaleDetailsDTO getSaleDetails(Long saleId) {
         TicketSale sale = ticketSaleRepository.findById(saleId)
@@ -390,6 +478,32 @@ public class TicketSaleService {
                     "Ticket sale not found"
             );
         }
+    @Autowired
+    private EventFactory eventFactory;
+
+    @Autowired
+    private MongoEventLogger mongoEventLogger;
+
+    private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
+
+    @PostConstruct
+    public void initObservers() {
+        registerObserver(mongoEventLogger);
+    }
+
+    public void registerObserver(EntityObserver observer) {
+        observers.add(observer);
+    }
+
+    public void unregisterObserver(EntityObserver observer) {
+        observers.remove(observer);
+    }
+
+    private void notifyObservers(String eventType, Object payload) {
+        for (EntityObserver observer : observers) {
+            observer.onEvent(eventType, payload);
+        }
+    }
 
         List<PaymentAuditEvent> events =
                 paymentAuditEventRepository
