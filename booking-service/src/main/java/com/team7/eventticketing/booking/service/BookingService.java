@@ -35,6 +35,7 @@ import java.util.Optional;
 import com.team7.eventticketing.booking.adapter.Neo4jRecordAdapter;
 import com.team7.eventticketing.booking.dto.ProviderRecommendationDTO;
 import org.neo4j.driver.Driver;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @Service
 public class BookingService implements EntitySubject {
@@ -45,21 +46,21 @@ public class BookingService implements EntitySubject {
 	@Autowired
 	private BookingItemService bookingItemService;
 
-    @Autowired
-    private CacheInvalidationService cacheInvalidationService;
+  @Autowired
+  private CacheInvalidationService cacheInvalidationService;
 
-    private final List<EntityObserver> observers = new ArrayList<>();
+  private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
 
-    @Autowired
-    public void registerMongoLogger(MongoEventLogger mongoEventLogger) {
-        register(mongoEventLogger);
-    }
+  @Autowired
+  public void registerMongoLogger(MongoEventLogger mongoEventLogger) {
+      register(mongoEventLogger);
+  }
 
-    @Autowired
-    private Driver neo4jDriver;
+  @Autowired
+  private Driver neo4jDriver;
 
-    @Autowired
-    private Neo4jRecordAdapter neo4jRecordAdapter;
+  @Autowired
+  private Neo4jRecordAdapter neo4jRecordAdapter;
 
 	public BookingDTO save(BookingDTO bookingDTO) {
 		Booking booking = convertToEntity(bookingDTO);
@@ -72,7 +73,13 @@ public class BookingService implements EntitySubject {
 			booking.setStatus(BookingStatus.PENDING);
 		}
 
-		return convertToDTO(bookingRepository.save(booking));
+		Booking savedBooking = bookingRepository.save(booking);
+
+		this.notifyObservers("BOOKING_CREATED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::*");
+
+		return convertToDTO(savedBooking);
 	}
 
 	public Optional<BookingDTO> findById(Long id) {
@@ -87,6 +94,10 @@ public class BookingService implements EntitySubject {
 
 	public void deleteById(Long id) {
 		bookingRepository.deleteById(id);
+		
+		this.notifyObservers("BOOKING_DELETED", Map.of("bookingId", id));
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + id);
 	}
 
 	public Optional<BookingDTO> updateBooking(Long id, BookingDTO bookingDetails) {
@@ -114,7 +125,13 @@ public class BookingService implements EntitySubject {
 					booking.getMetadata().putAll(bookingDetails.getMetadata());
 				}
 			}
-			return convertToDTO(bookingRepository.save(booking));
+			Booking savedBooking = bookingRepository.save(booking);
+			
+			this.notifyObservers("BOOKING_UPDATED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
+			cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+			cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + id);
+
+			return convertToDTO(savedBooking);
 		});
 	}
 
@@ -175,7 +192,13 @@ public class BookingService implements EntitySubject {
 		booking.setStatus(BookingStatus.CONFIRMED);
 		booking.setConfirmedAt(LocalDateTime.now());
 
-		return convertToDTO(bookingRepository.save(booking));
+		Booking savedBooking = bookingRepository.save(booking);
+
+		this.notifyObservers("BOOKING_CONFIRMED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::*");
+
+		return convertToDTO(savedBooking);
 	}
 
 	@Transactional
@@ -201,6 +224,11 @@ public class BookingService implements EntitySubject {
 				savedBooking.getId(),
 				savedBooking.getUserId(),
 				savedBooking.getTotalAmount());
+		
+		this.notifyObservers("BOOKING_COMPLETED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + id);
+
 		return convertToDTO(savedBooking);
 	}
 
@@ -463,19 +491,20 @@ public class BookingService implements EntitySubject {
 
 		Booking savedBooking = bookingRepository.save(booking);
 
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("bookingId", savedBooking.getId());
-        payload.put("userId", savedBooking.getUserId());
-        payload.put("eventId", savedBooking.getEventId());
-        payload.put("itemsAdded", itemDTOs.size());
-        payload.put("status", savedBooking.getStatus().name());
+    Map<String, Object> payload = new HashMap<>();
+    payload.put("bookingId", savedBooking.getId());
+    payload.put("userId", savedBooking.getUserId());
+    payload.put("eventId", savedBooking.getEventId());
+    payload.put("itemsAdded", itemDTOs.size());
+    payload.put("status", savedBooking.getStatus().name());
 
-        notifyObservers("ITEMS_ADDED", payload);
+    notifyObservers("ITEMS_ADDED", payload);
 
-        invalidateBookingCaches(savedBooking.getId());
+    invalidateBookingCaches(savedBooking.getId());
 
-        return convertToDTO(savedBooking);
-	}
+    return convertToDTO(savedBooking);
+    
+  }
 
 	@Transactional
 	public void cancelBooking(Long bookingId) {
@@ -492,7 +521,6 @@ public class BookingService implements EntitySubject {
 		if (bookingRepository.ticketsTableExists()) {
 			bookingRepository.cancelValidTicketsByBookingId(bookingId);
 		}
-
         Booking savedBooking = bookingRepository.save(booking);
 
         Map<String, Object> payload = new HashMap<>();
@@ -504,8 +532,8 @@ public class BookingService implements EntitySubject {
         notifyObservers("BOOKING_CANCELLED", payload);
 
         invalidateBookingCaches(savedBooking.getId());
-	}
-
+    }
+    
     @Override
     public void register(EntityObserver o) {
         observers.add(o);
