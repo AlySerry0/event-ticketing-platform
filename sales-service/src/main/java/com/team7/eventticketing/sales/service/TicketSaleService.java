@@ -1,5 +1,7 @@
 package com.team7.eventticketing.sales.service;
 
+import com.team7.eventticketing.sales.adapter.ObjectArrayDtoAdapter;
+import com.team7.eventticketing.sales.dto.TierRevenueDTO;
 import com.team7.eventticketing.sales.observer.EntitySubject;
 import com.team7.eventticketing.sales.util.CacheInvalidationService;
 import com.team7.eventticketing.sales.factory.EventFactory;
@@ -26,6 +28,7 @@ import com.team7.eventticketing.sales.observer.MongoEventLogger;
 import jakarta.annotation.PostConstruct;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,9 +66,13 @@ public class TicketSaleService {
     @Autowired
     private CacheInvalidationService cacheInvalidationService;
     @Autowired
+    private ObjectArrayDtoAdapter objectArrayDtoAdapter;
+    @Autowired
     private MongoEventLogger mongoEventLogger;
     @Autowired
     private EntitySubject entitySubject;
+    @Autowired
+    private EventFactory eventFactory;
     @Autowired
     private RefundStrategySelector refundStrategySelector;
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
@@ -535,21 +542,20 @@ public class TicketSaleService {
         return convertToDTO(saved);
     }
 
+    @Cacheable(
+            value = "S5-F6",
+            key = "#start.toString() + '_' + #end.toString()",
+            unless = "#result == null"
+    )
     public RevenueReportDTO getRevenueReport(LocalDateTime start, LocalDateTime end) {
-
         Double totalRevenue = ticketSaleRepository.getTotalRevenue(start, end);
         Long totalTransactions = ticketSaleRepository.getTotalTransactions(start, end);
         Double refundedAmount = ticketSaleRepository.getRefundedAmount(start, end);
         Long refundCount = ticketSaleRepository.getRefundCount(start, end);
 
-        Double averageSale = (totalTransactions != 0)
-                ? totalRevenue / totalTransactions
-                : 0.0;
-
-        return new RevenueReportDTO(
+        return objectArrayDtoAdapter.toRevenueReportDTO(
                 totalRevenue,
                 totalTransactions,
-                averageSale,
                 refundedAmount,
                 refundCount
         );
@@ -594,38 +600,38 @@ public class TicketSaleService {
 
         return savedSale;
     }
+    @Cacheable(
+            value = "S5-F8",
+            key = "#saleId",
+            unless = "#result == null"
+    )
     public SaleDetailsDTO getSaleDetails(Long saleId) {
         TicketSale sale = ticketSaleRepository.findById(saleId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Ticket sale not found"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Ticket sale not found"));
 
-        List<SaleDetailsDTO.AppliedPromotionDTO> appliedPromotions = sale.getSalePromotions()
-                .stream()
-                .map(sp -> new SaleDetailsDTO.AppliedPromotionDTO(
-                        sp.getPromotion().getCode(),
-                        sp.getPromotion().getDiscountType().name(),
-                        sp.getDiscountApplied(),
-                        sp.getAppliedAt()
-                ))
+        return objectArrayDtoAdapter.toSaleDetailsDTO(sale);
+    }
+    @Cacheable(
+            value  = "S5-F10",
+            key    = "#startDate.toString() + '_' + #endDate.toString()",
+            unless = "#result == null"
+    )
+    public List<TierRevenueDTO> getTierRevenue(LocalDate startDate, LocalDate endDate) {
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime   = endDate.atTime(LocalTime.of(23, 59, 59, 999_000_000));
+
+        List<Object[]> rows = ticketSaleRepository.findTierRevenue(startDateTime, endDateTime);
+
+        return rows.stream()
+                .map(objectArrayDtoAdapter::toTierRevenueDTO)
                 .toList();
+    }
 
-        double totalDiscount = appliedPromotions.stream()
-                .mapToDouble(SaleDetailsDTO.AppliedPromotionDTO::getDiscountApplied)
-                .sum();
-
-        SaleDetailsDTO dto = new SaleDetailsDTO();
-        dto.setSaleId(sale.getId());
-        dto.setBookingId(sale.getBookingId());
-        dto.setUserId(sale.getUserId());
-        dto.setOriginalAmount(sale.getAmount());
-        dto.setMethod(sale.getMethod());
-        dto.setStatus(sale.getStatus());
-        dto.setTransactionDetails(sale.getTransactionDetails());
-        dto.setAppliedPromotions(appliedPromotions);
-        dto.setTotalDiscount(totalDiscount);
-        dto.setFinalAmount(sale.getAmount() - totalDiscount);
-
-        return dto;
+    public void logTierAnalyticsViewed(LocalDate startDate, LocalDate endDate) {
+        PaymentAuditEvent event = eventFactory.createAnalyticsViewedEvent(
+                "ANALYTICS_VIEWED", startDate, endDate);
+        entitySubject.notifyObservers("ANALYTICS_VIEWED", event);
     }
     @Cacheable(value = "S5-F11", key = "#saleId")
     public SaleAuditTrailDTO getSaleAuditTrail(Long saleId) {
