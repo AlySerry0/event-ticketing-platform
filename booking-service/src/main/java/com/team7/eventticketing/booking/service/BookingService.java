@@ -17,7 +17,7 @@ import com.team7.eventticketing.booking.observer.EntitySubject;
 import com.team7.eventticketing.booking.observer.MongoEventLogger;
 import com.team7.eventticketing.booking.util.CacheInvalidationService;
 import com.team7.eventticketing.booking.dto.EventRecommendationDTO;
-import com.team7.eventticketing.booking.adapter.PostgresRowAdapter;
+import com.team7.eventticketing.booking.adapter.EventDetailsAdapter;
 
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import org.neo4j.driver.Driver;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
@@ -66,7 +65,7 @@ public class BookingService implements EntitySubject {
     private Neo4jRecordAdapter neo4jRecordAdapter;
 
     @Autowired
-    private PostgresRowAdapter postgresRowAdapter;
+    private EventDetailsAdapter eventDetailsAdapter;
 
 	public BookingDTO save(BookingDTO bookingDTO) {
 		Booking booking = convertToEntity(bookingDTO);
@@ -443,7 +442,7 @@ public class BookingService implements EntitySubject {
                             return recommendation;
                         }
 
-                        return postgresRowAdapter.adapt(row, recommendation.getScore());
+                        return eventDetailsAdapter.adapt(row, recommendation.getScore());
                     })
                     .toList();
         }

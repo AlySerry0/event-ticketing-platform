@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 
 @Component
-public class PostgresRowAdapter {
+public class EventDetailsAdapter {
 
     public EventRecommendationDTO adapt(Object[] row, Long score) {
         return new EventRecommendationDTO.Builder()
