@@ -8,19 +8,7 @@ public class RevenueReportDTO {
     private Double refundedAmount;
     private Long refundCount;
 
-    public RevenueReportDTO(Double totalRevenue,
-                            Long totalTransactions,
-                            Double averageSale,
-                            Double refundedAmount,
-                            Long refundCount) {
-        this.totalRevenue = totalRevenue;
-        this.totalTransactions = totalTransactions;
-        this.averageSale = averageSale;
-        this.refundedAmount = refundedAmount;
-        this.refundCount = refundCount;
-    }
-
-    // Getters
+    private RevenueReportDTO() {}
     public Double getTotalRevenue() {
         return totalRevenue;
     }
@@ -39,5 +27,42 @@ public class RevenueReportDTO {
 
     public Long getRefundCount() {
         return refundCount;
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private final RevenueReportDTO dto = new RevenueReportDTO();
+
+        public Builder totalRevenue(Double totalRevenue) {
+            dto.totalRevenue = totalRevenue;
+            return this;
+        }
+
+        public Builder totalTransactions(Long totalTransactions) {
+            dto.totalTransactions = totalTransactions;
+            return this;
+        }
+
+        public Builder averageSale(Double averageSale) {
+            dto.averageSale = averageSale;
+            return this;
+        }
+
+        public Builder refundedAmount(Double refundedAmount) {
+            dto.refundedAmount = refundedAmount;
+            return this;
+        }
+
+        public Builder refundCount(Long refundCount) {
+            dto.refundCount = refundCount;
+            return this;
+        }
+
+        public RevenueReportDTO build() {
+            return dto;
+        }
     }
 }

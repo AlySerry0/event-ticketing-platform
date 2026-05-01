@@ -25,6 +25,7 @@ public class MongoEventLogger implements EntityObserver {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public void onEvent(String eventType, Object payload) {
         try {
             if (!(payload instanceof Map<?, ?> rawPayload)) {
@@ -35,7 +36,7 @@ public class MongoEventLogger implements EntityObserver {
             Map<String, Object> params = new HashMap<>((Map<String, Object>) rawPayload);
             params.put("action", eventType);
 
-            MongoEvent event = eventFactory.createEvent(EventType.PAYMENT_AUDIT, params);
+            Object event = eventFactory.createEvent(EventType.PAYMENT_AUDIT, params);
 
             if (event instanceof PaymentAuditEvent paymentAuditEvent) {
                 repository.save(paymentAuditEvent);

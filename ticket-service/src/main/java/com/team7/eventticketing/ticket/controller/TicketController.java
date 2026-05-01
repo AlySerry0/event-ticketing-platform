@@ -1,11 +1,6 @@
 package com.team7.eventticketing.ticket.controller;
-import com.team7.eventticketing.ticket.dto.BatchTicketRequestDTO;
+import com.team7.eventticketing.ticket.dto.*;
 
-import com.team7.eventticketing.ticket.dto.NearbyTicketDTO;
-import com.team7.eventticketing.ticket.dto.IssueTicketDTO;
-import com.team7.eventticketing.ticket.dto.EventAttendanceSummaryDTO;
-import com.team7.eventticketing.ticket.dto.TicketDTO;
-import com.team7.eventticketing.ticket.dto.UnusedTicketDTO;
 import com.team7.eventticketing.ticket.service.TicketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -171,6 +166,15 @@ public class TicketController {
             @RequestParam String endDate,
             @RequestParam(required = false) String status) {
         return ResponseEntity.ok(ticketService.getTicketsInDateRange(startDate, endDate, status));
+    }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+    @GetMapping("/analytics")
+    public TicketAnalyticsDTO getAnalytics(
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate
+    ) {
+        return ticketService.getAnalytics(startDate, endDate);
     }
 
     @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")

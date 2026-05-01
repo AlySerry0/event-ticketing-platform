@@ -1,16 +1,16 @@
 package com.team7.eventticketing.ticket.service;
 import com.team7.eventticketing.ticket.adapter.EventSummaryAdapter;
+import com.team7.eventticketing.ticket.adapter.TicketAnalyticsAdapter;
+import com.team7.eventticketing.ticket.dto.*;
+import com.team7.eventticketing.ticket.adapter.UnusedTicketAdapter;
 import com.team7.eventticketing.ticket.dto.BatchTicketRequestDTO;
 
-import com.team7.eventticketing.ticket.dto.NearbyTicketDTO;
-import com.team7.eventticketing.ticket.dto.IssueTicketDTO;
-import com.team7.eventticketing.ticket.dto.EventAttendanceSummaryDTO;
-import com.team7.eventticketing.ticket.dto.TicketDTO;
-import com.team7.eventticketing.ticket.dto.UnusedTicketDTO;
 import com.team7.eventticketing.ticket.model.Ticket;
 import com.team7.eventticketing.ticket.model.TicketStatus;
 import com.team7.eventticketing.ticket.repository.TicketRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,27 +40,45 @@ import java.util.HashMap;
 @Service
 public class TicketService implements EntitySubject {
 
-
     @Autowired
     private final TicketRepository ticketRepository;
+
+    @Autowired
+    @Lazy
+    private TicketService self;
 
 
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
     private final CacheInvalidationService cacheInvalidationService;
     private final EventSummaryAdapter eventSummaryAdapter;
+    private final UnusedTicketAdapter unusedTicketAdapter;
     private final TicketScanEventRepository ticketScanEventRepository;
     private final CassandraRowAdapter cassandraRowAdapter;
     private final TicketScanEventAdapter ticketScanEventAdapter;
+    private final TicketAnalyticsAdapter ticketAnalyticsAdapter;
+    private final UnusedTicketAdapter unusedTicketAdapter;
 
     @Autowired
-    public TicketService(MongoEventLogger mongoEventLogger, TicketRepository ticketRepository, CacheInvalidationService cacheInvalidationService, EventSummaryAdapter eventSummaryAdapter, TicketScanEventRepository ticketScanEventRepository, CassandraRowAdapter cassandraRowAdapter, TicketScanEventAdapter ticketScanEventAdapter) {
+    public TicketService(
+        MongoEventLogger mongoEventLogger, 
+        TicketRepository ticketRepository, 
+        CacheInvalidationService cacheInvalidationService, 
+        EventSummaryAdapter eventSummaryAdapter, 
+        TicketAnalyticsAdapter ticketAnalyticsAdapter, 
+        UnusedTicketAdapter unusedTicketAdapter, 
+        TicketScanEventRepository ticketScanEventRepository, 
+        CassandraRowAdapter cassandraRowAdapter, 
+        TicketScanEventAdapter ticketScanEventAdapter
+    ) {
+        this.mongoEventLogger = mongoEventLogger;
         this.ticketRepository = ticketRepository;
         this.cacheInvalidationService = cacheInvalidationService;
         this.eventSummaryAdapter = eventSummaryAdapter;
+        this.ticketAnalyticsAdapter = ticketAnalyticsAdapter;
+        this.unusedTicketAdapter = unusedTicketAdapter;
         this.ticketScanEventRepository = ticketScanEventRepository;
         this.cassandraRowAdapter = cassandraRowAdapter;
         this.ticketScanEventAdapter = ticketScanEventAdapter;
-        this.register(mongoEventLogger);
     }
 
     @Override
@@ -96,7 +114,7 @@ public class TicketService implements EntitySubject {
         ticketDTO.setStatus(TicketStatus.VALID);
         Ticket ticket = convertToEntity(ticketDTO);
         Ticket savedTicket = ticketRepository.save(ticket);
-        
+
         this.notifyObservers("TICKET_CREATED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
@@ -118,7 +136,7 @@ public class TicketService implements EntitySubject {
 
     public void deleteById(Long id) {
         ticketRepository.deleteById(id);
-        
+
         this.notifyObservers("TICKET_DELETED", Map.of("ticketId", id));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
@@ -150,21 +168,20 @@ public class TicketService implements EntitySubject {
         return ticket;
     }
 
+    @Cacheable(cacheNames = "S4-F8", key = "#eventId")
     public EventAttendanceSummaryDTO getEventSummary(Long eventId) {
       List<Object[]> results = ticketRepository.getEventAttendanceSummary(eventId);
       if (results == null || results.isEmpty()) {
           throw new RuntimeException("No tickets found");
       }
+      EventAttendanceSummaryDTO dto = eventSummaryAdapter.convert(results.get(0));
 
-      Object[] row = results.get(0);
-      EventAttendanceSummaryDTO dto = eventSummaryAdapter.convert(row);
       if (dto.getTotalTickets() == 0) {
           throw new RuntimeException("No tickets found");
       }
-      dto.setEventId(eventId);
 
       return dto;
-  }
+    }
 
     @Transactional
     public int purgeOldTickets(int olderThanDays) {
@@ -173,7 +190,7 @@ public class TicketService implements EntitySubject {
         }
         LocalDateTime cutoff = LocalDateTime.now().minusDays(olderThanDays);
         int deletedCount = ticketRepository.deleteOldExpiredOrCancelled(cutoff);
-        
+
         this.notifyObservers("OLD_DATA_PURGED", Map.of("olderThanDays", olderThanDays, "deletedCount", deletedCount));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
@@ -214,7 +231,7 @@ public class TicketService implements EntitySubject {
         ticket.setMetadata(request.getMetadata());
         ticket.setStatus(TicketStatus.VALID);
         Ticket savedTicket = ticketRepository.save(ticket);
-        
+
         this.notifyObservers("TICKET_ISSUED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
@@ -233,9 +250,17 @@ public class TicketService implements EntitySubject {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No tickets found for booking"));
     }
 
+    @Cacheable(cacheNames = "S4-F9", key = "'upcoming-unused'")
     @Transactional(readOnly = true)
     public List<UnusedTicketDTO> getUnusedTicketsForUpcomingEvents() {
-        return ticketRepository.findUnusedTicketsForUpcomingEvents();
+        List<Object[]> rows = ticketRepository.findUnusedTicketsForUpcomingEvents();
+        if (rows == null || rows.isEmpty()) {
+            return List.of(); // or throw if your spec requires 404
+        }
+
+        return rows.stream()
+                .map(unusedTicketAdapter::convert)
+                .toList();
     }
     @Cacheable(value = "S4-F5", key = "#key + '|' + #operator + '|' + #value") 
     public List<TicketDTO> filterTicketsByMetadata(String key, String operator, String value) {
@@ -288,14 +313,14 @@ public class TicketService implements EntitySubject {
         }).toList();
 
         List<Ticket> savedTickets = ticketRepository.saveAll(ticketsToSave);
-        
+
         this.notifyObservers("BATCH_ISSUED", Map.of("bookingId", batchRequest.getBookingId(), "size", savedTickets.size()));
-        
+
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
-        
+
         return savedTickets.size();
     }
     @Cacheable(value = "S4-F6", key = "#startDate + '|' + #endDate + '|' + #ticketStatusInput")
@@ -380,7 +405,7 @@ public class TicketService implements EntitySubject {
             }
 
             Ticket savedTicket = ticketRepository.saveAndFlush(ticket);
-            
+
             this.notifyObservers("TICKET_UPDATED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
             cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
             cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
@@ -390,6 +415,34 @@ public class TicketService implements EntitySubject {
             return convertToDTO(savedTicket);
         });
     }
+    public TicketAnalyticsDTO getAnalytics(LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dates are required");
+        }
+        if (startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid date range");
+        }
+        notifyObservers(
+                "ANALYTICS_VIEWED",
+                Map.of(
+                        "startDate", startDate.toString(),
+                        "endDate", endDate.toString()
+                )
+        );
+        return self.getAnalyticsCached(startDate, endDate);
+    }
+
+    @Cacheable(value = "S4-F10", key = "#startDate.toString() + '_' + #endDate.toString()")
+    public TicketAnalyticsDTO getAnalyticsCached(LocalDate startDate, LocalDate endDate) {
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.atTime(23, 59, 59, 999_000_000);
+        List<Object[]> results = ticketRepository.getTicketAnalytics(start, end);
+        Object[] row = (results != null && !results.isEmpty())
+                ? results.get(0)
+                : new Object[]{0L, 0L, 0L, 0L, 0L};
+        return ticketAnalyticsAdapter.convert(row);
+    }
+
 
     @Transactional
     public void recordTicketScan(Long ticketId, TicketScanDTO scanDTO) {

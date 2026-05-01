@@ -1,5 +1,7 @@
 package com.team7.eventticketing.sales.service;
 
+import com.team7.eventticketing.sales.adapter.ObjectArrayDtoAdapter;
+import com.team7.eventticketing.sales.dto.TierRevenueDTO;
 import com.team7.eventticketing.sales.observer.EntitySubject;
 import com.team7.eventticketing.sales.util.CacheInvalidationService;
 import com.team7.eventticketing.sales.factory.EventFactory;
@@ -26,11 +28,25 @@ import com.team7.eventticketing.sales.observer.MongoEventLogger;
 import jakarta.annotation.PostConstruct;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+
+import com.team7.eventticketing.sales.observer.EntityObserver;
+import com.team7.eventticketing.sales.observer.MongoEventLogger;
+import com.team7.eventticketing.sales.util.CacheInvalidationService;
+import jakarta.annotation.PostConstruct;
+
+import java.util.ArrayList;
+
+import com.team7.eventticketing.sales.dto.RefundRequestDTO;
+import com.team7.eventticketing.sales.strategy.RefundResult;
+import com.team7.eventticketing.sales.strategy.RefundStrategy;
+import com.team7.eventticketing.sales.strategy.RefundStrategySelector;
+import java.time.Duration;
 
 @Service
 public class TicketSaleService {
@@ -50,10 +66,15 @@ public class TicketSaleService {
     @Autowired
     private CacheInvalidationService cacheInvalidationService;
     @Autowired
+    private ObjectArrayDtoAdapter objectArrayDtoAdapter;
+    @Autowired
     private MongoEventLogger mongoEventLogger;
     @Autowired
     private EntitySubject entitySubject;
-
+    @Autowired
+    private EventFactory eventFactory;
+    @Autowired
+    private RefundStrategySelector refundStrategySelector;
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
 
     @PostConstruct
@@ -138,6 +159,10 @@ public class TicketSaleService {
         return ticketSale;
     }
 
+    @Cacheable(
+            value = "S5-F1",
+            key = "#status + '|' + #startDate + '|' + #endDate"
+    )
     public List<TicketSaleDTO> searchTicketSales(TicketSaleStatus status,
                                                  LocalDate startDate,
                                                  LocalDate endDate) {
@@ -366,6 +391,11 @@ public class TicketSaleService {
         invalidateAfterTicketSaleWrite(completedSale);
         return completedSale;
     }
+
+    @Cacheable(
+            value = "S5-F3",
+            key = "#userId"
+    )
     public UserSaleSummaryDTO getUserSaleSummary(Long userId) {
        boolean userExists = ticketSaleRepository.userExists(userId);
 
@@ -399,7 +429,6 @@ public class TicketSaleService {
                 methodBreakdown
         );
     }
-
     @Transactional
     public TicketSaleDTO processRefund(Long saleId, String reason) {
         TicketSale ticketSale = ticketSaleRepository.findById(saleId)
@@ -428,22 +457,105 @@ public class TicketSaleService {
         TicketSale saved = ticketSaleRepository.save(ticketSale);
         return convertToDTO(saved);
     }
+    @Transactional
+    public TicketSaleDTO processRefundWithWindowPolicy(Long saleId, RefundRequestDTO request) {
+        TicketSale ticketSale = ticketSaleRepository.findById(saleId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Ticket sale not found"));
 
+        if (ticketSale.getStatus() != TicketSaleStatus.COMPLETED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Only COMPLETED ticket sales can be refunded"
+            );
+        }
+
+        LocalDateTime eventDate = ticketSaleRepository.findEventDateBySaleId(saleId);
+
+        if (eventDate == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "booking has no associated event"
+            );
+        }
+
+        long hoursUntilEvent = Duration.between(LocalDateTime.now(), eventDate).toHours();
+
+        RefundStrategy strategy = refundStrategySelector.select(ticketSale, eventDate);
+        RefundResult refundResult = strategy.calculateRefund(ticketSale, request, eventDate);
+
+        if (!refundResult.isApproved()) {
+            Map<String, Object> detailsPayload = new HashMap<>();
+            detailsPayload.put("strategyName", refundResult.getStrategyName());
+            detailsPayload.put("denialReason", "refund window expired");
+            detailsPayload.put("hoursUntilEvent", hoursUntilEvent);
+
+            Map<String, Object> eventPayload = new HashMap<>();
+            eventPayload.put("saleId", ticketSale.getId());
+            eventPayload.put("method", ticketSale.getMethod() != null ? ticketSale.getMethod().name() : null);
+            eventPayload.put("amount", ticketSale.getAmount());
+            eventPayload.put("details", detailsPayload);
+
+            entitySubject.notifyObservers("REFUND_DENIED", eventPayload);
+
+            cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
+            cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + ticketSale.getId());
+
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "refund window expired");
+        }
+
+        ticketSale.setStatus(TicketSaleStatus.REFUNDED);
+
+        Map<String, Object> transactionDetails = ticketSale.getTransactionDetails();
+        if (transactionDetails == null) {
+            transactionDetails = new HashMap<>();
+        }
+
+        transactionDetails.put("refundAmount", refundResult.getRefundAmount());
+        transactionDetails.put("refundPolicy", refundResult.getStrategyName());
+        transactionDetails.put("refundReason", request.getReason());
+        transactionDetails.put("refundedAt", LocalDateTime.now().toString());
+
+        ticketSale.setTransactionDetails(transactionDetails);
+
+        TicketSale saved = ticketSaleRepository.save(ticketSale);
+
+        Map<String, Object> detailsPayload = new HashMap<>();
+        detailsPayload.put("strategyName", refundResult.getStrategyName());
+        detailsPayload.put("reason", request.getReason());
+        detailsPayload.put("originalAmount", saved.getAmount());
+        detailsPayload.put("refundAmount", refundResult.getRefundAmount());
+        detailsPayload.put("hoursUntilEvent", hoursUntilEvent);
+
+        Map<String, Object> eventPayload = new HashMap<>();
+        eventPayload.put("saleId", saved.getId());
+        eventPayload.put("method", saved.getMethod() != null ? saved.getMethod().name() : null);
+        eventPayload.put("amount", saved.getAmount());
+        eventPayload.put("details", detailsPayload);
+
+        entitySubject.notifyObservers("REFUNDED", eventPayload);
+
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + saved.getId());
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::ticket-sale::" + saved.getId());
+
+        return convertToDTO(saved);
+    }
+
+    @Cacheable(
+            value = "S5-F6",
+            key = "#start.toString() + '_' + #end.toString()",
+            unless = "#result == null"
+    )
     public RevenueReportDTO getRevenueReport(LocalDateTime start, LocalDateTime end) {
-
         Double totalRevenue = ticketSaleRepository.getTotalRevenue(start, end);
         Long totalTransactions = ticketSaleRepository.getTotalTransactions(start, end);
         Double refundedAmount = ticketSaleRepository.getRefundedAmount(start, end);
         Long refundCount = ticketSaleRepository.getRefundCount(start, end);
 
-        Double averageSale = (totalTransactions != 0)
-                ? totalRevenue / totalTransactions
-                : 0.0;
-
-        return new RevenueReportDTO(
+        return objectArrayDtoAdapter.toRevenueReportDTO(
                 totalRevenue,
                 totalTransactions,
-                averageSale,
                 refundedAmount,
                 refundCount
         );
@@ -488,38 +600,38 @@ public class TicketSaleService {
 
         return savedSale;
     }
+    @Cacheable(
+            value = "S5-F8",
+            key = "#saleId",
+            unless = "#result == null"
+    )
     public SaleDetailsDTO getSaleDetails(Long saleId) {
         TicketSale sale = ticketSaleRepository.findById(saleId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Ticket sale not found"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Ticket sale not found"));
 
-        List<SaleDetailsDTO.AppliedPromotionDTO> appliedPromotions = sale.getSalePromotions()
-                .stream()
-                .map(sp -> new SaleDetailsDTO.AppliedPromotionDTO(
-                        sp.getPromotion().getCode(),
-                        sp.getPromotion().getDiscountType().name(),
-                        sp.getDiscountApplied(),
-                        sp.getAppliedAt()
-                ))
+        return objectArrayDtoAdapter.toSaleDetailsDTO(sale);
+    }
+    @Cacheable(
+            value  = "S5-F10",
+            key    = "#startDate.toString() + '_' + #endDate.toString()",
+            unless = "#result == null"
+    )
+    public List<TierRevenueDTO> getTierRevenue(LocalDate startDate, LocalDate endDate) {
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime   = endDate.atTime(LocalTime.of(23, 59, 59, 999_000_000));
+
+        List<Object[]> rows = ticketSaleRepository.findTierRevenue(startDateTime, endDateTime);
+
+        return rows.stream()
+                .map(objectArrayDtoAdapter::toTierRevenueDTO)
                 .toList();
+    }
 
-        double totalDiscount = appliedPromotions.stream()
-                .mapToDouble(SaleDetailsDTO.AppliedPromotionDTO::getDiscountApplied)
-                .sum();
-
-        SaleDetailsDTO dto = new SaleDetailsDTO();
-        dto.setSaleId(sale.getId());
-        dto.setBookingId(sale.getBookingId());
-        dto.setUserId(sale.getUserId());
-        dto.setOriginalAmount(sale.getAmount());
-        dto.setMethod(sale.getMethod());
-        dto.setStatus(sale.getStatus());
-        dto.setTransactionDetails(sale.getTransactionDetails());
-        dto.setAppliedPromotions(appliedPromotions);
-        dto.setTotalDiscount(totalDiscount);
-        dto.setFinalAmount(sale.getAmount() - totalDiscount);
-
-        return dto;
+    public void logTierAnalyticsViewed(LocalDate startDate, LocalDate endDate) {
+        PaymentAuditEvent event = eventFactory.createAnalyticsViewedEvent(
+                "ANALYTICS_VIEWED", startDate, endDate);
+        entitySubject.notifyObservers("ANALYTICS_VIEWED", event);
     }
     @Cacheable(value = "S5-F11", key = "#saleId")
     public SaleAuditTrailDTO getSaleAuditTrail(Long saleId) {
