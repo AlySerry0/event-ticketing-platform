@@ -176,6 +176,8 @@ public class TicketController {
     ) {
         return ticketService.getAnalytics(startDate, endDate);
     }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/{id}/scans")
     public ResponseEntity<List<TicketScanDTO>> getTicketScanHistory(
             @PathVariable Long id,
