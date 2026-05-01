@@ -28,7 +28,6 @@ public class TicketSale {
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(nullable = false)
     private PaymentMethod method;
 
     @Enumerated(EnumType.STRING)

@@ -14,7 +14,7 @@ public class MongoDocumentAdapter {
         List<AuditEventDTO> auditEvents = events.stream()
                 .map(event -> new AuditEventDTO(
                         event.getAction(),
-                        event.getTimestamp(),
+                        event.getTimestamp() == null ? null : event.getTimestamp().toString(),
                         event.getMethod(),
                         event.getAmount(),
                         event.getDetails()
