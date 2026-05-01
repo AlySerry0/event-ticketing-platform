@@ -170,6 +170,9 @@ public class TicketSaleController {
         List<TierRevenueDTO> result = ticketSaleService.getTierRevenue(startDate, endDate);
 
         return ResponseEntity.ok(result);
+    }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/{id}/audit-trail")
     public ResponseEntity<SaleAuditTrailDTO> getSaleAuditTrail(@PathVariable Long id) {
         return ResponseEntity.ok(ticketSaleService.getSaleAuditTrail(id));

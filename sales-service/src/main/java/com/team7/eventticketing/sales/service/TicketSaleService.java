@@ -54,9 +54,12 @@ public class TicketSaleService {
     private CacheInvalidationService cacheInvalidationService;
     @Autowired
     private ObjectArrayDtoAdapter objectArrayDtoAdapter;
+    @Autowired
     private MongoEventLogger mongoEventLogger;
     @Autowired
     private EntitySubject entitySubject;
+    @Autowired
+    private EventFactory eventFactory;
 
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
 
