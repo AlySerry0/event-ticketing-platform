@@ -43,6 +43,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
         FROM tickets t
         JOIN bookings b ON t.booking_id = b.id
         WHERE b.event_id = :eventId
+        GROUP BY b.event_id
     """, nativeQuery = true)
     List<Object[]> getEventAttendanceSummary(@Param("eventId") Long eventId);
          
