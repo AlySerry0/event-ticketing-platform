@@ -8,12 +8,12 @@ import org.springframework.stereotype.Component;
 public class Neo4jRecordAdapter {
 
     public EventRecommendationDTO adapt(Record record) {
-        return new EventRecommendationDTO(
-                record.get("eventId").asLong(),
-                record.get("eventName").asString(""),
-                record.get("category").asString(""),
-                null, // will be filled later from PostgreSQL
-                record.get("score").asLong()
-        );
+        return new EventRecommendationDTO.Builder()
+                .eventId(record.get("eventId").asLong())
+                .name(record.get("eventName").asString(""))
+                .category(record.get("category").asString(""))
+                .eventDate(null) // still filled later from PostgreSQL
+                .score(record.get("score").asLong())
+                .build();
     }
 }

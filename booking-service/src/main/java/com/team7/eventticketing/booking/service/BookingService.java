@@ -8,59 +8,65 @@ import com.team7.eventticketing.booking.model.Booking;
 import com.team7.eventticketing.booking.model.BookingItem;
 import com.team7.eventticketing.booking.model.BookingStatus;
 import com.team7.eventticketing.booking.repository.BookingRepository;
+import com.team7.eventticketing.booking.adapter.Neo4jRecordAdapter;
+import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
+import com.team7.eventticketing.booking.dto.BookingItemDTO;
+import com.team7.eventticketing.booking.model.BookingItemStatus;
+import com.team7.eventticketing.booking.observer.EntityObserver;
+import com.team7.eventticketing.booking.observer.EntitySubject;
+import com.team7.eventticketing.booking.observer.MongoEventLogger;
+import com.team7.eventticketing.booking.util.CacheInvalidationService;
+import com.team7.eventticketing.booking.dto.EventRecommendationDTO;
+import com.team7.eventticketing.booking.adapter.PostgresRowAdapter;
+
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
-import com.team7.eventticketing.booking.dto.BookingItemDTO;
-import com.team7.eventticketing.booking.model.BookingItemStatus;
-import java.util.Comparator;
-import com.team7.eventticketing.booking.observer.EntityObserver;
-import com.team7.eventticketing.booking.observer.EntitySubject;
-import com.team7.eventticketing.booking.observer.MongoEventLogger;
-import com.team7.eventticketing.booking.util.CacheInvalidationService;
-import org.springframework.cache.annotation.Cacheable;
+import org.neo4j.driver.Driver;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Comparator;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Optional;
-import com.team7.eventticketing.booking.adapter.Neo4jRecordAdapter;
-import com.team7.eventticketing.booking.dto.EventRecommendationDTO;
-import org.neo4j.driver.Driver;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 @Service
 public class BookingService implements EntitySubject {
 
-	@Autowired
-	private BookingRepository bookingRepository;
+    @Autowired
+    private BookingRepository bookingRepository;
 
-	@Autowired
-	private BookingItemService bookingItemService;
+    @Autowired
+    private BookingItemService bookingItemService;
 
-  @Autowired
-  private CacheInvalidationService cacheInvalidationService;
+    @Autowired
+    private CacheInvalidationService cacheInvalidationService;
 
-  private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
+    private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
 
-  @Autowired
-  public void registerMongoLogger(MongoEventLogger mongoEventLogger) {
-      register(mongoEventLogger);
-  }
+    @Autowired
+    public void registerMongoLogger(MongoEventLogger mongoEventLogger) {
+        register(mongoEventLogger);
+    }
 
-  @Autowired
-  private Driver neo4jDriver;
+    @Autowired
+    private Driver neo4jDriver;
 
-  @Autowired
-  private Neo4jRecordAdapter neo4jRecordAdapter;
+    @Autowired
+    private Neo4jRecordAdapter neo4jRecordAdapter;
+
+    @Autowired
+    private PostgresRowAdapter postgresRowAdapter;
 
 	public BookingDTO save(BookingDTO bookingDTO) {
 		Booking booking = convertToEntity(bookingDTO);
@@ -429,22 +435,17 @@ public class BookingService implements EntitySubject {
                             row -> row
                     ));
 
-            for (EventRecommendationDTO recommendation : recommendations) {
-                Object[] row = eventDetails.get(recommendation.getEventId());
-                if (row != null) {
-                    recommendation.setName((String) row[1]);
-                    recommendation.setCategory((String) row[2]);
+            return recommendations.stream()
+                    .map(recommendation -> {
+                        Object[] row = eventDetails.get(recommendation.getEventId());
 
-                    if (row[3] instanceof java.sql.Timestamp timestamp) {
-                        recommendation.setEventDate(timestamp.toLocalDateTime());
-                    } else if (row[3] instanceof java.time.LocalDateTime dateTime) {
-                        recommendation.setEventDate(dateTime);
-                    }
-                }
+                        if (row == null) {
+                            return recommendation;
+                        }
 
-            }
-
-            return recommendations;
+                        return postgresRowAdapter.adapt(row, recommendation.getScore());
+                    })
+                    .toList();
         }
     }
 
