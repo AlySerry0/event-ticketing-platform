@@ -124,7 +124,7 @@ public class TicketService implements EntitySubject {
         return convertToDTO(savedTicket);
     }
 
-    @Cacheable(value = "ticketById", key = "#id")
+    @Cacheable(value = "ticket", key = "#id")
     public Optional<TicketDTO> findById(Long id) {
         return ticketRepository.findById(id).map(this::convertToDTO);
     }
