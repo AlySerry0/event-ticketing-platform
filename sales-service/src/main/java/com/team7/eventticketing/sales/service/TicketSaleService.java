@@ -153,7 +153,7 @@ public class TicketSaleService {
     }
 
     @Cacheable(
-            value = "S5-F10",
+            value = "S5-F1",
             key = "#status + '|' + #startDate + '|' + #endDate"
     )
     public List<TicketSaleDTO> searchTicketSales(TicketSaleStatus status,
