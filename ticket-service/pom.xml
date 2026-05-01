@@ -118,7 +118,6 @@
             <artifactId>spring-boot-starter-data-cassandra</artifactId>
         </dependency>
     </dependencies>
-
     <build>
         <plugins>
             <plugin>
