@@ -1,5 +1,6 @@
 package com.team7.eventticketing.booking.controller;
 
+import com.team7.eventticketing.booking.dto.AttendanceRecordDTO;
 import com.team7.eventticketing.booking.dto.BookingAnalyticsDTO;
 import com.team7.eventticketing.booking.dto.BookingAnalyticsDashboardDTO;
 import com.team7.eventticketing.booking.dto.BookingCostEstimateDTO;
@@ -206,10 +207,10 @@ public class BookingController {
 
 	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PostMapping("/{bookingId}/record-attendance")
-	public ResponseEntity<String> recordAttendance(@PathVariable Long bookingId) {
+	public ResponseEntity<AttendanceRecordDTO> recordAttendance(@PathVariable Long bookingId) {
 		try {
-			bookingService.recordAttendance(bookingId);
-			return ResponseEntity.ok("Attendance recorded successfully");
+			int count = bookingService.recordAttendance(bookingId);
+			return ResponseEntity.ok(new AttendanceRecordDTO(count));
 		} catch (NoSuchElementException e) {
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
 		} catch (ResponseStatusException e) {

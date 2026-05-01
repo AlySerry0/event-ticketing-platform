@@ -528,7 +528,7 @@ public class BookingService implements EntitySubject {
 	}
 
 	@Transactional
-	public void recordAttendance(Long bookingId) {
+	public int recordAttendance(Long bookingId) {
 		Booking booking = bookingRepository.findById(bookingId)
 				.orElseThrow(() -> new NoSuchElementException("Booking not found"));
 
@@ -553,14 +553,17 @@ public class BookingService implements EntitySubject {
 				.findFirst();
 
 		if (existingRel.isPresent() && existingRel.get().getRecordedBookingIds().contains(bookingId)) {
-			return; // Idempotent skip
+			return existingRel.get().getAttendanceCount(); // Idempotent skip
 		}
+
+		int finalAttendanceCount;
 
 		if (existingRel.isPresent()) {
 			AttendedRelationship rel = existingRel.get();
 			rel.setAttendanceCount(rel.getAttendanceCount() + 1);
 			rel.setLastAttendedDate(LocalDateTime.now());
 			rel.getRecordedBookingIds().add(bookingId);
+			finalAttendanceCount = rel.getAttendanceCount();
 		} else {
 			AttendedRelationship rel = new AttendedRelationship();
 			EventNode eventNode = eventNodeRepository.findByEventId(booking.getEventId())
@@ -573,6 +576,7 @@ public class BookingService implements EntitySubject {
 			rel.setLastAttendedDate(LocalDateTime.now());
 			rel.getRecordedBookingIds().add(bookingId);
 			userNode.getAttendedEvents().add(rel);
+			finalAttendanceCount = 1;
 		}
 
 		userNodeRepository.save(userNode);
@@ -584,5 +588,7 @@ public class BookingService implements EntitySubject {
 				"eventId", booking.getEventId(),
 				"action", "INTERACTION_RECORDED"
 		));
+
+		return finalAttendanceCount;
 	}
 }
