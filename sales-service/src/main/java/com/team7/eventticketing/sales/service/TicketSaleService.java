@@ -35,6 +35,19 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import com.team7.eventticketing.sales.observer.EntityObserver;
+import com.team7.eventticketing.sales.observer.MongoEventLogger;
+import com.team7.eventticketing.sales.util.CacheInvalidationService;
+import jakarta.annotation.PostConstruct;
+
+import java.util.ArrayList;
+
+import com.team7.eventticketing.sales.dto.RefundRequestDTO;
+import com.team7.eventticketing.sales.strategy.RefundResult;
+import com.team7.eventticketing.sales.strategy.RefundStrategy;
+import com.team7.eventticketing.sales.strategy.RefundStrategySelector;
+import java.time.Duration;
+
 @Service
 public class TicketSaleService {
 
@@ -60,7 +73,8 @@ public class TicketSaleService {
     private EntitySubject entitySubject;
     @Autowired
     private EventFactory eventFactory;
-
+    @Autowired
+    private RefundStrategySelector refundStrategySelector;
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
 
     @PostConstruct
@@ -145,6 +159,10 @@ public class TicketSaleService {
         return ticketSale;
     }
 
+    @Cacheable(
+            value = "S5-F1",
+            key = "#status + '|' + #startDate + '|' + #endDate"
+    )
     public List<TicketSaleDTO> searchTicketSales(TicketSaleStatus status,
                                                  LocalDate startDate,
                                                  LocalDate endDate) {
@@ -373,6 +391,11 @@ public class TicketSaleService {
         invalidateAfterTicketSaleWrite(completedSale);
         return completedSale;
     }
+
+    @Cacheable(
+            value = "S5-F3",
+            key = "#userId"
+    )
     public UserSaleSummaryDTO getUserSaleSummary(Long userId) {
        boolean userExists = ticketSaleRepository.userExists(userId);
 
@@ -406,7 +429,6 @@ public class TicketSaleService {
                 methodBreakdown
         );
     }
-
     @Transactional
     public TicketSaleDTO processRefund(Long saleId, String reason) {
         TicketSale ticketSale = ticketSaleRepository.findById(saleId)
@@ -433,6 +455,90 @@ public class TicketSaleService {
         ticketSale.setTransactionDetails(transactionDetails);
 
         TicketSale saved = ticketSaleRepository.save(ticketSale);
+        return convertToDTO(saved);
+    }
+    @Transactional
+    public TicketSaleDTO processRefundWithWindowPolicy(Long saleId, RefundRequestDTO request) {
+        TicketSale ticketSale = ticketSaleRepository.findById(saleId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Ticket sale not found"));
+
+        if (ticketSale.getStatus() != TicketSaleStatus.COMPLETED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Only COMPLETED ticket sales can be refunded"
+            );
+        }
+
+        LocalDateTime eventDate = ticketSaleRepository.findEventDateBySaleId(saleId);
+
+        if (eventDate == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "booking has no associated event"
+            );
+        }
+
+        long hoursUntilEvent = Duration.between(LocalDateTime.now(), eventDate).toHours();
+
+        RefundStrategy strategy = refundStrategySelector.select(ticketSale, eventDate);
+        RefundResult refundResult = strategy.calculateRefund(ticketSale, request, eventDate);
+
+        if (!refundResult.isApproved()) {
+            Map<String, Object> detailsPayload = new HashMap<>();
+            detailsPayload.put("strategyName", refundResult.getStrategyName());
+            detailsPayload.put("denialReason", "refund window expired");
+            detailsPayload.put("hoursUntilEvent", hoursUntilEvent);
+
+            Map<String, Object> eventPayload = new HashMap<>();
+            eventPayload.put("saleId", ticketSale.getId());
+            eventPayload.put("method", ticketSale.getMethod() != null ? ticketSale.getMethod().name() : null);
+            eventPayload.put("amount", ticketSale.getAmount());
+            eventPayload.put("details", detailsPayload);
+
+            entitySubject.notifyObservers("REFUND_DENIED", eventPayload);
+
+            cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
+            cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + ticketSale.getId());
+
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "refund window expired");
+        }
+
+        ticketSale.setStatus(TicketSaleStatus.REFUNDED);
+
+        Map<String, Object> transactionDetails = ticketSale.getTransactionDetails();
+        if (transactionDetails == null) {
+            transactionDetails = new HashMap<>();
+        }
+
+        transactionDetails.put("refundAmount", refundResult.getRefundAmount());
+        transactionDetails.put("refundPolicy", refundResult.getStrategyName());
+        transactionDetails.put("refundReason", request.getReason());
+        transactionDetails.put("refundedAt", LocalDateTime.now().toString());
+
+        ticketSale.setTransactionDetails(transactionDetails);
+
+        TicketSale saved = ticketSaleRepository.save(ticketSale);
+
+        Map<String, Object> detailsPayload = new HashMap<>();
+        detailsPayload.put("strategyName", refundResult.getStrategyName());
+        detailsPayload.put("reason", request.getReason());
+        detailsPayload.put("originalAmount", saved.getAmount());
+        detailsPayload.put("refundAmount", refundResult.getRefundAmount());
+        detailsPayload.put("hoursUntilEvent", hoursUntilEvent);
+
+        Map<String, Object> eventPayload = new HashMap<>();
+        eventPayload.put("saleId", saved.getId());
+        eventPayload.put("method", saved.getMethod() != null ? saved.getMethod().name() : null);
+        eventPayload.put("amount", saved.getAmount());
+        eventPayload.put("details", detailsPayload);
+
+        entitySubject.notifyObservers("REFUNDED", eventPayload);
+
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + saved.getId());
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::ticket-sale::" + saved.getId());
+
         return convertToDTO(saved);
     }
 

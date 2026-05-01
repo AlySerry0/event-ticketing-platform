@@ -108,4 +108,12 @@ public interface TicketSaleRepository extends JpaRepository<TicketSale, Long> {
             @Param("endDateTime")   LocalDateTime endDateTime
     );
 
+    @Query(value = """
+    SELECT e.event_date
+    FROM ticket_sales ts
+    JOIN bookings b ON b.id = ts.booking_id
+    LEFT JOIN events e ON e.id = b.event_id
+    WHERE ts.id = :saleId
+    """, nativeQuery = true)
+    LocalDateTime findEventDateBySaleId(@Param("saleId") Long saleId);
 }
