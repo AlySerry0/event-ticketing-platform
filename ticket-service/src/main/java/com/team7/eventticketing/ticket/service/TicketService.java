@@ -426,6 +426,8 @@ public class TicketService implements EntitySubject {
                 ? results.get(0)
                 : new Object[]{0L, 0L, 0L, 0L, 0L};
         return ticketAnalyticsAdapter.convert(row);
+    }
+
 
     @Cacheable(value = "S4-F12", key = "#ticketId")
     public List<TicketScanDTO> getTicketScanHistory(Long ticketId, LocalDateTime startTime, LocalDateTime endTime) {
