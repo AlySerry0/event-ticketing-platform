@@ -1,11 +1,6 @@
 package com.team7.eventticketing.ticket.controller;
-import com.team7.eventticketing.ticket.dto.BatchTicketRequestDTO;
+import com.team7.eventticketing.ticket.dto.*;
 
-import com.team7.eventticketing.ticket.dto.NearbyTicketDTO;
-import com.team7.eventticketing.ticket.dto.IssueTicketDTO;
-import com.team7.eventticketing.ticket.dto.EventAttendanceSummaryDTO;
-import com.team7.eventticketing.ticket.dto.TicketDTO;
-import com.team7.eventticketing.ticket.dto.UnusedTicketDTO;
 import com.team7.eventticketing.ticket.service.TicketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -13,8 +8,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
+import com.team7.eventticketing.ticket.dto.TicketScanDTO;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -136,7 +133,7 @@ public class TicketController {
                     org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
         }
     }
-    
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/metadata/search")
     public ResponseEntity<?> filterTicketsByMetadata(
             @RequestParam String key,
@@ -150,7 +147,7 @@ public class TicketController {
             return ResponseEntity.status(500).body(e.getMessage());
         }
     }
-
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PostMapping("/batch")
     public ResponseEntity<?> issueBatchTickets(@RequestBody BatchTicketRequestDTO batchRequest) {
         try {
@@ -162,13 +159,31 @@ public class TicketController {
             return ResponseEntity.status(500).body(e.getMessage());
         }
     }
-
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/history")
     public ResponseEntity<List<TicketDTO>> getTicketsInDateRange(
             @RequestParam String startDate,
             @RequestParam String endDate,
             @RequestParam(required = false) String status) {
         return ResponseEntity.ok(ticketService.getTicketsInDateRange(startDate, endDate, status));
+    }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+    @GetMapping("/analytics")
+    public TicketAnalyticsDTO getAnalytics(
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate
+    ) {
+        return ticketService.getAnalytics(startDate, endDate);
+    }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+    @GetMapping("/{id}/scans")
+    public ResponseEntity<List<TicketScanDTO>> getTicketScanHistory(
+            @PathVariable Long id,
+            @RequestParam(required = false) LocalDateTime startTime,
+            @RequestParam(required = false) LocalDateTime endTime) {
+        return ResponseEntity.ok(ticketService.getTicketScanHistory(id, startTime, endTime));
     }
 }
 
