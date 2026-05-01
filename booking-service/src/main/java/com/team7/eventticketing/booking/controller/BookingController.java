@@ -1,5 +1,6 @@
 package com.team7.eventticketing.booking.controller;
 
+import com.team7.eventticketing.booking.dto.AttendanceRecordDTO;
 import com.team7.eventticketing.booking.dto.BookingAnalyticsDTO;
 import com.team7.eventticketing.booking.dto.BookingAnalyticsDashboardDTO;
 import com.team7.eventticketing.booking.dto.BookingCostEstimateDTO;
@@ -207,14 +208,29 @@ public class BookingController {
   }
 
   @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
-  @GetMapping("/{bookingId}/details")
-  public ResponseEntity<BookingDetailsDTO> getBookingDetails(@PathVariable Long bookingId) {
-      try {
-          return ResponseEntity.ok(bookingService.getBookingDetails(bookingId));
-      } catch (NoSuchElementException e) {
-          throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-      }
-  }
+	@GetMapping("/{bookingId}/details")
+	public ResponseEntity<BookingDetailsDTO> getBookingDetails(@PathVariable Long bookingId) {
+		try {
+			return ResponseEntity.ok(bookingService.getBookingDetails(bookingId));
+		} catch (NoSuchElementException e) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+		}
+	}
+
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@PostMapping("/{bookingId}/record-attendance")
+	public ResponseEntity<AttendanceRecordDTO> recordAttendance(@PathVariable Long bookingId) {
+		try {
+			int count = bookingService.recordAttendance(bookingId);
+			return ResponseEntity.ok(new AttendanceRecordDTO(count));
+		} catch (NoSuchElementException e) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+		} catch (ResponseStatusException e) {
+			throw e;
+		} catch (Exception e) {
+			throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error recording attendance: " + e.getMessage());
+		}
+	}
 
   @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
   @GetMapping("/recommendations")

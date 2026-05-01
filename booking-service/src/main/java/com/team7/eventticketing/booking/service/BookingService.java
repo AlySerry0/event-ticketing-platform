@@ -1,10 +1,16 @@
 package com.team7.eventticketing.booking.service;
 
+import com.team7.eventticketing.booking.adapter.BookingNodeAdapter;
 import com.team7.eventticketing.booking.dto.*;
 import com.team7.eventticketing.booking.model.Booking;
 import com.team7.eventticketing.booking.model.BookingItem;
 import com.team7.eventticketing.booking.model.BookingStatus;
+import com.team7.eventticketing.booking.model.neo4j.AttendedRelationship;
+import com.team7.eventticketing.booking.model.neo4j.EventNode;
+import com.team7.eventticketing.booking.model.neo4j.UserNode;
 import com.team7.eventticketing.booking.repository.BookingRepository;
+import com.team7.eventticketing.booking.repository.EventNodeRepository;
+import com.team7.eventticketing.booking.repository.UserNodeRepository;
 import com.team7.eventticketing.booking.adapter.Neo4jRecordAdapter;
 import com.team7.eventticketing.booking.model.BookingItemStatus;
 import com.team7.eventticketing.booking.observer.EntityObserver;
@@ -41,6 +47,15 @@ public class BookingService implements EntitySubject {
 
     @Autowired
     private BookingItemService bookingItemService;
+
+	@Autowired
+	private UserNodeRepository userNodeRepository;
+
+	@Autowired
+	private EventNodeRepository eventNodeRepository;
+
+	@Autowired
+	private BookingNodeAdapter bookingNodeAdapter;
 
     @Autowired
     private CacheInvalidationService cacheInvalidationService;
@@ -608,5 +623,69 @@ public class BookingService implements EntitySubject {
           observer.onEvent(action, payload);
       }
   }
-}
 
+	@Transactional
+	public int recordAttendance(Long bookingId) {
+		Booking booking = bookingRepository.findById(bookingId)
+				.orElseThrow(() -> new NoSuchElementException("Booking not found"));
+
+		if (booking.getStatus() != BookingStatus.COMPLETED) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking is not completed");
+		}
+
+		if (booking.getEventId() == null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking has no assigned event");
+		}
+
+		// Look up user node or create it
+		UserNode userNode = userNodeRepository.findByUserId(booking.getUserId())
+				.orElseGet(() -> {
+					String name = bookingRepository.findUserNameById(booking.getUserId());
+					return bookingNodeAdapter.toUserNode(booking.getUserId(), name);
+				});
+
+		// Check idempotency
+		Optional<AttendedRelationship> existingRel = userNode.getAttendedEvents().stream()
+				.filter(rel -> rel.getEvent() != null && rel.getEvent().getEventId().equals(booking.getEventId()))
+				.findFirst();
+
+		if (existingRel.isPresent() && existingRel.get().getRecordedBookingIds().contains(bookingId)) {
+			return existingRel.get().getAttendanceCount(); // Idempotent skip
+		}
+
+		int finalAttendanceCount;
+
+		if (existingRel.isPresent()) {
+			AttendedRelationship rel = existingRel.get();
+			rel.setAttendanceCount(rel.getAttendanceCount() + 1);
+			rel.setLastAttendedDate(LocalDateTime.now());
+			rel.getRecordedBookingIds().add(bookingId);
+			finalAttendanceCount = rel.getAttendanceCount();
+		} else {
+			AttendedRelationship rel = new AttendedRelationship();
+			EventNode eventNode = eventNodeRepository.findByEventId(booking.getEventId())
+					.orElseGet(() -> {
+						Object[] details = (Object[]) bookingRepository.findEventDetailsById(booking.getEventId());
+						return bookingNodeAdapter.toEventNode(booking.getEventId(), details);
+					});
+			rel.setEvent(eventNode);
+			rel.setAttendanceCount(1);
+			rel.setLastAttendedDate(LocalDateTime.now());
+			rel.getRecordedBookingIds().add(bookingId);
+			userNode.getAttendedEvents().add(rel);
+			finalAttendanceCount = 1;
+		}
+
+		userNodeRepository.save(userNode);
+
+		// Notify observers (MongoDB logging)
+		this.notifyObservers("INTERACTION_RECORDED", Map.of(
+				"bookingId", bookingId,
+				"userId", booking.getUserId(),
+				"eventId", booking.getEventId(),
+				"action", "INTERACTION_RECORDED"
+		));
+
+		return finalAttendanceCount;
+	}
+}
