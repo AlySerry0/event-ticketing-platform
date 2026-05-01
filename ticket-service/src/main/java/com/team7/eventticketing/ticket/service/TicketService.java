@@ -34,6 +34,7 @@ import com.team7.eventticketing.ticket.observer.EntitySubject;
 import com.team7.eventticketing.ticket.observer.MongoEventLogger;
 import com.team7.eventticketing.ticket.util.CacheInvalidationService;
 import java.util.Map;
+import java.util.HashMap;
 
 @Service
 public class TicketService implements EntitySubject {
@@ -385,6 +386,40 @@ public class TicketService implements EntitySubject {
 
             return convertToDTO(savedTicket);
         });
+    }
+
+    @Transactional
+    public void recordTicketScan(Long ticketId, TicketScanDTO scanDTO) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket not found"));
+
+        TicketScanEvent scanEvent = new TicketScanEvent();
+        scanEvent.setTicketId(ticketId);
+        scanEvent.setTimestamp(LocalDateTime.now());
+        scanEvent.setScanType(scanDTO.getScanType());
+        scanEvent.setAttendeeName(ticket.getAttendeeName());
+        scanEvent.setGate(scanDTO.getGate());
+        scanEvent.setSection(scanDTO.getSection());
+        scanEvent.setSeatNumber(scanDTO.getSeatNumber());
+        scanEvent.setNotes(scanDTO.getNotes());
+
+        ticketScanEventRepository.save(scanEvent);
+
+        // Notify observers for MongoDB logging
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("ticketId", ticketId);
+        payload.put("scanType", scanDTO.getScanType());
+        payload.put("gate", scanDTO.getGate());
+        payload.put("section", scanDTO.getSection());
+        payload.put("seatNumber", scanDTO.getSeatNumber());
+        payload.put("notes", scanDTO.getNotes());
+        payload.put("action", "TRACKING_RECORDED");
+
+        this.notifyObservers("TRACKING_RECORDED", payload);
+
+        // Cache Invalidation
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F12::" + ticketId);
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
     }
 
     @Cacheable(value = "S4-F12", key = "#ticketId")
