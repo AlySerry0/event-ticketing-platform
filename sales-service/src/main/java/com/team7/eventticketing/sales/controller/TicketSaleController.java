@@ -159,6 +159,23 @@ public class TicketSaleController {
     }
 
     @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+    @GetMapping("/analytics/tier")
+    public ResponseEntity<List<TierRevenueDTO>> getTicketSalesByTier(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        if (startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "startDate cannot be after endDate");
+        }
+
+        ticketSaleService.logTierAnalyticsViewed(startDate, endDate);
+
+        List<TierRevenueDTO> result = ticketSaleService.getTierRevenue(startDate, endDate);
+
+        return ResponseEntity.ok(result);
+    }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/{id}/audit-trail")
     public ResponseEntity<SaleAuditTrailDTO> getSaleAuditTrail(@PathVariable Long id) {
         return ResponseEntity.ok(ticketSaleService.getSaleAuditTrail(id));

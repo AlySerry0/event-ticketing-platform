@@ -175,12 +175,22 @@ public class TicketController {
             @RequestParam LocalDate endDate
     ) {
         return ticketService.getAnalytics(startDate, endDate);
+    }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/{id}/scans")
     public ResponseEntity<List<TicketScanDTO>> getTicketScanHistory(
             @PathVariable Long id,
             @RequestParam(required = false) LocalDateTime startTime,
             @RequestParam(required = false) LocalDateTime endTime) {
         return ResponseEntity.ok(ticketService.getTicketScanHistory(id, startTime, endTime));
+    }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+    @PostMapping("/{id}/scan")
+    public ResponseEntity<Void> recordTicketScan(@PathVariable Long id, @RequestBody TicketScanDTO scanDTO) {
+        ticketService.recordTicketScan(id, scanDTO);
+        return ResponseEntity.status(201).build();
     }
 }
 

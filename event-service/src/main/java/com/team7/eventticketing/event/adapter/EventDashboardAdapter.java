@@ -19,6 +19,13 @@ public class EventDashboardAdapter {
 
     public EventDashboardDTO adapt(Object[] row, Long eventId,
                                    String name, Double rating) {
+
+        // Unwrap if the query returned Object[] wrapping another Object[]
+        // This happens with some native SQL queries via JPA
+        if (row != null && row.length > 0 && row[0] instanceof Object[]) {
+            row = (Object[]) row[0];
+        }
+
         long totalBookings    = row != null && row.length > 0 && row[0] != null
                 ? ((Number) row[0]).longValue() : 0L;
         double totalRevenue   = row != null && row.length > 1 && row[1] != null

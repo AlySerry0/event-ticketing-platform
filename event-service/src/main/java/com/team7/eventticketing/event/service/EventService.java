@@ -40,8 +40,8 @@ public class EventService {
     private final  EventIndexService eventIndexService;  // needed to trigger re-indexing on updates
     private final ElasticsearchOperations elasticsearchOperations;
     private final ElasticsearchHitAdapter elasticsearchHitAdapter;
-    @Autowired
-    private EventService self;
+//    @Autowired
+//    private EventService self;
 
     public void register(EntityObserver observer) {
         if (!observers.contains(observer)) {
@@ -65,19 +65,21 @@ public class EventService {
     private final EventRepository eventRepository;
     private final CacheInvalidationService cacheInvalidationService;
     private final ObjectArrayDtoAdapter objectArrayDtoAdapter = new ObjectArrayDtoAdapter();
+    private EventCacheService eventCacheService;
 
     /**
      * Constructor — MongoEventLogger is injected by Spring and registered
      * as the single observer for this service.
      */
     public EventService(EventRepository eventRepository, MongoEventLogger mongoEventLogger, EventIndexService eventIndexService, ElasticsearchOperations elasticsearchOperations, ElasticsearchHitAdapter elasticsearchHitAdapter,
-CacheInvalidationService cacheInvalidationService) {
+CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheService) {
         this.eventRepository = eventRepository;
         this.eventIndexService = eventIndexService;
         this.elasticsearchOperations = elasticsearchOperations;
         this.elasticsearchHitAdapter = elasticsearchHitAdapter;
         this.register(mongoEventLogger);
         this.cacheInvalidationService = cacheInvalidationService;
+        this.eventCacheService = eventCacheService;
     }
 
     // -----------------------------------------------------------------------
@@ -529,27 +531,8 @@ CacheInvalidationService cacheInvalidationService) {
     // Split into cached inner method + public wrapper per spec §10.2.3 step g.
     // -----------------------------------------------------------------------
 
-    /**
-     * Inner cached method — only the DB computation is cached, not the Mongo log.
-     * Never call this directly from the controller; call getEventDashboard() instead.
-     */
-    @Cacheable(value = "S2-F12", key = "#eventId")
-    public EventDashboardDTO getEventDashboardCached(Long eventId) {
-        Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Event not found with id: " + eventId));
-
-        Object[] row = eventRepository.findEventDashboardMetrics(eventId);
-
-        return objectArrayDtoAdapter.toEventDashboardDTO(
-                row,
-                event.getId(),
-                event.getName(),
-                event.getRating()
-        );
-    }
     public EventDashboardDTO getEventDashboard(Long eventId) {
-        EventDashboardDTO result = self.getEventDashboardCached(eventId); // ← was getEventDashboardCached()
+        EventDashboardDTO result = eventCacheService.getEventDashboardCached(eventId);
         notifyObservers("DASHBOARD_VIEWED", buildPayload(eventId, Collections.emptyMap()));
         return result;
     }

@@ -91,6 +91,24 @@ public interface TicketSaleRepository extends JpaRepository<TicketSale, Long> {
     boolean userExistsByEmail(String email);
 
     @Query(value = """
+        SELECT
+            COALESCE(bi.metadata->>'ticketTier', 'UNSPECIFIED') AS tier,
+            SUM(bi.unit_price * bi.quantity)                    AS totalRevenue,
+            COUNT(DISTINCT ts.id)                               AS saleCount,
+            SUM(bi.quantity)                                    AS ticketsSold
+        FROM ticket_sales ts
+        JOIN bookings      b  ON b.id  = ts.booking_id
+        JOIN booking_items bi ON bi.booking_id = b.id
+        WHERE ts.created_at BETWEEN :startDateTime AND :endDateTime
+          AND ts.status = 'COMPLETED'
+        GROUP BY COALESCE(bi.metadata->>'ticketTier', 'UNSPECIFIED')
+        """, nativeQuery = true)
+    List<Object[]> findTierRevenue(
+            @Param("startDateTime") LocalDateTime startDateTime,
+            @Param("endDateTime")   LocalDateTime endDateTime
+    );
+
+    @Query(value = """
     SELECT e.event_date
     FROM ticket_sales ts
     JOIN bookings b ON b.id = ts.booking_id
