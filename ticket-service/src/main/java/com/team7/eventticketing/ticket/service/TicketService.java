@@ -56,7 +56,7 @@ public class TicketService implements EntitySubject {
     private final CassandraRowAdapter cassandraRowAdapter;
     private final TicketScanEventAdapter ticketScanEventAdapter;
     private final TicketAnalyticsAdapter ticketAnalyticsAdapter;
-    private final UnusedTicketAdapter unusedTicketAdapter;
+    private final MongoEventLogger mongoEventLogger;
 
     @Autowired
     public TicketService(
@@ -124,6 +124,7 @@ public class TicketService implements EntitySubject {
         return convertToDTO(savedTicket);
     }
 
+    @Cacheable(value = "ticketById", key = "#id")
     public Optional<TicketDTO> findById(Long id) {
         return ticketRepository.findById(id).map(this::convertToDTO);
     }
@@ -203,6 +204,7 @@ public class TicketService implements EntitySubject {
         return deletedCount;
     }
 
+    @Cacheable(value = "S4-F3", key = "#lat + '_' + #lon + '_' + #radiusKm")
     public List<NearbyTicketDTO> getNearbyTickets(double lat, double lon, double radiusKm) {
         if (radiusKm < 0) {
             throw new IllegalArgumentException("radiusKm must be non-negative");
@@ -245,6 +247,7 @@ public class TicketService implements EntitySubject {
         return convertToDTO(savedTicket);
     }
 
+    @Cacheable(value = "S4-F1", key = "#bookingId")
     public TicketDTO getLatestTicketForBooking(Long bookingId) {
         if (!ticketRepository.existsBookingById(bookingId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
