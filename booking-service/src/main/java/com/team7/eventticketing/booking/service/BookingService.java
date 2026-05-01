@@ -102,6 +102,8 @@ public class BookingService implements EntitySubject {
 		this.notifyObservers("BOOKING_DELETED", Map.of("bookingId", id));
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + id);
+		cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
+
 	}
 
 	public Optional<BookingDTO> updateBooking(Long id, BookingDTO bookingDetails) {
@@ -134,6 +136,7 @@ public class BookingService implements EntitySubject {
 			this.notifyObservers("BOOKING_UPDATED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
 			cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
 			cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + id);
+			cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
 
 			return convertToDTO(savedBooking);
 		});
@@ -201,6 +204,7 @@ public class BookingService implements EntitySubject {
 		this.notifyObservers("BOOKING_CONFIRMED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::*");
+		cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
 
 		return convertToDTO(savedBooking);
 	}
@@ -232,6 +236,7 @@ public class BookingService implements EntitySubject {
 		this.notifyObservers("BOOKING_COMPLETED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + id);
+		cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
 
 		return convertToDTO(savedBooking);
 	}
@@ -460,6 +465,8 @@ public class BookingService implements EntitySubject {
 		this.notifyObservers("BOOKING_CANCELLED", Map.of("bookingId", bookingId, "status", booking.getStatus()));
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + bookingId);
+		cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
+
 	}
 }
 
