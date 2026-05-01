@@ -11,35 +11,42 @@ import com.team7.eventticketing.booking.model.neo4j.UserNode;
 import com.team7.eventticketing.booking.repository.BookingRepository;
 import com.team7.eventticketing.booking.repository.EventNodeRepository;
 import com.team7.eventticketing.booking.repository.UserNodeRepository;
+import com.team7.eventticketing.booking.adapter.Neo4jRecordAdapter;
+import com.team7.eventticketing.booking.model.BookingItemStatus;
+import com.team7.eventticketing.booking.observer.EntityObserver;
+import com.team7.eventticketing.booking.observer.EntitySubject;
+import com.team7.eventticketing.booking.observer.MongoEventLogger;
+import com.team7.eventticketing.booking.util.CacheInvalidationService;
+import com.team7.eventticketing.booking.adapter.EventDetailsAdapter;
+
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import com.team7.eventticketing.booking.model.BookingItemStatus;
-import org.springframework.cache.annotation.Cacheable;
+import org.neo4j.driver.Driver;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Comparator;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
-import com.team7.eventticketing.booking.observer.EntityObserver;
-import com.team7.eventticketing.booking.observer.EntitySubject;
-import com.team7.eventticketing.booking.observer.MongoEventLogger;
-import com.team7.eventticketing.booking.util.CacheInvalidationService;
-import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
-
 @Service
 public class BookingService implements EntitySubject {
 
-	@Autowired
-	private BookingRepository bookingRepository;
+    @Autowired
+    private BookingRepository bookingRepository;
 
-	@Autowired
-	private BookingItemService bookingItemService;
+    @Autowired
+    private BookingItemService bookingItemService;
 
 	@Autowired
 	private UserNodeRepository userNodeRepository;
@@ -50,31 +57,24 @@ public class BookingService implements EntitySubject {
 	@Autowired
 	private BookingNodeAdapter bookingNodeAdapter;
 
-	private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
-	private final CacheInvalidationService cacheInvalidationService;
+    @Autowired
+    private CacheInvalidationService cacheInvalidationService;
 
-	@Autowired
-	public BookingService(MongoEventLogger mongoEventLogger, CacheInvalidationService cacheInvalidationService) {
-		this.cacheInvalidationService = cacheInvalidationService;
-		this.register(mongoEventLogger);
-	}
+    private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
 
-	@Override
-	public void register(EntityObserver o) {
-		observers.add(o);
-	}
+    @Autowired
+    public void registerMongoLogger(MongoEventLogger mongoEventLogger) {
+        register(mongoEventLogger);
+    }
 
-	@Override
-	public void unregister(EntityObserver o) {
-		observers.remove(o);
-	}
+    @Autowired
+    private Driver neo4jDriver;
 
-	@Override
-	public void notifyObservers(String action, Object payload) {
-		for (EntityObserver observer : observers) {
-			observer.onEvent(action, payload);
-		}
-	}
+    @Autowired
+    private Neo4jRecordAdapter neo4jRecordAdapter;
+
+    @Autowired
+    private EventDetailsAdapter eventDetailsAdapter;
 
 	public BookingDTO save(BookingDTO bookingDTO) {
 		Booking booking = convertToEntity(bookingDTO);
@@ -367,18 +367,11 @@ public class BookingService implements EntitySubject {
 				.toList();
 	}
 
-
+    @Cacheable(value = "S3-F9", key = "#bookingId")
 	public BookingDetailsDTO getBookingDetails(Long bookingId) {
 		Booking booking = bookingRepository.findById(bookingId)
 				.orElseThrow(() -> new NoSuchElementException("Booking not found"));
 
-		BookingDetailsDTO dto = new BookingDetailsDTO();
-		dto.setBookingId(booking.getId());
-		dto.setUserId(booking.getUserId());
-		dto.setEventId(booking.getEventId());
-		dto.setStatus(booking.getStatus());
-		dto.setTotalAmount(booking.getTotalAmount());
-		dto.setMetadata(booking.getMetadata());
 
 		List<BookingItem> bookingItems = booking.getBookingItems() == null ? List.of() : booking.getBookingItems();
 
@@ -391,12 +384,84 @@ public class BookingService implements EntitySubject {
 				.filter(item -> item.getStatus() == BookingItemStatus.CONFIRMED)
 				.count();
 
-		dto.setItems(itemDTOs);
-		dto.setTotalItems(itemDTOs.size());
-		dto.setConfirmedItems(confirmedItems);
 
-		return dto;
+        return BookingDetailsDTO.builder()
+                .bookingId(booking.getId())
+                .userId(booking.getUserId())
+                .eventId(booking.getEventId())
+                .status(booking.getStatus())
+                .totalAmount(booking.getTotalAmount())
+                .metadata(booking.getMetadata())
+                .items(itemDTOs)
+                .totalItems(itemDTOs.size())
+                .confirmedItems(confirmedItems)
+                .build();
 	}
+
+    @Cacheable(value = "S3-F12", key = "#userId + '-' + (#limit == null ? 5 : #limit)")
+    public List<EventRecommendationDTO> getEventRecommendations(Long userId, Integer limit, Long requesterId, String requesterRole) {
+        if (!userId.equals(requesterId) && !"ADMIN".equals(requesterRole)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only view your own recommendations");
+        }
+
+        if (!bookingRepository.userExistsById(userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+        }
+
+        int recommendationLimit = limit == null ? 5 : limit;
+
+        String cypher = """
+            MATCH (target:User {userId: $userId})-[:ATTENDED]->(shared:Event)<-[:ATTENDED]-(similar:User)-[:ATTENDED]->(recommended:Event)
+            WHERE NOT (target)-[:ATTENDED]->(recommended)
+            RETURN recommended.eventId AS eventId,
+                   recommended.name AS eventName,
+                   recommended.category AS category,
+                   count(similar) AS score
+            ORDER BY score DESC
+            LIMIT $limit
+            """;
+
+        try (var session = neo4jDriver.session()) {
+            List<EventRecommendationDTO> recommendations = session.executeRead(tx ->
+                    tx.run(cypher, Map.of("userId", userId, "limit", recommendationLimit))
+                            .list(neo4jRecordAdapter::adapt)
+            );
+
+            List<Long> eventIds = recommendations.stream()
+                    .map(EventRecommendationDTO::getEventId)
+                    .toList();
+
+            if (eventIds.isEmpty()) {
+                return recommendations;
+            }
+
+            Map<Long, Object[]> eventDetails = bookingRepository.findEventRecommendationDetails(eventIds)
+                    .stream()
+                    .collect(java.util.stream.Collectors.toMap(
+                            row -> ((Number) row[0]).longValue(),
+                            row -> row
+                    ));
+
+            return recommendations.stream()
+                    .map(recommendation -> {
+                        Object[] row = eventDetails.get(recommendation.getEventId());
+
+                        if (row == null) {
+                            return recommendation;
+                        }
+
+                        return eventDetailsAdapter.adapt(row, recommendation.getScore());
+                    })
+                    .toList();
+        }
+    }
+
+    private void invalidateBookingCaches(Long bookingId) {
+        cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + bookingId);
+        cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F9::*");
+        cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F12::*");
+    }
 
 	@Transactional
 	public BookingDTO addItemsToBooking(Long bookingId, List<BookingItemDTO> itemDTOs) {
@@ -440,13 +505,21 @@ public class BookingService implements EntitySubject {
 		}
 
 		Booking savedBooking = bookingRepository.save(booking);
-		
-		this.notifyObservers("ITEMS_ADDED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
-		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
-		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + bookingId);
 
-		return convertToDTO(savedBooking);
-	}
+    Map<String, Object> payload = new HashMap<>();
+    payload.put("bookingId", savedBooking.getId());
+    payload.put("userId", savedBooking.getUserId());
+    payload.put("eventId", savedBooking.getEventId());
+    payload.put("itemsAdded", itemDTOs.size());
+    payload.put("status", savedBooking.getStatus().name());
+
+    notifyObservers("ITEMS_ADDED", payload);
+
+    invalidateBookingCaches(savedBooking.getId());
+
+    return convertToDTO(savedBooking);
+    
+  }
 
 	@Transactional
 	public void cancelBooking(Long bookingId) {
@@ -463,71 +536,93 @@ public class BookingService implements EntitySubject {
 		if (bookingRepository.ticketsTableExists()) {
 			bookingRepository.cancelValidTicketsByBookingId(bookingId);
 		}
+  Booking savedBooking = bookingRepository.save(booking);
 
-		bookingRepository.save(booking);
-		
-		this.notifyObservers("BOOKING_CANCELLED", Map.of("bookingId", bookingId, "status", booking.getStatus()));
-		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
-		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + bookingId);
-		cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
+  Map<String, Object> payload = new HashMap<>();
+  payload.put("bookingId", savedBooking.getId());
+  payload.put("userId", savedBooking.getUserId());
+  payload.put("eventId", savedBooking.getEventId());
+  payload.put("status", savedBooking.getStatus().name());
 
-	}
+  notifyObservers("BOOKING_CANCELLED", payload);
 
-	@Cacheable(value = "booking-service", key = "'S3-F10::' + #startDate.toString() + '_' + #endDate.toString()")
+  invalidateBookingCaches(savedBooking.getId());
+  cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
+  }
 
-	public BookingAnalyticsDashboardDTO getAnalyticsDashboard(LocalDate startDate, LocalDate endDate) {
-		if (startDate.isAfter(endDate)) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be after end date");
-		}
+  @Cacheable(value = "booking-service", key = "'S3-F10::' + #startDate.toString() + '_' + #endDate.toString()")
+  public BookingAnalyticsDashboardDTO getAnalyticsDashboard(LocalDate startDate, LocalDate endDate) {
+      if (startDate.isAfter(endDate)) {
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be after end date");
+      }
 
-		LocalDateTime start = startDate.atStartOfDay();
-		LocalDateTime end = endDate.atTime(LocalTime.MAX);
+      LocalDateTime start = startDate.atStartOfDay();
+      LocalDateTime end = endDate.atTime(LocalTime.MAX);
 
-		List<Booking> bookings = bookingRepository.findByBookingDateBetweenOrderByBookingDateDesc(start, end);
+      List<Booking> bookings = bookingRepository.findByBookingDateBetweenOrderByBookingDateDesc(start, end);
 
-		long totalBookings = bookings.size();
-		double totalRevenue = 0.0;
-		long completedCount = 0;
-		long conversionCount = 0;
-		Map<String, Long> statusMap = new HashMap<>();
+      long totalBookings = bookings.size();
+      double totalRevenue = 0.0;
+      long completedCount = 0;
+      long conversionCount = 0;
+      Map<String, Long> statusMap = new HashMap<>();
 
-		for(Booking b : bookings) {
-			String status = b.getStatus().name();
-			statusMap.put(status, statusMap.getOrDefault(status, 0L) + 1);
+      for (Booking b : bookings) {
+          String status = b.getStatus().name();
+          statusMap.put(status, statusMap.getOrDefault(status, 0L) + 1);
 
-			if (b.getStatus() == BookingStatus.COMPLETED) {
-				completedCount++;
-				if(b.getTotalAmount() != null) {
-					totalRevenue += b.getTotalAmount();
-				}
-			}
-			if (b.getStatus() == BookingStatus.CONFIRMED || b.getStatus() == BookingStatus.CHECKED_IN || b.getStatus() == BookingStatus.COMPLETED) {
-				conversionCount++;
-			}
-		}
+          if (b.getStatus() == BookingStatus.COMPLETED) {
+              completedCount++;
+              if (b.getTotalAmount() != null) {
+                  totalRevenue += b.getTotalAmount();
+              }
+          }
 
-		double avgValue = completedCount > 0 ? totalRevenue / completedCount : 0.0;
-		double convRate = totalBookings > 0 ? (double) conversionCount / totalBookings : 0.0;
+          if (b.getStatus() == BookingStatus.CONFIRMED
+                  || b.getStatus() == BookingStatus.CHECKED_IN
+                  || b.getStatus() == BookingStatus.COMPLETED) {
+              conversionCount++;
+          }
+      }
 
-		// Utilizing the Phase 5 Builder
-		return BookingAnalyticsDashboardDTO.builder()
-				.totalBookings(totalBookings)
-				.totalRevenue(totalRevenue)
-				.averageBookingValue(avgValue)
-				.conversionRate(convRate)
-				.bookingsByStatus(statusMap)
-				.build();
-	}
+      double avgValue = completedCount > 0 ? totalRevenue / completedCount : 0.0;
+      double convRate = totalBookings > 0 ? (double) conversionCount / totalBookings : 0.0;
 
-	public void recordAnalyticsView(LocalDate startDate, LocalDate endDate, Double totalRevenueCalculated) {
-		Map<String, Object> payload = new HashMap<>();
-		payload.put("dashboardType", "BookingAnalytics");
-		payload.put("startDate", startDate.toString());
-		payload.put("endDate", endDate.toString());
-		payload.put("totalRevenueCalculated", totalRevenueCalculated);
+      return BookingAnalyticsDashboardDTO.builder()
+              .totalBookings(totalBookings)
+              .totalRevenue(totalRevenue)
+              .averageBookingValue(avgValue)
+              .conversionRate(convRate)
+              .bookingsByStatus(statusMap)
+              .build();
+  }
 
-		notifyObservers("ANALYTICS_VIEWED", payload);
-	}
+  public void recordAnalyticsView(LocalDate startDate, LocalDate endDate, Double totalRevenueCalculated) {
+      Map<String, Object> payload = new HashMap<>();
+      payload.put("dashboardType", "BookingAnalytics");
+      payload.put("startDate", startDate.toString());
+      payload.put("endDate", endDate.toString());
+      payload.put("totalRevenueCalculated", totalRevenueCalculated);
+
+      notifyObservers("ANALYTICS_VIEWED", payload);
+  }
+
+  @Override
+  public void register(EntityObserver o) {
+      observers.add(o);
+  }
+
+  @Override
+  public void unregister(EntityObserver o) {
+      observers.remove(o);
+  }
+
+  @Override
+  public void notifyObservers(String action, Object payload) {
+      for (EntityObserver observer : observers) {
+          observer.onEvent(action, payload);
+      }
+  }
 
 	@Transactional
 	public int recordAttendance(Long bookingId) {
