@@ -1,5 +1,6 @@
 package com.team7.eventticketing.booking.service;
 
+import com.team7.eventticketing.booking.adapter.BookingNodeAdapter;
 import com.team7.eventticketing.booking.dto.*;
 import com.team7.eventticketing.booking.model.Booking;
 import com.team7.eventticketing.booking.model.BookingItem;
@@ -45,6 +46,9 @@ public class BookingService implements EntitySubject {
 
 	@Autowired
 	private EventNodeRepository eventNodeRepository;
+
+	@Autowired
+	private BookingNodeAdapter bookingNodeAdapter;
 
 	private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
 	private final CacheInvalidationService cacheInvalidationService;
@@ -539,11 +543,8 @@ public class BookingService implements EntitySubject {
 		// Look up user node or create it
 		UserNode userNode = userNodeRepository.findByUserId(booking.getUserId())
 				.orElseGet(() -> {
-					UserNode newNode = new UserNode();
-					newNode.setUserId(booking.getUserId());
 					String name = bookingRepository.findUserNameById(booking.getUserId());
-					newNode.setName(name != null ? name : "Unknown User");
-					return newNode;
+					return bookingNodeAdapter.toUserNode(booking.getUserId(), name);
 				});
 
 		// Check idempotency
@@ -564,17 +565,8 @@ public class BookingService implements EntitySubject {
 			AttendedRelationship rel = new AttendedRelationship();
 			EventNode eventNode = eventNodeRepository.findByEventId(booking.getEventId())
 					.orElseGet(() -> {
-						EventNode newNode = new EventNode();
-						newNode.setEventId(booking.getEventId());
 						Object[] details = (Object[]) bookingRepository.findEventDetailsById(booking.getEventId());
-						if (details != null && details.length > 0) {
-							newNode.setName((String) details[0]);
-							newNode.setCategory(details[1] != null ? details[1].toString() : "UNSPECIFIED");
-						} else {
-							newNode.setName("Unknown Event");
-							newNode.setCategory("UNSPECIFIED");
-						}
-						return newNode;
+						return bookingNodeAdapter.toEventNode(booking.getEventId(), details);
 					});
 			rel.setEvent(eventNode);
 			rel.setAttendanceCount(1);
