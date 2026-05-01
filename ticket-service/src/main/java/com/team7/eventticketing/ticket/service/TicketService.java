@@ -8,6 +8,7 @@ import com.team7.eventticketing.ticket.model.TicketStatus;
 import com.team7.eventticketing.ticket.repository.TicketRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +33,10 @@ public class TicketService implements EntitySubject {
 
     @Autowired
     private final TicketRepository ticketRepository;
+
+    @Autowired
+    @Lazy
+    private TicketService self;
 
 
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
@@ -370,8 +375,6 @@ public class TicketService implements EntitySubject {
         if (startDate.isAfter(endDate)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid date range");
         }
-        LocalDateTime start = startDate.atStartOfDay();
-        LocalDateTime end = endDate.atTime(23, 59, 59, 999_000_000);
         notifyObservers(
                 "ANALYTICS_VIEWED",
                 Map.of(
@@ -379,15 +382,17 @@ public class TicketService implements EntitySubject {
                         "endDate", endDate.toString()
                 )
         );
-        return getAnalyticsCached(startDate, endDate, start, end);
+        return self.getAnalyticsCached(startDate, endDate);
     }
 
     @Cacheable(value = "S4-F10", key = "#startDate.toString() + '_' + #endDate.toString()")
-    public TicketAnalyticsDTO getAnalyticsCached(LocalDate startDate, LocalDate endDate, LocalDateTime start, LocalDateTime end) {
-        Object[] row = ticketRepository.getTicketAnalytics(start, end);
-        if (row == null) {
-            row = new Object[]{0L, 0L, 0L, 0L, 0L};
-        }
+    public TicketAnalyticsDTO getAnalyticsCached(LocalDate startDate, LocalDate endDate) {
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.atTime(23, 59, 59, 999_000_000);
+        List<Object[]> results = ticketRepository.getTicketAnalytics(start, end);
+        Object[] row = (results != null && !results.isEmpty())
+                ? results.get(0)
+                : new Object[]{0L, 0L, 0L, 0L, 0L};
         return ticketAnalyticsAdapter.convert(row);
     }
 }

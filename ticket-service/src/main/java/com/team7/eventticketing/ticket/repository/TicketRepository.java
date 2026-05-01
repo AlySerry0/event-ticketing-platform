@@ -110,9 +110,6 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
         FROM tickets
         WHERE issued_at BETWEEN :start AND :end
         """, nativeQuery = true)
-    Object[] getTicketAnalytics(
-            @Param("start") LocalDateTime start,
-            @Param("end") LocalDateTime end
-    );
+    List<Object[]> getTicketAnalytics(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }
 

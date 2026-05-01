@@ -10,18 +10,16 @@ public class TicketAnalyticsAdapter implements ObjectArrayAdapter<TicketAnalytic
 
     @Override
     public TicketAnalyticsDTO convert(Object[] row) {
+        // Note: PostgreSQL native queries often return BigInteger for counts
+        long total = (row[0] != null) ? ((Number) row[0]).longValue() : 0L;
+        long used = (row[1] != null) ? ((Number) row[1]).longValue() : 0L;
+        long valid = (row[2] != null) ? ((Number) row[2]).longValue() : 0L;
+        long expired = (row[3] != null) ? ((Number) row[3]).longValue() : 0L;
+        long cancelled = (row[4] != null) ? ((Number) row[4]).longValue() : 0L;
 
-        long total = ((Number) row[0]).longValue();
-        long used = ((Number) row[1]).longValue();
-        long valid = ((Number) row[2]).longValue();
-        long expired = ((Number) row[3]).longValue();
-        long cancelled = ((Number) row[4]).longValue();
+        double rate = (total == 0) ? 0.0 : (double) used / total;
 
-        double rate = total == 0 ? 0.0 : (double) used / total;
-
-        Map<String, Long> statusMap = (total == 0)
-                ? Map.of()
-                : Map.of(
+        Map<String, Long> statusMap = (total == 0) ? Map.of() : Map.of(
                 "USED", used,
                 "VALID", valid,
                 "EXPIRED", expired,
