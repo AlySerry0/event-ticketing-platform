@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -59,4 +60,12 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE email = :email", nativeQuery = true)
     boolean userExistsByEmail(String email);
+
+    @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE id = :userId", nativeQuery = true)
+    boolean userExistsById(@Param("userId") Long userId);
+
+    @Query(value = "SELECT id, name, category, event_date FROM events WHERE id IN (:eventIds)", nativeQuery = true)
+    List<Object[]> findEventRecommendationDetails(@Param("eventIds") List<Long> eventIds);
+
+
 }

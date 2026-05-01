@@ -16,6 +16,63 @@ public class BookingDetailsDTO {
     private Integer totalItems;
     private Integer confirmedItems;
 
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private final BookingDetailsDTO dto = new BookingDetailsDTO();
+
+        public Builder bookingId(Long bookingId) {
+            dto.bookingId = bookingId;
+            return this;
+        }
+
+        public Builder userId(Long userId) {
+            dto.userId = userId;
+            return this;
+        }
+
+        public Builder eventId(Long eventId) {
+            dto.eventId = eventId;
+            return this;
+        }
+
+        public Builder status(BookingStatus status) {
+            dto.status = status;
+            return this;
+        }
+
+        public Builder totalAmount(Double totalAmount) {
+            dto.totalAmount = totalAmount;
+            return this;
+        }
+
+        public Builder metadata(Map<String, Object> metadata) {
+            dto.metadata = metadata;
+            return this;
+        }
+
+        public Builder items(List<BookingItemDTO> items) {
+            dto.items = items;
+            return this;
+        }
+
+        public Builder totalItems(Integer totalItems) {
+            dto.totalItems = totalItems;
+            return this;
+        }
+
+        public Builder confirmedItems(Integer confirmedItems) {
+            dto.confirmedItems = confirmedItems;
+            return this;
+        }
+
+        public BookingDetailsDTO build() {
+            return dto;
+        }
+    }
+
     public Long getBookingId() {
         return bookingId;
     }
