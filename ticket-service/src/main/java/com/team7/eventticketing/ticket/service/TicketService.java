@@ -78,6 +78,7 @@ public class TicketService implements EntitySubject {
         this.cassandraRowAdapter = cassandraRowAdapter;
         this.ticketScanEventAdapter = ticketScanEventAdapter;
         this.nearbyTicketAdapter= nearbyTicketAdapter;
+        register(mongoEventLogger);
     }
 
     @Override
