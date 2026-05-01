@@ -1,0 +1,22 @@
+# Milestone 2 — Python Integration & E2E Test Suite
+# Install with: pip install -r requirements.txt
+
+# --- Core test framework ---
+pytest>=8.0.0
+pytest-timeout>=2.3.1      # per-test timeouts to guard against hung services
+
+# --- HTTP client ---
+requests>=2.31.0
+
+# --- JWT decoding (to inspect uid / role claims without a secret) ---
+PyJWT>=2.8.0
+
+# --- Database drivers (one per NoSQL DB + PostgreSQL) ---
+psycopg2-binary>=2.9.9     # PostgreSQL — CC-5, Section 4.1 password hash checks
+pymongo>=4.6.3             # MongoDB  — Observer audit events (Section 7.1)
+redis>=5.0.3               # Redis    — Cache key assertions (CC-3, Section 4.4)
+elasticsearch>=8.13.0      # Elasticsearch — S2-F10/S2-F11 index checks (Section 7.2)
+                           #   NOTE: if your docker-compose uses ES 9.x, upgrade to
+                           #   elasticsearch>=9.0.0
+neo4j>=5.18.0              # Neo4j    — S3-F11 graph assertions (Section 7.3)
+cassandra-driver>=3.29.1   # Cassandra — S4-F11/S4-F12 scan event checks (Section 7.4)
