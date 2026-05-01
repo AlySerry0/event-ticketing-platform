@@ -43,6 +43,11 @@ public class RedisConfig implements CachingConfigurer {
         Map<String, RedisCacheConfiguration> caches = new HashMap<>();
         caches.put("S5-F1", baseConfig(Duration.ofMinutes(5), serializer));
         caches.put("S5-F3",  baseConfig(Duration.ofMinutes(10), serializer));
+        caches.put("S5-F6", baseConfig(Duration.ofMinutes(10), serializer));
+        caches.put("S5-F8",  baseConfig(Duration.ofMinutes(15), serializer));
+        caches.put("S5-F9", baseConfig(Duration.ofMinutes(10), serializer));
+        caches.put("S5-F10",  baseConfig(Duration.ofMinutes(10), serializer));
+        caches.put("S5-F11",  baseConfig(Duration.ofMinutes(10), serializer));
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)
