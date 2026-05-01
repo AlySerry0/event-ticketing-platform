@@ -142,6 +142,8 @@ public class TicketService implements EntitySubject {
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::" + id);
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
+
     }
 
     public TicketDTO convertToDTO(Ticket ticket) {
@@ -193,6 +195,8 @@ public class TicketService implements EntitySubject {
 
         this.notifyObservers("OLD_DATA_PURGED", Map.of("olderThanDays", olderThanDays, "deletedCount", deletedCount));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
+
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         
@@ -411,6 +415,7 @@ public class TicketService implements EntitySubject {
             cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
             cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
             cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::" + id);
+            cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
 
             return convertToDTO(savedTicket);
         });
