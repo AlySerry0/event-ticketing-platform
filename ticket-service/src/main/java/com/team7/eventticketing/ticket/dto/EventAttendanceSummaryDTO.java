@@ -11,64 +11,71 @@ public class EventAttendanceSummaryDTO {
     private double attendanceRate;
     private LocalDateTime lastCheckIn;
 
-    public EventAttendanceSummaryDTO() {}
+    private EventAttendanceSummaryDTO() {}
 
-    public EventAttendanceSummaryDTO(Long eventId, long totalTickets, long usedTickets,
-                                     long validTickets, double attendanceRate,
-                                     LocalDateTime lastCheckIn) {
-        this.eventId = eventId;
-        this.totalTickets = totalTickets;
-        this.usedTickets = usedTickets;
-        this.validTickets = validTickets;
-        this.attendanceRate = attendanceRate;
-        this.lastCheckIn = lastCheckIn;
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private final EventAttendanceSummaryDTO dto = new EventAttendanceSummaryDTO();
+
+        public Builder eventId(Long eventId) {
+            dto.eventId = eventId;
+            return this;
+        }
+
+        public Builder totalTickets(long totalTickets) {
+            dto.totalTickets = totalTickets;
+            return this;
+        }
+
+        public Builder usedTickets(long usedTickets) {
+            dto.usedTickets = usedTickets;
+            return this;
+        }
+
+        public Builder validTickets(long validTickets) {
+            dto.validTickets = validTickets;
+            return this;
+        }
+
+        public Builder attendanceRate(double attendanceRate) {
+            dto.attendanceRate = attendanceRate;
+            return this;
+        }
+
+        public Builder lastCheckIn(LocalDateTime lastCheckIn) {
+            dto.lastCheckIn = lastCheckIn;
+            return this;
+        }
+
+        public EventAttendanceSummaryDTO build() {
+            return dto;
+        }
     }
 
     public Long getEventId() {
         return eventId;
     }
 
-    public void setEventId(Long eventId) {
-        this.eventId = eventId;
-    }
-
     public long getTotalTickets() {
         return totalTickets;
-    }
-
-    public void setTotalTickets(long totalTickets) {
-        this.totalTickets = totalTickets;
     }
 
     public long getUsedTickets() {
         return usedTickets;
     }
 
-    public void setUsedTickets(long usedTickets) {
-        this.usedTickets = usedTickets;
-    }
-
     public long getValidTickets() {
         return validTickets;
-    }
-
-    public void setValidTickets(long validTickets) {
-        this.validTickets = validTickets;
     }
 
     public double getAttendanceRate() {
         return attendanceRate;
     }
 
-    public void setAttendanceRate(double attendanceRate) {
-        this.attendanceRate = attendanceRate;
-    }
-
     public LocalDateTime getLastCheckIn() {
         return lastCheckIn;
-    }
-
-    public void setLastCheckIn(LocalDateTime lastCheckIn) {
-        this.lastCheckIn = lastCheckIn;
     }
 }
