@@ -313,13 +313,14 @@ public class BookingService implements EntitySubject {
 		return booking;
 	}
 
+	@Cacheable(value = "booking-service", key = "'S3-F6::' + #startDate.toString() + '_' + #endDate.toString()")
 	public BookingAnalyticsDTO getAnalytics(LocalDate startDate, LocalDate endDate) {
 		if (startDate.isAfter(endDate)) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be after end date");
 		}
 
-		LocalDateTime start = startDate.atStartOfDay(); // 2026-03-01 00:00:00
-		LocalDateTime end = endDate.atTime(23, 59, 59); // 2026-03-31 23:59:59
+		LocalDateTime start = startDate.atStartOfDay();
+		LocalDateTime end = endDate.atTime(23, 59, 59);
 		List<Object[]> results = bookingRepository.getBookingAnalytics(start, end);
 		Object[] row = results.get(0);
 
@@ -328,27 +329,20 @@ public class BookingService implements EntitySubject {
 		Long cancelled = ((Number) row[2]).longValue();
 		Double revenue = ((Number) row[3]).doubleValue();
 
-		Double average = 0.0;
-		if (completed > 0) {
-			average = revenue / completed;
-		}
+		Double average = completed > 0 ? revenue / completed : 0.0;
+		Double completionRate = total > 0 ? ((double) completed / total) * 100.0 : 0.0;
 
-		Double completionRate = 0.0;
-		if (total > 0) {
-			completionRate = ((double) completed / total) * 100.0;
-		}
-
-		BookingAnalyticsDTO dto = new BookingAnalyticsDTO();
-		dto.setTotalBookings(total);
-		dto.setCompletedBookings(completed);
-		dto.setCancelledBookings(cancelled);
-		dto.setTotalRevenue(revenue);
-		dto.setAverageBookingAmount(average);
-		dto.setCompletionRate(completionRate);
-
-		return dto;
+		// Utilizing the Phase 5 Builder
+		return BookingAnalyticsDTO.builder()
+				.totalBookings(total)
+				.completedBookings(completed)
+				.cancelledBookings(cancelled)
+				.totalRevenue(revenue)
+				.averageBookingAmount(average)
+				.completionRate(completionRate)
+				.build();
 	}
-
+	@Cacheable(value = "booking-service", key = "'S3-F5::' + #key + '_' + #value")
 	public List<BookingDTO> filterBookingsByMetadata(String key, String value) {
 		if (key == null || key.trim().isEmpty() || value == null || value.trim().isEmpty()) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Metadata key and value cannot be blank");
@@ -463,7 +457,8 @@ public class BookingService implements EntitySubject {
 		cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
 
 	}
-	@Cacheable(value = "booking-service::S3-F10", key = "#startDate.toString() + '_' + #endDate.toString()")
+
+	@Cacheable(value = "booking-service", key = "'S3-F10::' + #startDate.toString() + '_' + #endDate.toString()")
 	public BookingAnalyticsDashboardDTO getAnalyticsDashboard(LocalDate startDate, LocalDate endDate) {
 		if (startDate.isAfter(endDate)) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be after end date");
@@ -498,14 +493,14 @@ public class BookingService implements EntitySubject {
 		double avgValue = completedCount > 0 ? totalRevenue / completedCount : 0.0;
 		double convRate = totalBookings > 0 ? (double) conversionCount / totalBookings : 0.0;
 
-		BookingAnalyticsDashboardDTO dto = new BookingAnalyticsDashboardDTO();
-		dto.setTotalBookings(totalBookings);
-		dto.setTotalRevenue(totalRevenue);
-		dto.setAverageBookingValue(avgValue);
-		dto.setConversionRate(convRate);
-		dto.setBookingsByStatus(statusMap);
-
-		return dto;
+		// Utilizing the Phase 5 Builder
+		return BookingAnalyticsDashboardDTO.builder()
+				.totalBookings(totalBookings)
+				.totalRevenue(totalRevenue)
+				.averageBookingValue(avgValue)
+				.conversionRate(convRate)
+				.bookingsByStatus(statusMap)
+				.build();
 	}
 	public void recordAnalyticsView(LocalDate startDate, LocalDate endDate, Double totalRevenueCalculated) {
 		Map<String, Object> payload = new HashMap<>();
