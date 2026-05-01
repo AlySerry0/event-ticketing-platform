@@ -19,12 +19,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.team7.eventticketing.user.util.CacheInvalidationService;
+
 @Service
 public class AuthService {
 
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final CacheInvalidationService cacheInvalidationService;
 
     // -----------------------------------------------------------------------
     // Classical GoF Observer — subject side
@@ -32,18 +35,34 @@ public class AuthService {
     // -----------------------------------------------------------------------
     private final List<EntityObserver> observers = new ArrayList<>();
 
+//    public AuthService(UserRepository userRepository,
+//                       JwtService jwtService,
+//                       BCryptPasswordEncoder passwordEncoder,
+//                       AuthEventRepository authEventRepository) {
+//        this.userRepository = userRepository;
+//        this.jwtService = jwtService;
+//        this.passwordEncoder = passwordEncoder;
+//
+//        // Register the MongoEventLogger observer at construction time.
+//        // MongoEventLogger is NOT a Spring bean — we instantiate it manually
+//        // as required by Section 3.3 (classical GoF, not Spring @EventListener).
+//        this.registerObserver(new MongoEventLogger(authEventRepository));
+//    }
+
     public AuthService(UserRepository userRepository,
                        JwtService jwtService,
                        BCryptPasswordEncoder passwordEncoder,
-                       AuthEventRepository authEventRepository) {
+                       AuthEventRepository authEventRepository,
+                       CacheInvalidationService cacheInvalidationService) {
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
+        this.cacheInvalidationService = cacheInvalidationService;
 
         // Register the MongoEventLogger observer at construction time.
         // MongoEventLogger is NOT a Spring bean — we instantiate it manually
         // as required by Section 3.3 (classical GoF, not Spring @EventListener).
-        this.registerObserver(new MongoEventLogger(authEventRepository));
+        this.registerObserver(new MongoEventLogger(authEventRepository, cacheInvalidationService));
     }
 
     // -----------------------------------------------------------------------

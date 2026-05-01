@@ -38,7 +38,8 @@ public class FavoriteVenueService {
         this.favoriteVenueRepository = favoriteVenueRepository;
         this.userRepository = userRepository;
         this.cacheInvalidationService = cacheInvalidationService;
-        this.registerObserver(new MongoEventLogger(authEventRepository));
+//        this.registerObserver(new MongoEventLogger(authEventRepository));
+        this.registerObserver(new MongoEventLogger(authEventRepository, cacheInvalidationService));
     }
 
     // -----------------------------------------------------------------------
