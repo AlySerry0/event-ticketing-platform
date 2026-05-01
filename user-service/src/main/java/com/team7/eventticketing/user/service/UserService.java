@@ -45,7 +45,8 @@ public class UserService {
                        AuthEventRepository authEventRepository) {
         this.userRepository = userRepository;
         this.cacheInvalidationService = cacheInvalidationService;
-        this.registerObserver(new MongoEventLogger(authEventRepository));
+//        this.registerObserver(new MongoEventLogger(authEventRepository));
+        this.registerObserver(new MongoEventLogger(authEventRepository, cacheInvalidationService));
     }
 
     // -----------------------------------------------------------------------
