@@ -305,8 +305,9 @@ public class TicketSaleService {
         Map<String, Object> details = (Map<String, Object>) payload.get("details");
         details.put("promotionCode", promo.getCode());
         details.put("discountApplied", discount);
-
-        entitySubject.notifyObservers("PROMOTION_APPLIED", payload);
+        details.put("promotionId", promo.getId());
+        details.put("finalAmount", sale.getAmount() - discount);
+        notifyObservers("PROMOTION_APPLIED", payload);
 
         invalidateAfterTicketSaleWrite(saved);
         return saved;
@@ -346,6 +347,18 @@ public class TicketSaleService {
                 (cardLastFour == null || !cardLastFour.matches("\\d{4}"))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cardLastFour must be 4 digits");
         }
+        double totalDiscount = 0.0;
+
+        if (ticketSale.getSalePromotions() != null) {
+            totalDiscount = ticketSale.getSalePromotions().stream()
+                    .mapToDouble(SalePromotion::getDiscountApplied)
+                    .sum();
+        }
+
+        double finalAmount = ticketSale.getAmount() - totalDiscount;
+        finalAmount = Math.round(finalAmount * 100.0) / 100.0;
+
+        ticketSale.setAmount(finalAmount);
 
         ticketSale.setMethod(method);
 
