@@ -1,8 +1,6 @@
 package com.team7.eventticketing.ticket.service;
-import com.team7.eventticketing.ticket.adapter.EventSummaryAdapter;
-import com.team7.eventticketing.ticket.adapter.TicketAnalyticsAdapter;
+import com.team7.eventticketing.ticket.adapter.*;
 import com.team7.eventticketing.ticket.dto.*;
-import com.team7.eventticketing.ticket.adapter.UnusedTicketAdapter;
 import com.team7.eventticketing.ticket.dto.BatchTicketRequestDTO;
 
 import com.team7.eventticketing.ticket.model.Ticket;
@@ -16,11 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.team7.eventticketing.ticket.adapter.CassandraRowAdapter;
 import com.team7.eventticketing.ticket.dto.TicketScanDTO;
 import com.team7.eventticketing.ticket.model.cassandra.TicketScanEvent;
 import com.team7.eventticketing.ticket.repository.cassandra.TicketScanEventRepository;
-import com.team7.eventticketing.ticket.adapter.TicketScanEventAdapter;
 import org.springframework.cache.annotation.Cacheable;
 
 import java.time.LocalDate;
@@ -57,6 +53,7 @@ public class TicketService implements EntitySubject {
     private final TicketScanEventAdapter ticketScanEventAdapter;
     private final TicketAnalyticsAdapter ticketAnalyticsAdapter;
     private final MongoEventLogger mongoEventLogger;
+    private final NearbyTicketAdapter nearbyTicketAdapter;
 
     @Autowired
     public TicketService(
@@ -68,7 +65,8 @@ public class TicketService implements EntitySubject {
         UnusedTicketAdapter unusedTicketAdapter, 
         TicketScanEventRepository ticketScanEventRepository, 
         CassandraRowAdapter cassandraRowAdapter, 
-        TicketScanEventAdapter ticketScanEventAdapter
+        TicketScanEventAdapter ticketScanEventAdapter,
+        NearbyTicketAdapter nearbyTicketAdapter
     ) {
         this.mongoEventLogger = mongoEventLogger;
         this.ticketRepository = ticketRepository;
@@ -79,6 +77,7 @@ public class TicketService implements EntitySubject {
         this.ticketScanEventRepository = ticketScanEventRepository;
         this.cassandraRowAdapter = cassandraRowAdapter;
         this.ticketScanEventAdapter = ticketScanEventAdapter;
+        this.nearbyTicketAdapter= nearbyTicketAdapter;
     }
 
     @Override
@@ -210,14 +209,10 @@ public class TicketService implements EntitySubject {
             throw new IllegalArgumentException("radiusKm must be non-negative");
         }
         List<Object[]> results = ticketRepository.findNearbyTicketsNative(lat, lon, radiusKm);
-        return results.stream().map(row -> new NearbyTicketDTO(
-                ((Number) row[0]).longValue(),
-                (String) row[1],
-                ((Number) row[2]).longValue(),
-                (String) row[3],
-                (Double) row[4],
-                (Double) row[5],
-                (Double) row[6])).toList();
+
+        return results.stream()
+                .map(nearbyTicketAdapter::convert)
+                .toList();
     }
 
     @Transactional
