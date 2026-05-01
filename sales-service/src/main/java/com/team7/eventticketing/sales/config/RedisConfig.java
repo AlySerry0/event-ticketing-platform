@@ -31,7 +31,7 @@ public class RedisConfig {
                         .fromSerializer(new GenericJackson2JsonRedisSerializer()));
 
         Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
-        cacheConfigs.put("S5-F10", defaultConfig.entryTtl(Duration.ofMinutes(5)));
+        cacheConfigs.put("S5-F1", defaultConfig.entryTtl(Duration.ofMinutes(5)));
         cacheConfigs.put("S5-F3", defaultConfig.entryTtl(Duration.ofMinutes(10)));
 
         return RedisCacheManager.builder(connectionFactory)
