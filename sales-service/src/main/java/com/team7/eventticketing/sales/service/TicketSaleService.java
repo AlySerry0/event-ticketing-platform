@@ -152,6 +152,10 @@ public class TicketSaleService {
         return ticketSale;
     }
 
+    @Cacheable(
+            value = "S5-F10",
+            key = "#status + '|' + #startDate + '|' + #endDate"
+    )
     public List<TicketSaleDTO> searchTicketSales(TicketSaleStatus status,
                                                  LocalDate startDate,
                                                  LocalDate endDate) {
@@ -380,6 +384,11 @@ public class TicketSaleService {
         invalidateAfterTicketSaleWrite(completedSale);
         return completedSale;
     }
+
+    @Cacheable(
+            value = "S5-F3",
+            key = "#userId"
+    )
     public UserSaleSummaryDTO getUserSaleSummary(Long userId) {
        boolean userExists = ticketSaleRepository.userExists(userId);
 

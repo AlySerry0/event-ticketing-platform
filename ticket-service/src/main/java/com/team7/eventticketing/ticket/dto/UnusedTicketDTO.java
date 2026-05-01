@@ -10,14 +10,48 @@ public class UnusedTicketDTO {
     private String eventName;
     private LocalDateTime eventDate;
 
-    public UnusedTicketDTO(Long ticketId, String attendeeName, String ticketCode,
-                           Long bookingId, String eventName, LocalDateTime eventDate) {
-        this.ticketId = ticketId;
-        this.attendeeName = attendeeName;
-        this.ticketCode = ticketCode;
-        this.bookingId = bookingId;
-        this.eventName = eventName;
-        this.eventDate = eventDate;
+    private UnusedTicketDTO() {}
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private final UnusedTicketDTO dto = new UnusedTicketDTO();
+
+        public Builder ticketId(Long ticketId) {
+            dto.ticketId = ticketId;
+            return this;
+        }
+
+        public Builder attendeeName(String attendeeName) {
+            dto.attendeeName = attendeeName;
+            return this;
+        }
+
+        public Builder ticketCode(String ticketCode) {
+            dto.ticketCode = ticketCode;
+            return this;
+        }
+
+        public Builder bookingId(Long bookingId) {
+            dto.bookingId = bookingId;
+            return this;
+        }
+
+        public Builder eventName(String eventName) {
+            dto.eventName = eventName;
+            return this;
+        }
+
+        public Builder eventDate(LocalDateTime eventDate) {
+            dto.eventDate = eventDate;
+            return this;
+        }
+
+        public UnusedTicketDTO build() {
+            return dto;
+        }
     }
 
     public Long getTicketId() { return ticketId; }
@@ -26,11 +60,4 @@ public class UnusedTicketDTO {
     public Long getBookingId() { return bookingId; }
     public String getEventName() { return eventName; }
     public LocalDateTime getEventDate() { return eventDate; }
-
-    public void setTicketId(Long ticketId) { this.ticketId = ticketId; }
-    public void setAttendeeName(String attendeeName) { this.attendeeName = attendeeName; }
-    public void setTicketCode(String ticketCode) { this.ticketCode = ticketCode; }
-    public void setBookingId(Long bookingId) { this.bookingId = bookingId; }
-    public void setEventName(String eventName) { this.eventName = eventName; }
-    public void setEventDate(LocalDateTime eventDate) { this.eventDate = eventDate; }
 }

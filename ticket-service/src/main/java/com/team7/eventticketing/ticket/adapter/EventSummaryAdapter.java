@@ -11,28 +11,27 @@ public class EventSummaryAdapter implements ObjectArrayAdapter<EventAttendanceSu
     @Override
     public EventAttendanceSummaryDTO convert(Object[] row) {
 
-        long total = row[0] != null ? ((Number) row[0]).longValue() : 0;
-        long used = row[1] != null ? ((Number) row[1]).longValue() : 0;
-        long valid = row[2] != null ? ((Number) row[2]).longValue() : 0;
+        Long eventId = row[0] != null ? ((Number) row[0]).longValue() : null;
+        long total = row[1] != null ? ((Number) row[1]).longValue() : 0;
+        long used = row[2] != null ? ((Number) row[2]).longValue() : 0;
+        long valid = row[3] != null ? ((Number) row[3]).longValue() : 0;
 
         double attendanceRate = total == 0 ? 0 : (used * 100.0) / total;
 
         LocalDateTime lastCheckIn = null;
-        if (row[3] != null) {
-            if (row[3] instanceof java.sql.Timestamp ts) {
-                lastCheckIn = ts.toLocalDateTime();
-            } else if (row[3] instanceof LocalDateTime ldt) {
-                lastCheckIn = ldt;
-            }
+        if (row[4] instanceof java.sql.Timestamp ts) {
+            lastCheckIn = ts.toLocalDateTime();
+        } else if (row[4] instanceof LocalDateTime ldt) {
+            lastCheckIn = ldt;
         }
 
-        return new EventAttendanceSummaryDTO(
-                null, // eventId handled in service
-                total,
-                used,
-                valid,
-                attendanceRate,
-                lastCheckIn
-        );
+        return EventAttendanceSummaryDTO.builder()
+                .eventId(eventId)
+                .totalTickets(total)
+                .usedTickets(used)
+                .validTickets(valid)
+                .attendanceRate(attendanceRate)
+                .lastCheckIn(lastCheckIn)
+                .build();
     }
 }
