@@ -20,6 +20,7 @@ import com.team7.eventticketing.ticket.adapter.CassandraRowAdapter;
 import com.team7.eventticketing.ticket.dto.TicketScanDTO;
 import com.team7.eventticketing.ticket.model.cassandra.TicketScanEvent;
 import com.team7.eventticketing.ticket.repository.cassandra.TicketScanEventRepository;
+import com.team7.eventticketing.ticket.adapter.TicketScanEventAdapter;
 import org.springframework.cache.annotation.Cacheable;
 
 import java.time.LocalDate;
@@ -49,14 +50,16 @@ public class TicketService implements EntitySubject {
     private final EventSummaryAdapter eventSummaryAdapter;
     private final TicketScanEventRepository ticketScanEventRepository;
     private final CassandraRowAdapter cassandraRowAdapter;
+    private final TicketScanEventAdapter ticketScanEventAdapter;
 
     @Autowired
-    public TicketService(MongoEventLogger mongoEventLogger, TicketRepository ticketRepository, CacheInvalidationService cacheInvalidationService, EventSummaryAdapter eventSummaryAdapter, TicketScanEventRepository ticketScanEventRepository, CassandraRowAdapter cassandraRowAdapter) {
+    public TicketService(MongoEventLogger mongoEventLogger, TicketRepository ticketRepository, CacheInvalidationService cacheInvalidationService, EventSummaryAdapter eventSummaryAdapter, TicketScanEventRepository ticketScanEventRepository, CassandraRowAdapter cassandraRowAdapter, TicketScanEventAdapter ticketScanEventAdapter) {
         this.ticketRepository = ticketRepository;
         this.cacheInvalidationService = cacheInvalidationService;
         this.eventSummaryAdapter = eventSummaryAdapter;
         this.ticketScanEventRepository = ticketScanEventRepository;
         this.cassandraRowAdapter = cassandraRowAdapter;
+        this.ticketScanEventAdapter = ticketScanEventAdapter;
         this.register(mongoEventLogger);
     }
 
@@ -393,15 +396,7 @@ public class TicketService implements EntitySubject {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket not found"));
 
-        TicketScanEvent scanEvent = new TicketScanEvent();
-        scanEvent.setTicketId(ticketId);
-        scanEvent.setTimestamp(LocalDateTime.now());
-        scanEvent.setScanType(scanDTO.getScanType());
-        scanEvent.setAttendeeName(ticket.getAttendeeName());
-        scanEvent.setGate(scanDTO.getGate());
-        scanEvent.setSection(scanDTO.getSection());
-        scanEvent.setSeatNumber(scanDTO.getSeatNumber());
-        scanEvent.setNotes(scanDTO.getNotes());
+        TicketScanEvent scanEvent = ticketScanEventAdapter.adaptToEvent(ticketId, ticket, scanDTO);
 
         ticketScanEventRepository.save(scanEvent);
 
