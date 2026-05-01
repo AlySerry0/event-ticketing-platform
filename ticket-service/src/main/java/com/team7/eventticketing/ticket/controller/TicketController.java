@@ -175,6 +175,7 @@ public class TicketController {
             @RequestParam LocalDate endDate
     ) {
         return ticketService.getAnalytics(startDate, endDate);
+    }
     @GetMapping("/{id}/scans")
     public ResponseEntity<List<TicketScanDTO>> getTicketScanHistory(
             @PathVariable Long id,
