@@ -20,6 +20,7 @@ import com.team7.eventticketing.ticket.adapter.CassandraRowAdapter;
 import com.team7.eventticketing.ticket.dto.TicketScanDTO;
 import com.team7.eventticketing.ticket.model.cassandra.TicketScanEvent;
 import com.team7.eventticketing.ticket.repository.cassandra.TicketScanEventRepository;
+import com.team7.eventticketing.ticket.adapter.TicketScanEventAdapter;
 import org.springframework.cache.annotation.Cacheable;
 
 import java.time.LocalDate;
@@ -34,6 +35,7 @@ import com.team7.eventticketing.ticket.observer.EntitySubject;
 import com.team7.eventticketing.ticket.observer.MongoEventLogger;
 import com.team7.eventticketing.ticket.util.CacheInvalidationService;
 import java.util.Map;
+import java.util.HashMap;
 
 @Service
 public class TicketService implements EntitySubject {
@@ -52,18 +54,31 @@ public class TicketService implements EntitySubject {
     private final UnusedTicketAdapter unusedTicketAdapter;
     private final TicketScanEventRepository ticketScanEventRepository;
     private final CassandraRowAdapter cassandraRowAdapter;
+    private final TicketScanEventAdapter ticketScanEventAdapter;
     private final TicketAnalyticsAdapter ticketAnalyticsAdapter;
+    private final UnusedTicketAdapter unusedTicketAdapter;
 
     @Autowired
-    public TicketService(MongoEventLogger mongoEventLogger, TicketRepository ticketRepository, CacheInvalidationService cacheInvalidationService, EventSummaryAdapter eventSummaryAdapter, TicketAnalyticsAdapter ticketAnalyticsAdapter, UnusedTicketAdapter unusedTicketAdapter, TicketScanEventRepository ticketScanEventRepository, CassandraRowAdapter cassandraRowAdapter) {
+    public TicketService(
+        MongoEventLogger mongoEventLogger, 
+        TicketRepository ticketRepository, 
+        CacheInvalidationService cacheInvalidationService, 
+        EventSummaryAdapter eventSummaryAdapter, 
+        TicketAnalyticsAdapter ticketAnalyticsAdapter, 
+        UnusedTicketAdapter unusedTicketAdapter, 
+        TicketScanEventRepository ticketScanEventRepository, 
+        CassandraRowAdapter cassandraRowAdapter, 
+        TicketScanEventAdapter ticketScanEventAdapter
+    ) {
+        this.mongoEventLogger = mongoEventLogger;
         this.ticketRepository = ticketRepository;
         this.cacheInvalidationService = cacheInvalidationService;
         this.eventSummaryAdapter = eventSummaryAdapter;
         this.ticketAnalyticsAdapter = ticketAnalyticsAdapter;
-        this.ticketScanEventRepository = ticketScanEventRepository;
         this.unusedTicketAdapter = unusedTicketAdapter;
+        this.ticketScanEventRepository = ticketScanEventRepository;
         this.cassandraRowAdapter = cassandraRowAdapter;
-        this.register(mongoEventLogger);
+        this.ticketScanEventAdapter = ticketScanEventAdapter;
     }
 
     @Override
@@ -428,6 +443,32 @@ public class TicketService implements EntitySubject {
         return ticketAnalyticsAdapter.convert(row);
     }
 
+
+    @Transactional
+    public void recordTicketScan(Long ticketId, TicketScanDTO scanDTO) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket not found"));
+
+        TicketScanEvent scanEvent = ticketScanEventAdapter.adaptToEvent(ticketId, ticket, scanDTO);
+
+        ticketScanEventRepository.save(scanEvent);
+
+        // Notify observers for MongoDB logging
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("ticketId", ticketId);
+        payload.put("scanType", scanDTO.getScanType());
+        payload.put("gate", scanDTO.getGate());
+        payload.put("section", scanDTO.getSection());
+        payload.put("seatNumber", scanDTO.getSeatNumber());
+        payload.put("notes", scanDTO.getNotes());
+        payload.put("action", "TRACKING_RECORDED");
+
+        this.notifyObservers("TRACKING_RECORDED", payload);
+
+        // Cache Invalidation
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F12::" + ticketId);
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+    }
 
     @Cacheable(value = "S4-F12", key = "#ticketId")
     public List<TicketScanDTO> getTicketScanHistory(Long ticketId, LocalDateTime startTime, LocalDateTime endTime) {

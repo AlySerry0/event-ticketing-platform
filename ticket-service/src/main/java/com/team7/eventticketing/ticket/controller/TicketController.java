@@ -185,6 +185,13 @@ public class TicketController {
             @RequestParam(required = false) LocalDateTime endTime) {
         return ResponseEntity.ok(ticketService.getTicketScanHistory(id, startTime, endTime));
     }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+    @PostMapping("/{id}/scan")
+    public ResponseEntity<Void> recordTicketScan(@PathVariable Long id, @RequestBody TicketScanDTO scanDTO) {
+        ticketService.recordTicketScan(id, scanDTO);
+        return ResponseEntity.status(201).build();
+    }
 }
 
 
