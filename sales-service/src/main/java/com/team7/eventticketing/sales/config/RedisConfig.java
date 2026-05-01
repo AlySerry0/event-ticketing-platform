@@ -48,6 +48,9 @@ public class RedisConfig implements CachingConfigurer {
         caches.put("S5-F9", baseConfig(Duration.ofMinutes(10), serializer));
         caches.put("S5-F10",  baseConfig(Duration.ofMinutes(10), serializer));
         caches.put("S5-F11",  baseConfig(Duration.ofMinutes(10), serializer));
+        caches.put("ticket-sale", baseConfig(Duration.ofMinutes(10), serializer));
+        caches.put("sale-promotion",  baseConfig(Duration.ofMinutes(10), serializer));
+        caches.put("promotion",  baseConfig(Duration.ofMinutes(10), serializer));
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)
