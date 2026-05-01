@@ -42,3 +42,11 @@ build/
 ### Mac OS ###
 .DS_Store
 
+### Python / Tests ###
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+.eggs/
