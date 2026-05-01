@@ -28,7 +28,7 @@ public class RefundStrategySelector {
             return fullWindowRefundStrategy;
         }
 
-        if (hoursUntilEvent >= 24) {
+        if (hoursUntilEvent > 24) {
             return partialWindowRefundStrategy;
         }
 
