@@ -1,9 +1,8 @@
 package com.team7.eventticketing.sales.observer;
 
-import com.team7.eventticketing.sales.mongo.EventFactory;
-import com.team7.eventticketing.sales.mongo.EventType;
-import com.team7.eventticketing.sales.mongo.MongoEvent;
-import com.team7.eventticketing.sales.mongo.PaymentAuditEvent;
+import com.team7.eventticketing.sales.factory.EventFactory;
+import com.team7.eventticketing.sales.factory.EventType;
+import com.team7.eventticketing.sales.model.PaymentAuditEvent;
 import com.team7.eventticketing.sales.repository.PaymentAuditEventRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,32 +16,34 @@ public class MongoEventLogger implements EntityObserver {
 
     private static final Logger log = LoggerFactory.getLogger(MongoEventLogger.class);
 
-    private final PaymentAuditEventRepository paymentAuditEventRepository;
-    private final EventType boundType = EventType.PAYMENT_AUDIT;
+    private final PaymentAuditEventRepository repository;
+    private final EventFactory eventFactory;
 
-    public MongoEventLogger(PaymentAuditEventRepository paymentAuditEventRepository) {
-        this.paymentAuditEventRepository = paymentAuditEventRepository;
+    public MongoEventLogger(PaymentAuditEventRepository repository, EventFactory eventFactory) {
+        this.repository = repository;
+        this.eventFactory = eventFactory;
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public void onEvent(String eventType, Object payload) {
         try {
-            Map<String, Object> params = new HashMap<>();
+            if (!(payload instanceof Map<?, ?> rawPayload)) {
+                log.warn("Unsupported Mongo audit payload for eventType={}", eventType);
+                return;
+            }
+
+            Map<String, Object> params = new HashMap<>((Map<String, Object>) rawPayload);
             params.put("action", eventType);
 
-            if (payload instanceof Map<?, ?> rawMap) {
-                for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
-                    params.put(String.valueOf(entry.getKey()), entry.getValue());
-                }
-            }
-
-            MongoEvent event = EventFactory.createEvent(boundType, params);
+            Object event = eventFactory.createEvent(EventType.PAYMENT_AUDIT, params);
 
             if (event instanceof PaymentAuditEvent paymentAuditEvent) {
-                paymentAuditEventRepository.save(paymentAuditEvent);
+                repository.save(paymentAuditEvent);
             }
+
         } catch (Exception e) {
-            log.warn("Failed to write payment audit event to MongoDB", e);
+            log.warn("Mongo audit logging failed for eventType={}: {}", eventType, e.getMessage());
         }
     }
 }

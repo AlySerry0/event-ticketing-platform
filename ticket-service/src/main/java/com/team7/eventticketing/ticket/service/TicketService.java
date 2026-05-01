@@ -16,6 +16,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.team7.eventticketing.ticket.adapter.CassandraRowAdapter;
+import com.team7.eventticketing.ticket.dto.TicketScanDTO;
+import com.team7.eventticketing.ticket.model.cassandra.TicketScanEvent;
+import com.team7.eventticketing.ticket.repository.cassandra.TicketScanEventRepository;
+import org.springframework.cache.annotation.Cacheable;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -40,12 +46,16 @@ public class TicketService implements EntitySubject {
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
     private final CacheInvalidationService cacheInvalidationService;
     private final EventSummaryAdapter eventSummaryAdapter;
+    private final TicketScanEventRepository ticketScanEventRepository;
+    private final CassandraRowAdapter cassandraRowAdapter;
 
     @Autowired
-    public TicketService(MongoEventLogger mongoEventLogger, TicketRepository ticketRepository, CacheInvalidationService cacheInvalidationService, EventSummaryAdapter eventSummaryAdapter) {
+    public TicketService(MongoEventLogger mongoEventLogger, TicketRepository ticketRepository, CacheInvalidationService cacheInvalidationService, EventSummaryAdapter eventSummaryAdapter, TicketScanEventRepository ticketScanEventRepository, CassandraRowAdapter cassandraRowAdapter) {
         this.ticketRepository = ticketRepository;
         this.cacheInvalidationService = cacheInvalidationService;
         this.eventSummaryAdapter = eventSummaryAdapter;
+        this.ticketScanEventRepository = ticketScanEventRepository;
+        this.cassandraRowAdapter = cassandraRowAdapter;
         this.register(mongoEventLogger);
     }
 
@@ -85,6 +95,8 @@ public class TicketService implements EntitySubject {
         
         this.notifyObservers("TICKET_CREATED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
 
         return convertToDTO(savedTicket);
@@ -105,6 +117,8 @@ public class TicketService implements EntitySubject {
         
         this.notifyObservers("TICKET_DELETED", Map.of("ticketId", id));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::" + id);
     }
 
@@ -158,6 +172,8 @@ public class TicketService implements EntitySubject {
         
         this.notifyObservers("OLD_DATA_PURGED", Map.of("olderThanDays", olderThanDays, "deletedCount", deletedCount));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         
         return deletedCount;
     }
@@ -197,6 +213,8 @@ public class TicketService implements EntitySubject {
         
         this.notifyObservers("TICKET_ISSUED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::" + savedTicket.getId());
 
         return convertToDTO(savedTicket);
@@ -215,7 +233,7 @@ public class TicketService implements EntitySubject {
     public List<UnusedTicketDTO> getUnusedTicketsForUpcomingEvents() {
         return ticketRepository.findUnusedTicketsForUpcomingEvents();
     }
-
+    @Cacheable(value = "S4-F5", key = "#key + '|' + #operator + '|' + #value") 
     public List<TicketDTO> filterTicketsByMetadata(String key, String operator, String value) {
         List<String> validOperators = List.of("eq", "gt", "lt");
         if (!validOperators.contains(operator)) {
@@ -270,11 +288,13 @@ public class TicketService implements EntitySubject {
         this.notifyObservers("BATCH_ISSUED", Map.of("bookingId", batchRequest.getBookingId(), "size", savedTickets.size()));
         
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
         
         return savedTickets.size();
     }
-
+    @Cacheable(value = "S4-F6", key = "#startDate + '|' + #endDate + '|' + #ticketStatusInput")
     public List<TicketDTO> getTicketsInDateRange(String startDate, String endDate, String ticketStatusInput) {
 
         LocalDateTime startDateTime = parseFlexibleDate(startDate, true);
@@ -359,10 +379,29 @@ public class TicketService implements EntitySubject {
             
             this.notifyObservers("TICKET_UPDATED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
             cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+            cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+            cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
             cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::" + id);
 
             return convertToDTO(savedTicket);
         });
+    }
+
+    @Cacheable(value = "S4-F12", key = "#ticketId")
+    public List<TicketScanDTO> getTicketScanHistory(Long ticketId, LocalDateTime startTime, LocalDateTime endTime) {
+        ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket not found"));
+
+        List<TicketScanEvent> events;
+        if (startTime != null && endTime != null) {
+            events = ticketScanEventRepository.findByTicketIdAndTimestampBetween(ticketId, startTime, endTime);
+        } else {
+            events = ticketScanEventRepository.findByTicketId(ticketId);
+        }
+
+        return events.stream()
+                .map(cassandraRowAdapter::adapt)
+                .toList();
     }
 }
 

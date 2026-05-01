@@ -1,4 +1,4 @@
-package com.team7.eventticketing.sales.mongo;
+package com.team7.eventticketing.sales.observer;
 
 import java.time.LocalDateTime;
 import java.util.Map;
