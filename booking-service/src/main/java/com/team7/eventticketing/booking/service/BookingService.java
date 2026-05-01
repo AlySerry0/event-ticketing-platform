@@ -1,22 +1,16 @@
 package com.team7.eventticketing.booking.service;
 
-import com.team7.eventticketing.booking.dto.BookingAnalyticsDTO;
-import com.team7.eventticketing.booking.dto.BookingCostEstimateDTO;
-import com.team7.eventticketing.booking.dto.BookingDTO;
-import com.team7.eventticketing.booking.dto.BookingEstimateRequestDTO;
+import com.team7.eventticketing.booking.dto.*;
 import com.team7.eventticketing.booking.model.Booking;
 import com.team7.eventticketing.booking.model.BookingItem;
 import com.team7.eventticketing.booking.model.BookingStatus;
 import com.team7.eventticketing.booking.repository.BookingRepository;
 import com.team7.eventticketing.booking.adapter.Neo4jRecordAdapter;
-import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
-import com.team7.eventticketing.booking.dto.BookingItemDTO;
 import com.team7.eventticketing.booking.model.BookingItemStatus;
 import com.team7.eventticketing.booking.observer.EntityObserver;
 import com.team7.eventticketing.booking.observer.EntitySubject;
 import com.team7.eventticketing.booking.observer.MongoEventLogger;
 import com.team7.eventticketing.booking.util.CacheInvalidationService;
-import com.team7.eventticketing.booking.dto.EventRecommendationDTO;
 import com.team7.eventticketing.booking.adapter.EventDetailsAdapter;
 
 import org.springframework.cache.annotation.Cacheable;
@@ -103,6 +97,8 @@ public class BookingService implements EntitySubject {
 		this.notifyObservers("BOOKING_DELETED", Map.of("bookingId", id));
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + id);
+		cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
+
 	}
 
 	public Optional<BookingDTO> updateBooking(Long id, BookingDTO bookingDetails) {
@@ -135,6 +131,7 @@ public class BookingService implements EntitySubject {
 			this.notifyObservers("BOOKING_UPDATED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
 			cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
 			cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + id);
+			cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
 
 			return convertToDTO(savedBooking);
 		});
@@ -202,6 +199,7 @@ public class BookingService implements EntitySubject {
 		this.notifyObservers("BOOKING_CONFIRMED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::*");
+		cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
 
 		return convertToDTO(savedBooking);
 	}
@@ -233,6 +231,7 @@ public class BookingService implements EntitySubject {
 		this.notifyObservers("BOOKING_COMPLETED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
 		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + id);
+		cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
 
 		return convertToDTO(savedBooking);
 	}
@@ -314,13 +313,14 @@ public class BookingService implements EntitySubject {
 		return booking;
 	}
 
+	@Cacheable(value = "booking-service", key = "'S3-F6::' + #startDate.toString() + '_' + #endDate.toString()")
 	public BookingAnalyticsDTO getAnalytics(LocalDate startDate, LocalDate endDate) {
 		if (startDate.isAfter(endDate)) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be after end date");
 		}
 
-		LocalDateTime start = startDate.atStartOfDay(); // 2026-03-01 00:00:00
-		LocalDateTime end = endDate.atTime(23, 59, 59); // 2026-03-31 23:59:59
+		LocalDateTime start = startDate.atStartOfDay();
+		LocalDateTime end = endDate.atTime(23, 59, 59);
 		List<Object[]> results = bookingRepository.getBookingAnalytics(start, end);
 		Object[] row = results.get(0);
 
@@ -329,27 +329,20 @@ public class BookingService implements EntitySubject {
 		Long cancelled = ((Number) row[2]).longValue();
 		Double revenue = ((Number) row[3]).doubleValue();
 
-		Double average = 0.0;
-		if (completed > 0) {
-			average = revenue / completed;
-		}
+		Double average = completed > 0 ? revenue / completed : 0.0;
+		Double completionRate = total > 0 ? ((double) completed / total) * 100.0 : 0.0;
 
-		Double completionRate = 0.0;
-		if (total > 0) {
-			completionRate = ((double) completed / total) * 100.0;
-		}
-
-		BookingAnalyticsDTO dto = new BookingAnalyticsDTO();
-		dto.setTotalBookings(total);
-		dto.setCompletedBookings(completed);
-		dto.setCancelledBookings(cancelled);
-		dto.setTotalRevenue(revenue);
-		dto.setAverageBookingAmount(average);
-		dto.setCompletionRate(completionRate);
-
-		return dto;
+		// Utilizing the Phase 5 Builder
+		return BookingAnalyticsDTO.builder()
+				.totalBookings(total)
+				.completedBookings(completed)
+				.cancelledBookings(cancelled)
+				.totalRevenue(revenue)
+				.averageBookingAmount(average)
+				.completionRate(completionRate)
+				.build();
 	}
-
+	@Cacheable(value = "booking-service", key = "'S3-F5::' + #key + '_' + #value")
 	public List<BookingDTO> filterBookingsByMetadata(String key, String value) {
 		if (key == null || key.trim().isEmpty() || value == null || value.trim().isEmpty()) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Metadata key and value cannot be blank");
@@ -528,34 +521,92 @@ public class BookingService implements EntitySubject {
 		if (bookingRepository.ticketsTableExists()) {
 			bookingRepository.cancelValidTicketsByBookingId(bookingId);
 		}
-        Booking savedBooking = bookingRepository.save(booking);
+  Booking savedBooking = bookingRepository.save(booking);
 
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("bookingId", savedBooking.getId());
-        payload.put("userId", savedBooking.getUserId());
-        payload.put("eventId", savedBooking.getEventId());
-        payload.put("status", savedBooking.getStatus().name());
+  Map<String, Object> payload = new HashMap<>();
+  payload.put("bookingId", savedBooking.getId());
+  payload.put("userId", savedBooking.getUserId());
+  payload.put("eventId", savedBooking.getEventId());
+  payload.put("status", savedBooking.getStatus().name());
 
-        notifyObservers("BOOKING_CANCELLED", payload);
+  notifyObservers("BOOKING_CANCELLED", payload);
 
-        invalidateBookingCaches(savedBooking.getId());
-    }
-    
-    @Override
-    public void register(EntityObserver o) {
-        observers.add(o);
-    }
+  invalidateBookingCaches(savedBooking.getId());
+  cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
+  }
 
-    @Override
-    public void unregister(EntityObserver o) {
-        observers.remove(o);
-    }
+  @Cacheable(value = "booking-service", key = "'S3-F10::' + #startDate.toString() + '_' + #endDate.toString()")
+  public BookingAnalyticsDashboardDTO getAnalyticsDashboard(LocalDate startDate, LocalDate endDate) {
+      if (startDate.isAfter(endDate)) {
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be after end date");
+      }
 
-    @Override
-    public void notifyObservers(String action, Object payload) {
-        for (EntityObserver observer : observers) {
-            observer.onEvent(action, payload);
-        }
-    }
+      LocalDateTime start = startDate.atStartOfDay();
+      LocalDateTime end = endDate.atTime(LocalTime.MAX);
+
+      List<Booking> bookings = bookingRepository.findByBookingDateBetweenOrderByBookingDateDesc(start, end);
+
+      long totalBookings = bookings.size();
+      double totalRevenue = 0.0;
+      long completedCount = 0;
+      long conversionCount = 0;
+      Map<String, Long> statusMap = new HashMap<>();
+
+      for (Booking b : bookings) {
+          String status = b.getStatus().name();
+          statusMap.put(status, statusMap.getOrDefault(status, 0L) + 1);
+
+          if (b.getStatus() == BookingStatus.COMPLETED) {
+              completedCount++;
+              if (b.getTotalAmount() != null) {
+                  totalRevenue += b.getTotalAmount();
+              }
+          }
+
+          if (b.getStatus() == BookingStatus.CONFIRMED
+                  || b.getStatus() == BookingStatus.CHECKED_IN
+                  || b.getStatus() == BookingStatus.COMPLETED) {
+              conversionCount++;
+          }
+      }
+
+      double avgValue = completedCount > 0 ? totalRevenue / completedCount : 0.0;
+      double convRate = totalBookings > 0 ? (double) conversionCount / totalBookings : 0.0;
+
+      return BookingAnalyticsDashboardDTO.builder()
+              .totalBookings(totalBookings)
+              .totalRevenue(totalRevenue)
+              .averageBookingValue(avgValue)
+              .conversionRate(convRate)
+              .bookingsByStatus(statusMap)
+              .build();
+  }
+
+  public void recordAnalyticsView(LocalDate startDate, LocalDate endDate, Double totalRevenueCalculated) {
+      Map<String, Object> payload = new HashMap<>();
+      payload.put("dashboardType", "BookingAnalytics");
+      payload.put("startDate", startDate.toString());
+      payload.put("endDate", endDate.toString());
+      payload.put("totalRevenueCalculated", totalRevenueCalculated);
+
+      notifyObservers("ANALYTICS_VIEWED", payload);
+  }
+
+  @Override
+  public void register(EntityObserver o) {
+      observers.add(o);
+  }
+
+  @Override
+  public void unregister(EntityObserver o) {
+      observers.remove(o);
+  }
+
+  @Override
+  public void notifyObservers(String action, Object payload) {
+      for (EntityObserver observer : observers) {
+          observer.onEvent(action, payload);
+      }
+  }
 }
 

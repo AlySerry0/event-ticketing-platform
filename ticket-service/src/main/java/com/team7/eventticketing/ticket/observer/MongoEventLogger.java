@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @Component
@@ -25,7 +26,7 @@ public class MongoEventLogger implements EntityObserver {
         try {
             if (payload instanceof Map) {
                 @SuppressWarnings("unchecked")
-                Map<String, Object> params = (Map<String, Object>) payload;
+                Map<String, Object> params = new HashMap<>((Map<String, Object>) payload);
                 params.putIfAbsent("action", action);
                 
                 MongoEvent event = eventFactory.createEvent(EventType.TICKET, params);

@@ -31,6 +31,14 @@ public class EventRevenueDTO {
         this.averageBookingAmount = builder.averageBookingAmount;
     }
 
+    public EventRevenueDTO() {
+        this.eventId              = null;
+        this.name                 = null;
+        this.totalBookings        = null;
+        this.totalRevenue         = null;
+        this.averageBookingAmount = null;
+    }
+
     // Legacy all-args constructor kept for backward compatibility with existing call sites
     public EventRevenueDTO(Long eventId, String name, Long totalBookings,
                            Double totalRevenue, Double averageBookingAmount) {

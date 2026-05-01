@@ -45,7 +45,8 @@ public class UserService {
                        AuthEventRepository authEventRepository) {
         this.userRepository = userRepository;
         this.cacheInvalidationService = cacheInvalidationService;
-        this.registerObserver(new MongoEventLogger(authEventRepository));
+//        this.registerObserver(new MongoEventLogger(authEventRepository));
+        this.registerObserver(new MongoEventLogger(authEventRepository, cacheInvalidationService));
     }
 
     // -----------------------------------------------------------------------
@@ -436,19 +437,18 @@ public class UserService {
                         "User not found with ID: " + id
                 ));
 
-        UserProfileDTO userProfileDTO = new UserProfileDTO();
-        userProfileDTO.setUserId(user.getId());
-        userProfileDTO.setName(user.getName());
-        userProfileDTO.setEmail(user.getEmail());
-        userProfileDTO.setPhone(user.getPhone());
-        userProfileDTO.setPreferences(user.getPreferences());
-        userProfileDTO.setFavoriteVenues(user.getFavoriteVenues()
-                .stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList()));
-        userProfileDTO.setTotalFavoriteVenues(user.getFavoriteVenues().size());
-
-        return userProfileDTO;
+        return UserProfileDTO.builder()
+                .userId(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .preferences(user.getPreferences())
+                .favoriteVenues(user.getFavoriteVenues()
+                        .stream()
+                        .map(this::convertToDTO)
+                        .collect(Collectors.toList()))
+                .totalFavoriteVenues(user.getFavoriteVenues().size())
+                .build();
     }
 
     /**
@@ -523,27 +523,27 @@ public class UserService {
      * Convert User entity to UserDTO
      */
     private UserDTO convertToDTO(User user) {
-        UserDTO userDTO = new UserDTO();
-        userDTO.setId(user.getId());
-        userDTO.setName(user.getName());
-        userDTO.setEmail(user.getEmail());
-        userDTO.setPhone(user.getPhone());
-        userDTO.setRole(user.getRole());
-        userDTO.setStatus(user.getStatus());
-        userDTO.setPreferences(user.getPreferences());
-        userDTO.setCreatedAt(user.getCreatedAt());
-        return userDTO;
+        return UserDTO.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .role(user.getRole())
+                .status(user.getStatus())
+                .preferences(user.getPreferences())
+                .createdAt(user.getCreatedAt())
+                .build();
     }
 
     private FavoriteVenueDTO convertToDTO(FavoriteVenue favoriteVenue) {
-        FavoriteVenueDTO dto = new FavoriteVenueDTO();
-        dto.setId(favoriteVenue.getId());
-        dto.setLabel(favoriteVenue.getLabel());
-        dto.setVenueName(favoriteVenue.getVenueName());
-        dto.setLocation(favoriteVenue.getLocation());
-        dto.setCapacity(favoriteVenue.getCapacity());
-        dto.setIsDefault(favoriteVenue.getIsDefault());
-        dto.setMetadata(favoriteVenue.getMetadata());
-        return dto;
+        return FavoriteVenueDTO.builder()
+                .id(favoriteVenue.getId())
+                .label(favoriteVenue.getLabel())
+                .venueName(favoriteVenue.getVenueName())
+                .location(favoriteVenue.getLocation())
+                .capacity(favoriteVenue.getCapacity())
+                .isDefault(favoriteVenue.getIsDefault())
+                .metadata(favoriteVenue.getMetadata())
+                .build();
     }
 }

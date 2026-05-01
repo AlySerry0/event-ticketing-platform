@@ -2,59 +2,49 @@ package com.team7.eventticketing.sales.factory;
 
 import com.team7.eventticketing.sales.model.PaymentAuditEvent;
 import com.team7.eventticketing.sales.model.TicketSale;
+import com.team7.eventticketing.sales.observer.MongoEvent;
 import org.springframework.stereotype.Component;
+
+import java.time.LocalDate;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+
 @Component
 public class EventFactory {
 
-    public PaymentAuditEvent createPaymentAuditEvent(String action, TicketSale sale) {
-        Map<String, Object> details = new HashMap<>();
-
-        if (sale.getTransactionDetails() != null) {
-            details.putAll(sale.getTransactionDetails());
+    public MongoEvent createEvent(EventType type, Map<String, Object> params) {
+        if (type != EventType.PAYMENT_AUDIT) {
+            throw new IllegalArgumentException("Unsupported event type: " + type);
         }
 
-        details.put("status", sale.getStatus() != null ? sale.getStatus().name() : null);
-        details.put("bookingId", sale.getBookingId());
-        details.put("userId", sale.getUserId());
-
         return new PaymentAuditEvent(
-                sale.getId(),
-                action,
+                (Long) params.get("saleId"),
+                (String) params.get("action"),
                 LocalDateTime.now(),
-                sale.getMethod() != null ? sale.getMethod().name() : null,
-                sale.getAmount(),
-                details
+                (String) params.get("method"),
+                params.get("amount") instanceof Number n ? n.doubleValue() : null,
+                (Map<String, Object>) params.get("details")
         );
     }
-
-    public PaymentAuditEvent createPromotionAppliedEvent(
-            TicketSale sale,
-            String promotionCode,
-            Double discountApplied
+    public PaymentAuditEvent createAnalyticsViewedEvent(
+            String action,
+            LocalDate startDate,
+            LocalDate endDate
     ) {
         Map<String, Object> details = new HashMap<>();
-
-        if (sale.getTransactionDetails() != null) {
-            details.putAll(sale.getTransactionDetails());
-        }
-
-        details.put("promotionCode", promotionCode);
-        details.put("discountApplied", discountApplied);
-        details.put("status", sale.getStatus() != null ? sale.getStatus().name() : null);
-        details.put("bookingId", sale.getBookingId());
-        details.put("userId", sale.getUserId());
+        details.put("feature", "S5-F10");
+        details.put("startDate", startDate.toString());
+        details.put("endDate", endDate.toString());
 
         return new PaymentAuditEvent(
-                sale.getId(),
-                "PROMOTION_APPLIED",
+                null,
+                action,
                 LocalDateTime.now(),
-                sale.getMethod() != null ? sale.getMethod().name() : null,
-                sale.getAmount(),
+                null,
+                null,
                 details
         );
     }

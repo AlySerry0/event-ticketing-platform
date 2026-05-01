@@ -91,4 +91,67 @@ public class PromotionUsageDTO {
         this.active = active;
         this.expired = expired;
     }
+    public static class Builder {
+        private Long promotionId;
+        private String code;
+        private String discountType;
+        private Integer timesUsed;
+        private Double discountValue;
+        private Double totalDiscountGiven;
+        private Boolean active;
+        private Boolean expired;
+
+        public Builder promotionId(Long promotionId) {
+            this.promotionId = promotionId;
+            return this;
+        }
+
+        public Builder code(String code) {
+            this.code = code;
+            return this;
+        }
+
+        public Builder discountType(String discountType) {
+            this.discountType = discountType;
+            return this;
+        }
+
+        public Builder timesUsed(Integer timesUsed) {
+            this.timesUsed = timesUsed;
+            return this;
+        }
+
+        public Builder discountValue(Double discountValue) {
+            this.discountValue = discountValue;
+            return this;
+        }
+
+        public Builder totalDiscountGiven(Double totalDiscountGiven) {
+            this.totalDiscountGiven = totalDiscountGiven;
+            return this;
+        }
+
+        public Builder active(Boolean active) {
+            this.active = active;
+            return this;
+        }
+
+        public Builder expired(Boolean expired) {
+            this.expired = expired;
+            return this;
+        }
+
+        public PromotionUsageDTO build() {
+            return new PromotionUsageDTO(
+                    promotionId,
+                    code,
+                    discountType,
+                    discountValue,
+                    timesUsed,
+                    totalDiscountGiven,
+                    active,
+                    expired
+            );
+        }
+    }
 }

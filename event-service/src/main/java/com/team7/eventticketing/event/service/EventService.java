@@ -11,6 +11,7 @@ import com.team7.eventticketing.event.observer.EntityObserver;
 import com.team7.eventticketing.event.observer.MongoEventLogger;
 import com.team7.eventticketing.event.repository.EventRepository;
 import com.team7.eventticketing.event.util.CacheInvalidationService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
@@ -39,7 +40,8 @@ public class EventService {
     private final  EventIndexService eventIndexService;  // needed to trigger re-indexing on updates
     private final ElasticsearchOperations elasticsearchOperations;
     private final ElasticsearchHitAdapter elasticsearchHitAdapter;
-
+//    @Autowired
+//    private EventService self;
 
     public void register(EntityObserver observer) {
         if (!observers.contains(observer)) {
@@ -63,19 +65,21 @@ public class EventService {
     private final EventRepository eventRepository;
     private final CacheInvalidationService cacheInvalidationService;
     private final ObjectArrayDtoAdapter objectArrayDtoAdapter = new ObjectArrayDtoAdapter();
+    private EventCacheService eventCacheService;
 
     /**
      * Constructor — MongoEventLogger is injected by Spring and registered
      * as the single observer for this service.
      */
     public EventService(EventRepository eventRepository, MongoEventLogger mongoEventLogger, EventIndexService eventIndexService, ElasticsearchOperations elasticsearchOperations, ElasticsearchHitAdapter elasticsearchHitAdapter,
-CacheInvalidationService cacheInvalidationService) {
+CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheService) {
         this.eventRepository = eventRepository;
         this.eventIndexService = eventIndexService;
         this.elasticsearchOperations = elasticsearchOperations;
         this.elasticsearchHitAdapter = elasticsearchHitAdapter;
         this.register(mongoEventLogger);
         this.cacheInvalidationService = cacheInvalidationService;
+        this.eventCacheService = eventCacheService;
     }
 
     // -----------------------------------------------------------------------
@@ -527,42 +531,8 @@ CacheInvalidationService cacheInvalidationService) {
     // Split into cached inner method + public wrapper per spec §10.2.3 step g.
     // -----------------------------------------------------------------------
 
-    /**
-     * Inner cached method — only the DB computation is cached, not the Mongo log.
-     * Never call this directly from the controller; call getEventDashboard() instead.
-     */
-    @Cacheable(value = "S2-F12", key = "#eventId")
-    public EventDashboardDTO getEventDashboardCached(Long eventId) {
-        Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Event not found with id: " + eventId));
-
-        Object[] row = eventRepository.findEventDashboardMetrics(eventId);
-
-        long totalBookings = row != null && row.length > 0 && row[0] != null
-                ? ((Number) row[0]).longValue() : 0L;
-        double totalRevenue = row != null && row.length > 1 && row[1] != null
-                ? ((Number) row[1]).doubleValue() : 0.0;
-        long totalTicketsSold = row != null && row.length > 2 && row[2] != null
-                ? ((Number) row[2]).longValue() : 0L;
-        long usedTickets = row != null && row.length > 3 && row[3] != null
-                ? ((Number) row[3]).longValue() : 0L;
-
-        double averageAttendanceRate = totalTicketsSold == 0
-                ? 0.0
-                : (double) usedTickets / totalTicketsSold;
-        return EventDashboardDTO.builder()
-                .eventId(event.getId())
-                .name(event.getName())
-                .totalBookings(totalBookings)
-                .totalTicketsSold(totalTicketsSold)
-                .totalRevenue(totalRevenue)
-                .averageAttendanceRate(averageAttendanceRate)
-                .averageRating(event.getRating() == null ? 0.0 : event.getRating())
-                .build();
-    }
     public EventDashboardDTO getEventDashboard(Long eventId) {
-        EventDashboardDTO result = getEventDashboardCached(eventId);
+        EventDashboardDTO result = eventCacheService.getEventDashboardCached(eventId);
         notifyObservers("DASHBOARD_VIEWED", buildPayload(eventId, Collections.emptyMap()));
         return result;
     }
