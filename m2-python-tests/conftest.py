@@ -238,7 +238,14 @@ def auth_user(user_url):
         f"[conftest] ATTENDEE user registration failed ({resp.status_code}): {resp.text}"
     )
 
-    token   = resp.json()["token"]
+    login = requests.post(
+        f"{user_url}/api/auth/login",
+        json={"email": email, "password": password},
+        timeout=10,
+    )
+    assert login.status_code == 200, f"[conftest] Attendee re-login failed: {login.text}"
+
+    token   = login.json()["token"]
     user_id = _uid_from_token(token)
     return {
         "token":    token,
