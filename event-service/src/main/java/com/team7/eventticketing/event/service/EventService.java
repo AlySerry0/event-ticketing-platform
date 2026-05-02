@@ -251,32 +251,29 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
 
     @Cacheable(value = "S2-F1", key = "#category + '_' + #startDate + '_' + #endDate")
     public List<EventDTO> searchEvents(String category, LocalDate startDate, LocalDate endDate) {
-
-        // Only validate if BOTH dates are provided — if only one is given, reject
-        if ((startDate == null) != (endDate == null)) {
+        if (startDate == null || endDate == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Both startDate and endDate must be provided together, or both omitted");
+                    "Start date and end date are required");
         }
-
-        // If both provided, validate order
-        if (startDate != null && startDate.isAfter(endDate)) {
+        if (startDate.isAfter(endDate)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Start date must be before or equal to end date");
         }
 
-        // Convert to LocalDateTime — null stays null, query handles it
-        LocalDateTime startDateTime = (startDate != null) ? startDate.atStartOfDay() : null;
-        LocalDateTime endDateTime   = (endDate != null)   ? endDate.atTime(LocalTime.MAX) : null;
+        EventCategory eventCategory = null;
+        if (category != null && !category.isBlank()) {
+            eventCategory = parseEventCategory(category.trim());
+        }
 
-        // Category — null means no filter, pass raw string to query
-        String categoryStr = (category != null && !category.isBlank())
-                ? parseEventCategory(category.trim()).name()
-                : null;
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
 
-        return eventRepository.searchEventsFlexible(categoryStr, startDateTime, endDateTime)
-                .stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+        List<Event> events = (eventCategory == null)
+                ? eventRepository.findByEventDateBetweenOrderByEventDateAsc(startDateTime, endDateTime)
+                : eventRepository.findByCategoryAndEventDateBetweenOrderByEventDateAsc(
+                eventCategory, startDateTime, endDateTime);
+
+        return events.stream().map(this::convertToDTO).collect(Collectors.toList());
     }
 
     // -----------------------------------------------------------------------

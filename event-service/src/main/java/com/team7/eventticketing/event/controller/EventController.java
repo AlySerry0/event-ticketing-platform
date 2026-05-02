@@ -117,8 +117,8 @@ public class EventController {
     @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventDTO>> searchEvents(
             @RequestParam(required = false) String category,
-            @RequestParam(required = false) LocalDate startDate,
-            @RequestParam(required = false) LocalDate endDate) {
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate) {
         List<EventDTO> events = eventService.searchEvents(category, startDate, endDate);
         return ResponseEntity.ok(events);
     }
