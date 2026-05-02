@@ -97,7 +97,7 @@ public class UserService {
                 createUserDTO.getEmail(),
                 createUserDTO.getPassword(),
                 createUserDTO.getPhone(),
-                createUserDTO.getRole()
+                UserRole.ATTENDEE
         );
 
         if (createUserDTO.getPreferences() != null) {
