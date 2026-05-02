@@ -105,6 +105,13 @@ def _create_completed_sale(event_url, booking_url, ticket_url, sales_url,
     assert tk.status_code in (200, 201), f"Ticket creation failed: {tk.text}"
     ticket = tk.json()
 
+    # S5-F4 requires a pre-existing PENDING ticket sale (booking service only creates
+    # one via the full lifecycle; direct COMPLETED booking creation skips that step).
+    requests.post(f"{sales_url}/api/sales", json={
+        "bookingId": bid, "userId": 1,
+        "amount": amount or 300.0, "status": "PENDING",
+    }, headers=auth_headers, timeout=10)
+
     # Ticket sale via M1 S5-F4
     sale_resp = requests.post(
         f"{sales_url}/api/sales/booking/{bid}",
@@ -186,8 +193,15 @@ class TestS5F10TicketSalesByTier:
                                        [("VIP", 5, 500.0), ("early-bird", 1, 100.0)],
                                        auth_headers)
 
-        # Create COMPLETED sales for each booking
+        # Create COMPLETED sales for each booking.
+        # processTicketSale (S5-F4) requires a pre-existing PENDING ticket sale row;
+        # create it first since bookings were created directly as COMPLETED.
+        amounts = {bid1: 1000.0, bid2: 600.0, bid3: 2600.0}
         for bid in [bid1, bid2, bid3]:
+            requests.post(f"{sales_url}/api/sales", json={
+                "bookingId": bid, "userId": 1,
+                "amount": amounts[bid], "status": "PENDING",
+            }, headers=auth_headers, timeout=10)
             sale = requests.post(f"{sales_url}/api/sales/booking/{bid}",
                                  json={"method": "CREDIT_CARD", "cardLastFour": "1234"},
                                  headers=auth_headers, timeout=10)
@@ -276,14 +290,57 @@ class TestS5F10TicketSalesByTier:
         keys = list(redis_client.scan_iter("sales-service::S5-F10::*"))
         assert keys, "Redis must have key matching 'sales-service::S5-F10::*' (CC-3)"
 
-    def test_tier_revenue_dto_builder_fields(self, sales_url, auth_headers):
+    def test_tier_revenue_dto_builder_fields(
+        self, event_url, booking_url, ticket_url, sales_url, auth_headers
+    ):
         """DP-4 Builder: TierRevenueDTO must have required fields.
 
         Section 3.5 test scenario a.
         """
+        suffix = uuid.uuid4().hex[:6]
+        now = datetime.now()
+
+        # Create self-contained data so this test never relies on other tests.
+        ev = requests.post(f"{event_url}/api/events", json={
+            "name": f"TierDPEv {suffix}", "category": "CONCERT", "venue": "DPV",
+            "eventDate": f"{now.year}-06-15T10:00:00", "status": "UPCOMING",
+            "rating": 0.0, "details": {},
+        }, headers=auth_headers, timeout=10)
+        assert ev.status_code in (200, 201), f"Event creation failed: {ev.text}"
+        eid = ev.json()["id"]
+
+        # Include booking items inline — BookingService.save handles nested items
+        # via CascadeType.ALL, which correctly sets the booking FK on each item.
+        bk = requests.post(f"{booking_url}/api/bookings", json={
+            "eventId": eid, "userId": 1, "status": "COMPLETED",
+            "totalAmount": 500.0, "bookingDate": f"{now.year}-05-01T10:00:00",
+            "contactEmail": "contact@test.com",
+            "bookingItems": [{
+                "eventOrder": 1, "sessionId": 1, "sessionTitle": "VIP Session",
+                "quantity": 2, "unitPrice": 250.0, "status": "CONFIRMED",
+                "metadata": {"ticketTier": "VIP"},
+            }],
+        }, headers=auth_headers, timeout=10)
+        assert bk.status_code in (200, 201), f"Booking creation failed: {bk.text}"
+        bid = bk.json()["id"]
+
+        # Pre-create PENDING sale (S5-F4 requires a pre-existing PENDING row).
+        requests.post(f"{sales_url}/api/sales", json={
+            "bookingId": bid, "userId": 1, "amount": 500.0, "status": "PENDING",
+        }, headers=auth_headers, timeout=10)
+
+        # Process sale → COMPLETED; this also invalidates the S5-F10 cache.
+        requests.post(
+            f"{sales_url}/api/sales/booking/{bid}",
+            json={"method": "CREDIT_CARD", "cardLastFour": "1234"},
+            headers=auth_headers, timeout=10,
+        )
+
+        start_date = f"{now.year}-01-01"
+        end_date   = f"{now.year}-12-31"
         resp = requests.get(
             f"{sales_url}/api/sales/analytics/tier",
-            params={"startDate": "2026-04-01", "endDate": "2026-04-30"},
+            params={"startDate": start_date, "endDate": end_date},
             headers=auth_headers, timeout=10,
         )
         assert resp.status_code == 200
@@ -700,13 +757,14 @@ class TestS5F12RefundWindowPolicy:
         assert bk.status_code in (200, 201)
         bid = bk.json()["id"]
 
-        sale = requests.post(f"{sales_url}/api/sales/booking/{bid}",
-                             json={"method": "CREDIT_CARD", "cardLastFour": "1234"},
-                             headers=auth_headers, timeout=10)
-        if sale.status_code not in (200, 201):
-            pytest.skip("Cannot create sale for PENDING booking test")
+        # Create a PENDING sale directly — processTicketSale requires COMPLETED booking
+        sale = requests.post(f"{sales_url}/api/sales", json={
+            "bookingId": bid, "userId": 1, "amount": 100.0, "status": "PENDING",
+        }, headers=auth_headers, timeout=10)
+        assert sale.status_code in (200, 201), (
+            f"Cannot create PENDING sale directly: {sale.status_code} {sale.text}"
+        )
         sale_id = sale.json()["id"]
-        # Do NOT complete the sale — it should be PENDING
 
         resp = requests.post(
             f"{sales_url}/api/sales/{sale_id}/refund-window-policy",
@@ -845,30 +903,45 @@ class TestM1DesignPatternRetrofits:
         event_url, booking_url, ticket_url
     ):
         """Section 4.5 / Scenario d: M1 S5-F5 Apply Promotion → PROMOTION_APPLIED in MongoDB."""
-        ctx = _create_completed_sale(
-            event_url, booking_url, ticket_url, sales_url,
-            auth_headers, event_date_str=_future_date_str(72), amount=200.0,
-        )
-        sale_id = ctx["sale"]["id"]
+        # Create a PENDING sale so a promotion can be applied (S5-F5 requires PENDING status)
+        suffix2 = uuid.uuid4().hex[:6]
+        ev2 = requests.post(f"{event_url}/api/events", json={
+            "name": f"PromoEv {suffix2}", "category": "CONCERT", "venue": "PV",
+            "eventDate": _future_date_str(72), "status": "UPCOMING", "rating": 0.0,
+            "details": {},
+        }, headers=auth_headers, timeout=10)
+        assert ev2.status_code in (200, 201)
+        bk2 = requests.post(f"{booking_url}/api/bookings", json={
+            "eventId": ev2.json()["id"], "userId": 1, "status": "PENDING",
+            "totalAmount": 200.0, "bookingDate": "2026-04-01T10:00:00",
+            "contactEmail": "contact@test.com",
+        }, headers=auth_headers, timeout=10)
+        assert bk2.status_code in (200, 201)
+        pending_sale = requests.post(f"{sales_url}/api/sales", json={
+            "bookingId": bk2.json()["id"], "userId": 1, "amount": 200.0, "status": "PENDING",
+        }, headers=auth_headers, timeout=10)
+        assert pending_sale.status_code in (200, 201)
+        sale_id = pending_sale.json()["id"]
 
-        # M1 S5-F5 endpoint — path may vary by team implementation
+        # Create a valid promotion and apply via M1 S5-F5: POST /api/sales/{saleId}/promotions/{promotionId}
+        promo_create = requests.post(f"{sales_url}/api/sales/promotions", json={
+            "code": f"TESTPROMO{suffix2}",
+            "discountType": "FIXED",
+            "discountValue": 10.0,
+            "maxUses": 100,
+            "currentUses": 0,
+            "expiryDate": _future_date_str(24 * 30),
+            "active": True,
+        }, headers=auth_headers, timeout=10)
+        assert promo_create.status_code in (200, 201), (
+            f"Could not create test promotion: {promo_create.text}"
+        )
+        promo_id = promo_create.json()["id"]
+
         promo_resp = requests.post(
-            f"{sales_url}/api/sales/{sale_id}/promote",
-            json={"promotionCode": "PROMO2026"},
+            f"{sales_url}/api/sales/{sale_id}/promotions/{promo_id}",
             headers=auth_headers, timeout=10,
         )
-        if promo_resp.status_code == 404:
-            # Try alternate path patterns
-            promo_resp = requests.post(
-                f"{sales_url}/api/sales/{sale_id}/apply-promotion",
-                json={"promotionCode": "PROMO2026"},
-                headers=auth_headers, timeout=10,
-            )
-        if promo_resp.status_code not in (200, 201, 400):
-            pytest.skip(
-                f"S5-F5 apply promotion endpoint returned {promo_resp.status_code} — "
-                "endpoint path may differ. Skipping MongoDB assertion."
-            )
         time.sleep(0.5)
 
         doc = mongo_db["payment_audit_trail"].find_one(
