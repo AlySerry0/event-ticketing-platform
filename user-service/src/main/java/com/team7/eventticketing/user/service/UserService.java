@@ -57,7 +57,7 @@ public class UserService {
                 createUserDTO.getEmail(),
                 createUserDTO.getPassword(),
                 createUserDTO.getPhone(),
-                createUserDTO.getRole()
+                UserRole.ATTENDEE
         );
 
         // Added this line because prefrences was not saved befor
