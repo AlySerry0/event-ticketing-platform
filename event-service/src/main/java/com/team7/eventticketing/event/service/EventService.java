@@ -251,31 +251,51 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
 
     @Cacheable(value = "S2-F1", key = "#category + '_' + #startDate + '_' + #endDate")
     public List<EventDTO> searchEvents(String category, LocalDate startDate, LocalDate endDate) {
-        if (startDate == null || endDate == null) {
+
+        // Only one date provided — reject
+        if ((startDate == null) != (endDate == null)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Start date and end date are required");
+                    "Both startDate and endDate must be provided together, or both omitted");
         }
-        if (startDate.isAfter(endDate)) {
+
+        // Both dates provided — validate order
+        if (startDate != null && startDate.isAfter(endDate)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Start date must be before or equal to end date");
         }
 
+        // Parse category — null means no category filter
         EventCategory eventCategory = null;
         if (category != null && !category.isBlank()) {
             eventCategory = parseEventCategory(category.trim());
         }
 
-        LocalDateTime startDateTime = startDate.atStartOfDay();
-        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+        // 4 cases
+        List<Event> events;
 
-        List<Event> events = (eventCategory == null)
-                ? eventRepository.findByEventDateBetweenOrderByEventDateAsc(startDateTime, endDateTime)
-                : eventRepository.findByCategoryAndEventDateBetweenOrderByEventDateAsc(
-                eventCategory, startDateTime, endDateTime);
+        if (eventCategory != null && startDate != null) {
+            LocalDateTime startDateTime = startDate.atStartOfDay();
+            LocalDateTime endDateTime   = endDate.atTime(LocalTime.MAX);
+            events = eventRepository.findByCategoryAndEventDateBetweenOrderByEventDateAsc(
+                    eventCategory, startDateTime, endDateTime);
+
+        } else if (eventCategory == null && startDate != null) {
+            LocalDateTime startDateTime = startDate.atStartOfDay();
+            LocalDateTime endDateTime   = endDate.atTime(LocalTime.MAX);
+            events = eventRepository.findByEventDateBetweenOrderByEventDateAsc(
+                    startDateTime, endDateTime);
+
+        } else if (eventCategory != null) {
+
+            events = eventRepository.findByEventCategory(eventCategory);
+
+        } else {
+
+            events = eventRepository.findAllByOrderByEventDateAsc();
+        }
 
         return events.stream().map(this::convertToDTO).collect(Collectors.toList());
     }
-
     // -----------------------------------------------------------------------
     // S2-F2 — JSONB partial update (write — invalidate)
     // -----------------------------------------------------------------------
