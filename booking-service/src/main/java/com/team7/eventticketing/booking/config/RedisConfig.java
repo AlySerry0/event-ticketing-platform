@@ -44,7 +44,14 @@ public class RedisConfig {
                         .fromSerializer(new GenericJackson2JsonRedisSerializer(mapper)));
 
         Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
+        cacheConfigs.put("booking", base.entryTtl(Duration.ofMinutes(15)));
+        cacheConfigs.put("booking-item", base.entryTtl(Duration.ofMinutes(15)));
+        cacheConfigs.put("S3-F1", base.entryTtl(Duration.ofMinutes(5)));
+        cacheConfigs.put("S3-F3", base.entryTtl(Duration.ofMinutes(10)));
+        cacheConfigs.put("S3-F5", base.entryTtl(Duration.ofMinutes(5)));
+        cacheConfigs.put("S3-F6", base.entryTtl(Duration.ofMinutes(10)));
         cacheConfigs.put("S3-F9", base.entryTtl(Duration.ofMinutes(10)));
+        cacheConfigs.put("S3-F10", base.entryTtl(Duration.ofMinutes(10)));
         cacheConfigs.put("S3-F12", base.entryTtl(Duration.ofMinutes(5)));
 
 
