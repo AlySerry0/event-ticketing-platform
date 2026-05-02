@@ -67,6 +67,9 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             LocalDateTime endDate
     );
 
+    List<Event> findAllByOrderByEventDateAsc();
+
+
     /**
      * Find events by rating (greater than or equal to)
      */
