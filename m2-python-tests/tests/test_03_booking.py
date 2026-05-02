@@ -433,7 +433,7 @@ class TestS3F11RecordAttendance:
         suffix = uuid.uuid4().hex[:8]
         ev = requests.post(f"{event_url}/api/events", json={
             "name": f"ConfEv {suffix}", "category": "SPORTS", "venue": "V",
-            "eventDate": "2026-05-01", "status": "UPCOMING", "rating": 0.0,
+            "eventDate": "2026-06-01T10:00:00", "status": "UPCOMING", "rating": 0.0,
             "details": {},
         }, headers=admin_headers, timeout=10)
         assert ev.status_code in (200, 201)
