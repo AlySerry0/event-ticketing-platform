@@ -287,7 +287,7 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
 
         } else if (eventCategory != null) {
 
-            events = eventRepository.findByEventCategory(eventCategory);
+            events = eventRepository.findByCategory(eventCategory);
 
         } else {
 
