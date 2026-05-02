@@ -100,7 +100,7 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
      */
     private void invalidateEventCaches(Long eventId) {
         // Entity detail cache (CRUD GET /api/events/{id}) — 15 min TTL
-        cacheInvalidationService.invalidateCacheWildcard("event-service::event::" + eventId + "::*");
+        cacheInvalidationService.invalidateCacheWildcard("event-service::event::" + eventId);
 
         // Feature caches — all wildcard because params vary per caller
         cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F1::*");
