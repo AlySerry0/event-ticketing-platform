@@ -558,7 +558,7 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
         notifyObservers("EVENT_DELETED", buildPayload(eventId, extra));
     }
 
-    @Cacheable(value = "S2-F10", key = "#query + '_' + #category + '_' + #venue + #status + '_' + #startDate + '_' + #endDate + '_' + #minRating + '_' + #maxRating")
+    @Cacheable(value = "S2-F10", key = "#query + '_' + #category + '_' + #venue + '_'+ #status + '_' + #startDate + '_' + #endDate + '_' + #minRating + '_' + #maxRating")
     public List<EventDTO> searchEventsFullText(
             String query, String category, String venue, String status,
             LocalDate startDate, LocalDate endDate, Double minRating, Double maxRating) {
