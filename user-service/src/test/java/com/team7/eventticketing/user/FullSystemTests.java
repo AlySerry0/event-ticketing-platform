@@ -88,6 +88,11 @@ public class FullSystemTests {
         try { return mapper.readTree(body); } catch (Exception e) { return null; }
     }
 
+    private String el(String table, String col, String value) {
+        try { String udt = jdbc.queryForObject("SELECT udt_name FROM information_schema.columns WHERE table_name = ? AND column_name = ?", String.class, table, col); if (udt != null && !udt.equals("varchar") && !udt.equals("text") && !udt.startsWith("int")) return "'" + value + "'::" + udt; } catch (Exception e) {}
+        return "'" + value + "'";
+    }
+
     private String registerUser(String email, String pwd, String role) {
         String phone = "01" + getNonce().substring(Math.max(0, getNonce().length() - 8));
         Map<String, String> body = Map.of("name", "User_" + getNonce(), "email", email, "password", pwd, "phone", phone);
@@ -423,9 +428,22 @@ public class FullSystemTests {
 
     @Test void tc43_completionRateOne() {
         String token = registerUser("adm43_" + getNonce() + "@test.io", "p", "ADMIN");
-        jdbc.update("DELETE FROM bookings"); jdbc.update("INSERT INTO bookings (status, amount) VALUES ('COMPLETED', 10)");
-        ResponseEntity<String> res = restTemplate.exchange(BOOKING_SVC + "/api/bookings/analytics/dashboard", HttpMethod.GET, new HttpEntity<>(authHeader(token)), String.class);
-        assertThat(parse(res.getBody()).get("completionRate").asDouble()).isCloseTo(1.0, org.assertj.core.data.Offset.offset(0.05));
+        jdbc.execute("DELETE FROM bookings");
+
+        // Using the mandatory columns and status helper from your successful example
+        String insertSql = "INSERT INTO bookings (user_id, contact_email, status, booking_date) " +
+                "VALUES (1, 'tc43@test.com', " + el("bookings", "status", "COMPLETED") + ", NOW())";
+
+        // Seed two COMPLETED bookings as per spec requirements
+        jdbc.execute(insertSql);
+        jdbc.execute(insertSql);
+
+        ResponseEntity<String> res = restTemplate.exchange(BOOKING_SVC + "/api/bookings/analytics/dashboard",
+                HttpMethod.GET, new HttpEntity<>(authHeader(token)), String.class);
+
+        // Assert completionRate is 1.0 (100%) with 0.05 tolerance
+        assertThat(parse(res.getBody()).get("completionRate").asDouble())
+                .isCloseTo(1.0, org.assertj.core.data.Offset.offset(0.05));
     }
 
     @Test void tc44_recordAttendanceNeo4j() {
