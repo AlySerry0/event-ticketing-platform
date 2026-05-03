@@ -69,7 +69,7 @@ public class FullSystemTests {
 
     @BeforeEach
     void setup() {
-        // Clear all relational data before every test[cite: 1]
+        // Clear all relational data before every test
         // TRUNCATE is faster and resets IDs, CASCADE handles foreign keys.
         jdbc.execute("TRUNCATE TABLE users, events, bookings, tickets CASCADE");
     }
@@ -371,7 +371,7 @@ public class FullSystemTests {
     @Test void tc35_esSearchHappyPath() {
         String token = registerUser("adm35_" + getNonce() + "@test.io", "p", "ADMIN");
         String keyword = "EV_" + getNonce();
-        jdbc.update("INSERT INTO events (name, description) VALUES (?, ?)", keyword, "D");
+        jdbc.update("INSERT INTO events (name, venue, event_date, category, status, rating, total_ratings, details, created_at) VALUES (?, 'V', '2026-05-01T20:00:00', 'CONCERT', "+ el("events", "status", "UPCOMING") +", 0.0, 0,'{}', NOW())", keyword);
         Long id = jdbc.queryForObject("SELECT id FROM events WHERE name = ?", Long.class, keyword);
         restTemplate.exchange(EVENT_SVC + "/api/events/" + id + "/index", HttpMethod.POST, new HttpEntity<>(authHeader(token)), String.class);
         ResponseEntity<String> res = restTemplate.exchange(EVENT_SVC + "/api/events/search/full-text?q=" + keyword, HttpMethod.GET, new HttpEntity<>(authHeader(token)), String.class);
@@ -392,9 +392,23 @@ public class FullSystemTests {
 
     @Test void tc38_manualIndex() {
         String token = registerUser("adm38_" + getNonce() + "@test.io", "p", "ADMIN");
-        jdbc.update("INSERT INTO events (name, description) VALUES ('I','D')");
-        Long id = jdbc.queryForObject("SELECT max(id) FROM events", Long.class);
-        ResponseEntity<String> res = restTemplate.exchange(EVENT_SVC + "/api/events/" + id + "/index", HttpMethod.POST, new HttpEntity<>(authHeader(token)), String.class);
+
+        // Fixed insertion including all mandatory fields and returning the generated ID
+        Long id = ((Number) jdbc.queryForObject(
+                "INSERT INTO events (name, venue, event_date, category, status, rating, total_ratings, details, created_at) " +
+                        "VALUES ('Manual Index Event', 'Test Venue', '2026-05-01T20:00:00', 'CONCERT', " +
+                        el("events", "status", "UPCOMING") + ",0.0, 0,'{}', NOW()) RETURNING id",
+                Long.class)).longValue();
+
+        // Trigger the manual index endpoint for the newly created event
+        ResponseEntity<String> res = restTemplate.exchange(
+                EVENT_SVC + "/api/events/" + id + "/index",
+                HttpMethod.POST,
+                new HttpEntity<>(authHeader(token)),
+                String.class
+        );
+
+        // Assert that the manual index trigger returns a successful 2xx status
         assertThat(res.getStatusCode().is2xxSuccessful()).isTrue();
     }
 
@@ -413,7 +427,11 @@ public class FullSystemTests {
 
     @Test void tc41_totalEventsMatch() {
         String token = registerUser("adm41_" + getNonce() + "@test.io", "p", "ADMIN");
-        jdbc.update("INSERT INTO events (name, description) VALUES ('E1','D'),('E2','D')");
+
+        jdbc.update("INSERT INTO events (name, venue, event_date, category, status, rating, total_ratings, details, created_at) " +
+                "VALUES ('E1', 'V', '2026-05-01T20:00:00', 'CONCERT', "+ el("events", "status", "UPCOMING") +", 0.0, 0,'{}', NOW())");
+        jdbc.update("INSERT INTO events (name, venue, event_date, category, status, rating, total_ratings, details, created_at) " +
+                        "VALUES ('E2', 'V', '2026-06-01T20:00:00', 'CONCERT', "+ el("events", "status", "UPCOMING") +", 0.0, 0,'{}', NOW())");
         ResponseEntity<String> res = restTemplate.exchange(EVENT_SVC + "/api/events/analytics/dashboard", HttpMethod.GET, new HttpEntity<>(authHeader(token)), String.class);
         assertThat(parse(res.getBody()).get("totalEvents").asInt()).isGreaterThanOrEqualTo(2);
     }
