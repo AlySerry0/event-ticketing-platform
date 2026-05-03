@@ -545,14 +545,17 @@ public class EventService {
             String query, String category, String venue, String status,
             LocalDate startDate, LocalDate endDate, Double minRating, Double maxRating) {
 
-        Criteria criteria = new Criteria();
-
-        // b) Full-text search on query against name, description, and venue
-        if (query != null && !query.isBlank()) {
-            criteria.subCriteria(new Criteria("name").contains(query)
-                    .or(new Criteria("description").contains(query))
-                    .or(new Criteria("venue").contains(query)));
+        if(query == null || query.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Query parameter is required for full-text search");
         }
+
+        String wildcard = "*" + query.toLowerCase() + "*";
+
+        Criteria textCriteria = new Criteria("name").expression(wildcard)
+                .or(new Criteria("description").expression(wildcard))
+                .or(new Criteria("venue").expression(wildcard));
+
+        Criteria criteria = new Criteria().and(textCriteria);
 
         // c) Optional Exact Match & Range Filters
         if (category != null && !category.isBlank()) {
