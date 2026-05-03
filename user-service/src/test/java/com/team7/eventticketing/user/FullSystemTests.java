@@ -473,8 +473,8 @@ public class FullSystemTests {
     @Test void tc45_repeatAttendIncrements() {
         String token = registerUser("adm45_" + getNonce() + "@test.io", "p", "ADMIN");
         restTemplate.exchange(BOOKING_SVC + "/api/bookings/1/attend", HttpMethod.POST, new HttpEntity<>(authHeader(token)), String.class);
-        restTemplate.exchange(BOOKING_SVC + "/api/bookings/1/attend", HttpMethod.POST, new HttpEntity<>(authHeader(token)), String.class);
-        assertThat(true).isTrue();
+        ResponseEntity<String> res = restTemplate.exchange(BOOKING_SVC + "/api/bookings/1/attend", HttpMethod.POST, new HttpEntity<>(authHeader(token)), String.class);
+        assertThat(parse(res.getBody()).get("attendanceCount").asInt()).isGreaterThanOrEqualTo(2);
     }
 
     @Test void tc46_attendNonExistent404() {
