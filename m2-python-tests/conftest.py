@@ -56,6 +56,65 @@ ADMIN_EMAIL    = os.environ.get("ADMIN_EMAIL",    "admin@admin.com")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "adminpass")
 
 # ---------------------------------------------------------------------------
+# Endpoint map — complete reference of all M2 API endpoints
+# Format: "service.operation": (method, path, min_auth_role)
+# ---------------------------------------------------------------------------
+ENDPOINT_MAP = {
+    # user-service (port 8081)
+    "user.register":              ("POST",   "/api/auth/register",                      "public"),
+    "user.login":                 ("POST",   "/api/auth/login",                         "public"),
+    "user.health":                ("GET",    "/api/users/health",                       "public"),
+    "user.list":                  ("GET",    "/api/users",                              "ATTENDEE"),
+    "user.get":                   ("GET",    "/api/users/{id}",                         "ATTENDEE"),
+    "user.update":                ("PUT",    "/api/users/{id}",                         "ATTENDEE"),
+    "user.preferences":           ("PUT",    "/api/users/{id}/preferences",             "ATTENDEE"),
+    "user.activity":              ("GET",    "/api/users/{id}/activity",                "ATTENDEE"),
+    "user.role":                  ("PUT",    "/api/users/{id}/role",                    "ADMIN"),
+    # event-service (port 8082)
+    "event.list":                 ("GET",    "/api/events",                             "ATTENDEE"),
+    "event.create":               ("POST",   "/api/events",                             "ATTENDEE"),
+    "event.get":                  ("GET",    "/api/events/{id}",                        "ATTENDEE"),
+    "event.update":               ("PUT",    "/api/events/{id}",                        "ATTENDEE"),
+    "event.delete":               ("DELETE", "/api/events/{id}",                        "ATTENDEE"),
+    "event.search":               ("GET",    "/api/events/search",                      "ATTENDEE"),
+    "event.full_text_search":     ("GET",    "/api/events/search/full-text",            "ATTENDEE"),
+    "event.index":                ("POST",   "/api/events/{id}/index",                  "ATTENDEE"),
+    "event.dashboard":            ("GET",    "/api/events/{id}/dashboard",              "ATTENDEE"),
+    # booking-service (port 8083)
+    "booking.list":               ("GET",    "/api/bookings",                           "ATTENDEE"),
+    "booking.create":             ("POST",   "/api/bookings",                           "ATTENDEE"),
+    "booking.get":                ("GET",    "/api/bookings/{id}",                      "ATTENDEE"),
+    "booking.update":             ("PUT",    "/api/bookings/{id}",                      "ATTENDEE"),
+    "booking.analytics_m1":       ("GET",    "/api/bookings/analytics",                 "ATTENDEE"),
+    "booking.dashboard":          ("GET",    "/api/bookings/analytics/dashboard",       "ATTENDEE"),
+    "booking.record_attendance":  ("POST",   "/api/bookings/{id}/record-attendance",    "ATTENDEE"),
+    "booking.recommendations":    ("GET",    "/api/bookings/recommendations",           "ATTENDEE"),
+    "booking_item.list":          ("GET",    "/api/booking-items",                      "ATTENDEE"),
+    "booking_item.create":        ("POST",   "/api/booking-items",                      "ATTENDEE"),
+    # ticket-service (port 8084)
+    "ticket.list":                ("GET",    "/api/tickets",                            "ATTENDEE"),
+    "ticket.create":              ("POST",   "/api/tickets",                            "ATTENDEE"),
+    "ticket.get":                 ("GET",    "/api/tickets/{id}",                       "ATTENDEE"),
+    "ticket.update":              ("PUT",    "/api/tickets/{id}",                       "ATTENDEE"),
+    "ticket.analytics":           ("GET",    "/api/tickets/analytics",                  "ATTENDEE"),
+    "ticket.scan":                ("POST",   "/api/tickets/{id}/scan",                  "ATTENDEE"),
+    "ticket.scan_history":        ("GET",    "/api/tickets/{id}/scans",                 "ATTENDEE"),
+    # sales-service (port 8085)
+    "sale.list":                  ("GET",    "/api/sales",                              "ATTENDEE"),
+    "sale.create":                ("POST",   "/api/sales",                              "ATTENDEE"),
+    "sale.get":                   ("GET",    "/api/sales/{id}",                         "ATTENDEE"),
+    "sale.update":                ("PUT",    "/api/sales/{id}",                         "ATTENDEE"),
+    "sale.process":               ("POST",   "/api/sales/booking/{id}",                 "ATTENDEE"),
+    "sale.refund_m1":             ("PUT",    "/api/sales/{id}/refund",                  "ATTENDEE"),
+    "sale.tier_analytics":        ("GET",    "/api/sales/analytics/tier",               "ATTENDEE"),
+    "sale.audit_trail":           ("GET",    "/api/sales/{id}/audit-trail",             "ATTENDEE"),
+    "sale.refund_window":         ("POST",   "/api/sales/{id}/refund-window-policy",    "ATTENDEE"),
+    "sale.promotions.list":       ("GET",    "/api/sales/promotions",                   "ATTENDEE"),
+    "sale.promotions.create":     ("POST",   "/api/sales/promotions",                   "ATTENDEE"),
+    "sale.promotions.apply":      ("POST",   "/api/sales/{saleId}/promotions/{promoId}","ATTENDEE"),
+}
+
+# ---------------------------------------------------------------------------
 # Internal utility
 # ---------------------------------------------------------------------------
 
@@ -526,3 +585,48 @@ def set_sale_status(sales_url, admin_headers):
         )
         return resp.json()
     return _update
+
+
+@pytest.fixture
+def fresh_booking(event_url, booking_url, admin_headers, auth_user):
+    """Create a fresh event + COMPLETED booking via the service endpoints.
+
+    Ensures every test that needs a booking builds it from scratch rather
+    than relying on pre-seeded data (userId=1, eventId=1).
+
+    Returns dict keys: booking_id, event_id, user_id, booking_headers.
+    """
+    from datetime import datetime
+    suffix = uuid.uuid4().hex[:6]
+    ev = requests.post(f"{event_url}/api/events", json={
+        "name":      f"TestEv {suffix}",
+        "category":  "CONCERT",
+        "venue":     "Test Venue",
+        "eventDate": "2027-08-01T10:00:00",
+        "status":    "UPCOMING",
+        "rating":    0.0,
+        "details":   {"description": "auto-created test event"},
+    }, headers=admin_headers, timeout=10)
+    assert ev.status_code in (200, 201), (
+        f"fresh_booking: event creation failed ({ev.status_code}): {ev.text}"
+    )
+    event_id = ev.json()["id"]
+
+    bk = requests.post(f"{booking_url}/api/bookings", json={
+        "eventId":      event_id,
+        "userId":       auth_user["user_id"],
+        "status":       "COMPLETED",
+        "totalAmount":  100.0,
+        "bookingDate":  datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"),
+        "contactEmail": "contact@test.com",
+    }, headers=auth_user["headers"], timeout=10)
+    assert bk.status_code in (200, 201), (
+        f"fresh_booking: booking creation failed ({bk.status_code}): {bk.text}"
+    )
+
+    return {
+        "booking_id":      bk.json()["id"],
+        "event_id":        event_id,
+        "user_id":         auth_user["user_id"],
+        "booking_headers": auth_user["headers"],
+    }

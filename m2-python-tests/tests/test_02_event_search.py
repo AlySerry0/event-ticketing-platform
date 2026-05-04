@@ -457,7 +457,7 @@ class TestS2F12EventDashboard:
     """
 
     def test_dashboard_returns_correct_aggregations(
-        self, event_url, booking_url, ticket_url, auth_headers, make_event
+        self, event_url, booking_url, ticket_url, auth_headers, make_event, auth_user
     ):
         """Scenario a: 4 COMPLETED bookings, 10 tickets (7 USED) → correct DTO values."""
         # Create an event
@@ -471,7 +471,7 @@ class TestS2F12EventDashboard:
         for amount in totals:
             b = requests.post(f"{booking_url}/api/bookings", json={
                 "eventId":     eid,
-                "userId":      1,   # seeded user
+                "userId":      auth_user["user_id"],
                 "status":      "COMPLETED",
                 "totalAmount": amount,
                 "bookingDate": "2026-04-01T10:00:00",

@@ -51,13 +51,21 @@ def _future_date_str(hours: float) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%S")
 
 
+def _user_id_from_headers(auth_headers: dict) -> int:
+    """Extract the numeric uid claim from the Bearer token in auth_headers."""
+    token = auth_headers.get("Authorization", "").replace("Bearer ", "")
+    return int(_jwt_lib.decode(token, options={"verify_signature": False},
+                               algorithms=["HS256"])["uid"])
+
+
 def _create_completed_sale(event_url, booking_url, ticket_url, sales_url,
                            auth_headers, event_date_str, amount=None):
     """Full-stack helper: create event → booking → ticket → ticket_sale (COMPLETED).
 
     Returns dict: {event, booking, ticket, sale}
     """
-    suffix = uuid.uuid4().hex[:6]
+    suffix  = uuid.uuid4().hex[:6]
+    user_id = _user_id_from_headers(auth_headers)
 
     # Event
     ev = requests.post(f"{event_url}/api/events", json={
@@ -76,7 +84,7 @@ def _create_completed_sale(event_url, booking_url, ticket_url, sales_url,
     # Booking
     bk = requests.post(f"{booking_url}/api/bookings", json={
         "eventId":     eid,
-        "userId":      1,
+        "userId":      user_id,
         "status":      "COMPLETED",
         "totalAmount": amount or 300.0,
         "bookingDate": "2026-04-01T10:00:00",
@@ -108,7 +116,7 @@ def _create_completed_sale(event_url, booking_url, ticket_url, sales_url,
     # S5-F4 requires a pre-existing PENDING ticket sale (booking service only creates
     # one via the full lifecycle; direct COMPLETED booking creation skips that step).
     requests.post(f"{sales_url}/api/sales", json={
-        "bookingId": bid, "userId": 1,
+        "bookingId": bid, "userId": user_id,
         "amount": amount or 300.0, "status": "PENDING",
     }, headers=auth_headers, timeout=10)
 
@@ -153,12 +161,13 @@ class TestS5F10TicketSalesByTier:
         self, event_url, booking_url, ticket_url, sales_url, auth_headers
     ):
         """Scenario a: VIP (3500), standard (600), early-bird (100) breakdowns."""
-        suffix = uuid.uuid4().hex[:6]
+        suffix  = uuid.uuid4().hex[:6]
+        user_id = _user_id_from_headers(auth_headers)
 
-        def _mk_booking_with_items(booking_url, event_id, items, auth_headers):
+        def _mk_booking_with_items(booking_url, event_id, items, auth_headers, uid):
             bk = requests.post(f"{booking_url}/api/bookings", json={
                 "eventId":     event_id,
-                "userId":      1,
+                "userId":      uid,
                 "status":      "COMPLETED",
                 "totalAmount": sum(q * p for _, q, p in items),
                 "bookingDate": "2026-04-10T10:00:00",
@@ -185,13 +194,13 @@ class TestS5F10TicketSalesByTier:
         eid = ev.json()["id"]
 
         # B1: 2 VIP @ 500 = 1000
-        bid1 = _mk_booking_with_items(booking_url, eid, [("VIP", 2, 500.0)], auth_headers)
+        bid1 = _mk_booking_with_items(booking_url, eid, [("VIP", 2, 500.0)], auth_headers, user_id)
         # B2: 3 standard @ 200 = 600
-        bid2 = _mk_booking_with_items(booking_url, eid, [("standard", 3, 200.0)], auth_headers)
+        bid2 = _mk_booking_with_items(booking_url, eid, [("standard", 3, 200.0)], auth_headers, user_id)
         # B3: 5 VIP @ 500 + 1 early-bird @ 100
         bid3 = _mk_booking_with_items(booking_url, eid,
                                        [("VIP", 5, 500.0), ("early-bird", 1, 100.0)],
-                                       auth_headers)
+                                       auth_headers, user_id)
 
         # Create COMPLETED sales for each booking.
         # processTicketSale (S5-F4) requires a pre-existing PENDING ticket sale row;
@@ -199,7 +208,7 @@ class TestS5F10TicketSalesByTier:
         amounts = {bid1: 1000.0, bid2: 600.0, bid3: 2600.0}
         for bid in [bid1, bid2, bid3]:
             requests.post(f"{sales_url}/api/sales", json={
-                "bookingId": bid, "userId": 1,
+                "bookingId": bid, "userId": user_id,
                 "amount": amounts[bid], "status": "PENDING",
             }, headers=auth_headers, timeout=10)
             sale = requests.post(f"{sales_url}/api/sales/booking/{bid}",
@@ -309,10 +318,12 @@ class TestS5F10TicketSalesByTier:
         assert ev.status_code in (200, 201), f"Event creation failed: {ev.text}"
         eid = ev.json()["id"]
 
+        user_id = _user_id_from_headers(auth_headers)
+
         # Include booking items inline — BookingService.save handles nested items
         # via CascadeType.ALL, which correctly sets the booking FK on each item.
         bk = requests.post(f"{booking_url}/api/bookings", json={
-            "eventId": eid, "userId": 1, "status": "COMPLETED",
+            "eventId": eid, "userId": user_id, "status": "COMPLETED",
             "totalAmount": 500.0, "bookingDate": f"{now.year}-05-01T10:00:00",
             "contactEmail": "contact@test.com",
             "bookingItems": [{
@@ -326,7 +337,7 @@ class TestS5F10TicketSalesByTier:
 
         # Pre-create PENDING sale (S5-F4 requires a pre-existing PENDING row).
         requests.post(f"{sales_url}/api/sales", json={
-            "bookingId": bid, "userId": 1, "amount": 500.0, "status": "PENDING",
+            "bookingId": bid, "userId": user_id, "amount": 500.0, "status": "PENDING",
         }, headers=auth_headers, timeout=10)
 
         # Process sale → COMPLETED; this also invalidates the S5-F10 cache.
@@ -517,7 +528,8 @@ class TestS5F11SaleAuditTrail:
         eid = ev.json()["id"]
 
         bk = requests.post(f"{booking_url}/api/bookings", json={
-            "eventId": eid, "userId": 1, "status": "CONFIRMED",
+            "eventId": eid, "userId": _user_id_from_headers(auth_headers),
+            "status": "CONFIRMED",
             "totalAmount": 200.0, "bookingDate": "2026-04-01T10:00:00",
             "contactEmail": "contact@test.com",
         }, headers=auth_headers, timeout=10)
@@ -749,8 +761,9 @@ class TestS5F12RefundWindowPolicy:
         assert ev.status_code in (200, 201)
         eid = ev.json()["id"]
 
+        user_id = _user_id_from_headers(auth_headers)
         bk = requests.post(f"{booking_url}/api/bookings", json={
-            "eventId": eid, "userId": 1, "status": "PENDING",
+            "eventId": eid, "userId": user_id, "status": "PENDING",
             "totalAmount": 100.0, "bookingDate": "2026-04-01T10:00:00",
             "contactEmail": "contact@test.com",
         }, headers=auth_headers, timeout=10)
@@ -759,7 +772,7 @@ class TestS5F12RefundWindowPolicy:
 
         # Create a PENDING sale directly — processTicketSale requires COMPLETED booking
         sale = requests.post(f"{sales_url}/api/sales", json={
-            "bookingId": bid, "userId": 1, "amount": 100.0, "status": "PENDING",
+            "bookingId": bid, "userId": user_id, "amount": 100.0, "status": "PENDING",
         }, headers=auth_headers, timeout=10)
         assert sale.status_code in (200, 201), (
             f"Cannot create PENDING sale directly: {sale.status_code} {sale.text}"
@@ -911,14 +924,15 @@ class TestM1DesignPatternRetrofits:
             "details": {},
         }, headers=auth_headers, timeout=10)
         assert ev2.status_code in (200, 201)
+        uid2 = _user_id_from_headers(auth_headers)
         bk2 = requests.post(f"{booking_url}/api/bookings", json={
-            "eventId": ev2.json()["id"], "userId": 1, "status": "PENDING",
+            "eventId": ev2.json()["id"], "userId": uid2, "status": "PENDING",
             "totalAmount": 200.0, "bookingDate": "2026-04-01T10:00:00",
             "contactEmail": "contact@test.com",
         }, headers=auth_headers, timeout=10)
         assert bk2.status_code in (200, 201)
         pending_sale = requests.post(f"{sales_url}/api/sales", json={
-            "bookingId": bk2.json()["id"], "userId": 1, "amount": 200.0, "status": "PENDING",
+            "bookingId": bk2.json()["id"], "userId": uid2, "amount": 200.0, "status": "PENDING",
         }, headers=auth_headers, timeout=10)
         assert pending_sale.status_code in (200, 201)
         sale_id = pending_sale.json()["id"]
