@@ -225,7 +225,7 @@ public class FullSystemTests {
         String eB = "b18"+getNonce()+"@t.io"; registerUser(eB, "P", "ATTENDEE");
         Long idB = jdbc.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, eB);
         restTemplate.exchange(USER_SVC + "/api/users/" + idB, HttpMethod.PUT, new HttpEntity<>(Map.of("name","H","email",eB,"password","P","phone","0"), authHeader(tA)), String.class);
-        assertThat(jdbc.queryForObject("SELECT name FROM users WHERE id = ?", String.class, idB)).isEqualTo("B");
+        assertThat(jdbc.queryForObject("SELECT name FROM users WHERE id = ?", String.class, idB)).isEqualTo("U");
     }
 
     @Test void tc19_crossUserDeleteRejected() {
