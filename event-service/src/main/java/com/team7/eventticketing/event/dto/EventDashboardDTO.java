@@ -26,6 +26,16 @@ public class EventDashboardDTO {
         this.averageRating = builder.averageRating;
     }
 
+    public EventDashboardDTO() {
+        this.eventId = null;
+        this.name = null;
+        this.totalBookings = 0L;
+        this.totalTicketsSold = 0L;
+        this.totalRevenue = 0.0;
+        this.averageAttendanceRate = 0.0;
+        this.averageRating = 0.0;
+    }
+
     // Legacy all-args constructor kept for compatibility.
     public EventDashboardDTO(Long eventId,
                              String name,

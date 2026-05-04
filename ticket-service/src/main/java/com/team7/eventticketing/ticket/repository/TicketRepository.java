@@ -30,11 +30,12 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
         WHERE t.status = 'VALID'
         AND e.status = 'UPCOMING'
         """, nativeQuery = true)
-    List<UnusedTicketDTO> findUnusedTicketsForUpcomingEvents();
+    List<Object[]> findUnusedTicketsForUpcomingEvents();
 
     
     @Query(value = """
         SELECT 
+            b.event_id AS eventId,
             COUNT(*) AS totalTickets,
             SUM(CASE WHEN t.status = 'USED' THEN 1 ELSE 0 END) AS usedTickets,
             SUM(CASE WHEN t.status = 'VALID' THEN 1 ELSE 0 END) AS validTickets,
@@ -42,6 +43,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
         FROM tickets t
         JOIN bookings b ON t.booking_id = b.id
         WHERE b.event_id = :eventId
+        GROUP BY b.event_id
     """, nativeQuery = true)
     List<Object[]> getEventAttendanceSummary(@Param("eventId") Long eventId);
          
@@ -99,5 +101,17 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE email = :email", nativeQuery = true)
     boolean userExistsByEmail(String email);
+
+    @Query(value = """
+        SELECT
+            COUNT(*) AS totalIssued,
+            COALESCE(SUM(CASE WHEN status = 'USED' THEN 1 ELSE 0 END), 0) AS usedCount,
+            COALESCE(SUM(CASE WHEN status = 'VALID' THEN 1 ELSE 0 END), 0) AS validCount,
+            COALESCE(SUM(CASE WHEN status = 'EXPIRED' THEN 1 ELSE 0 END), 0) AS expiredCount,
+            COALESCE(SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END), 0) AS cancelledCount
+        FROM tickets
+        WHERE issued_at BETWEEN :start AND :end
+        """, nativeQuery = true)
+    List<Object[]> getTicketAnalytics(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }
 

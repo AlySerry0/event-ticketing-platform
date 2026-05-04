@@ -31,6 +31,13 @@ public class TopEventDTO {
         this.totalBookings = builder.totalBookings;
     }
 
+    public TopEventDTO() {
+        this.eventId = null;
+        this.name = null;
+        this.rating = null;
+        this.totalBookings = null;
+    }
+
     // Legacy all-args constructor kept for backward compatibility
     public TopEventDTO(Long eventId, String name, Double rating, Long totalBookings) {
         this.eventId       = eventId;

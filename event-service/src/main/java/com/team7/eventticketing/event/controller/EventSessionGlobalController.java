@@ -4,6 +4,7 @@ import com.team7.eventticketing.event.dto.EventSessionAlertDTO;
 import com.team7.eventticketing.event.dto.EventSessionDTO;
 import com.team7.eventticketing.event.service.EventSessionService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -24,6 +25,7 @@ public class EventSessionGlobalController {
      * GET /api/events/sessions/{sessionId}
      */
     @GetMapping("/{sessionId}")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<EventSessionDTO> getEventSessionById(
             @PathVariable Long sessionId) {
         EventSessionDTO session = eventSessionService.getEventSessionById(sessionId);
@@ -35,6 +37,7 @@ public class EventSessionGlobalController {
      * GET /api/events/sessions/all-verified
      */
     @GetMapping("/all-verified")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventSessionDTO>> getAllVerifiedSessions() {
         List<EventSessionDTO> sessions = eventSessionService.getAllVerifiedSessions();
         return ResponseEntity.ok(sessions);
@@ -45,6 +48,7 @@ public class EventSessionGlobalController {
      * GET /api/events/sessions/all
      */
     @GetMapping("/all")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventSessionDTO>> getAllSessions() {
         List<EventSessionDTO> sessions = eventSessionService.getAllSessions();
         return ResponseEntity.ok(sessions);
@@ -55,6 +59,7 @@ public class EventSessionGlobalController {
      * GET /api/events/sessions/search/title?query=xyz
      */
     @GetMapping("/search/title")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventSessionDTO>> searchSessionsByTitle(@RequestParam String query) {
         List<EventSessionDTO> sessions = eventSessionService.searchSessionsByTitle(query);
         return ResponseEntity.ok(sessions);
@@ -65,6 +70,7 @@ public class EventSessionGlobalController {
      * GET /api/events/sessions/search/speaker?query=xyz
      */
     @GetMapping("/search/speaker")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventSessionDTO>> searchSessionsBySpeaker(@RequestParam String query) {
         List<EventSessionDTO> sessions = eventSessionService.searchSessionsBySpeaker(query);
         return ResponseEntity.ok(sessions);
@@ -75,6 +81,7 @@ public class EventSessionGlobalController {
      * GET /api/events/sessions/between?startTime=...&endTime=...
      */
     @GetMapping("/between")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventSessionDTO>> getSessionsBetweenDates(
             @RequestParam LocalDateTime startTime,
             @RequestParam LocalDateTime endTime) {
@@ -87,6 +94,7 @@ public class EventSessionGlobalController {
      * GET /api/events/sessions/available-capacity
      */
     @GetMapping("/available-capacity")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventSessionDTO>> getSessionsWithAvailableCapacity() {
         List<EventSessionDTO> sessions = eventSessionService.getSessionsWithAvailableCapacity();
         return ResponseEntity.ok(sessions);
@@ -97,6 +105,7 @@ public class EventSessionGlobalController {
      * GET /api/events/sessions/unverified
      */
     @GetMapping("/unverified")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventSessionAlertDTO>> getEventsWithUnverifiedSessions() {
         List<EventSessionAlertDTO> alerts = eventSessionService.getEventsWithUnverifiedSessions();
         return ResponseEntity.ok(alerts);

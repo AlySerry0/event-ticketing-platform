@@ -28,6 +28,8 @@ public class TicketSaleController {
     public TicketSaleDTO create(@RequestBody TicketSaleDTO ticketSaleDTO) {
         return ticketSaleService.save(ticketSaleDTO);
     }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/{saleId}/details")
     public ResponseEntity<SaleDetailsDTO> getSaleDetails(@PathVariable Long saleId) {
         return ResponseEntity.ok(ticketSaleService.getSaleDetails(saleId));
@@ -47,6 +49,7 @@ public class TicketSaleController {
         return ticketSaleService.findAll();
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/search")
     public List<TicketSaleDTO> searchTicketSales(
             @RequestParam(required = false) TicketSaleStatus status,
@@ -99,22 +102,28 @@ public class TicketSaleController {
     @PostMapping("/booking/{bookingId}")
     public ResponseEntity<TicketSaleDTO> processTicketSale(
             @PathVariable Long bookingId,
-            @RequestBody ProcessTicketDTO request
+            @RequestBody ProcessTicketDTO request,
+            @RequestParam(defaultValue = "false") boolean simulateFailure
     ) {
-
         TicketSale updatedSale = ticketSaleService.processTicketSale(
                 bookingId,
                 request.getMethod(),
-                request.getCardLastFour()
+                request.getCardLastFour(),
+                simulateFailure
         );
-        return ResponseEntity.status(HttpStatus.CREATED).body(ticketSaleService.convertToDTO(updatedSale));
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ticketSaleService.convertToDTO(updatedSale));
     }
-    
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/user/{userId}/summary")
     public ResponseEntity<UserSaleSummaryDTO> getUserSaleSummary(@PathVariable Long userId) {
         return ResponseEntity.ok(ticketSaleService.getUserSaleSummary(userId));
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PutMapping("/{id}/refund")
     public ResponseEntity<TicketSaleDTO> processRefund(
             @PathVariable Long id,
@@ -124,6 +133,7 @@ public class TicketSaleController {
         return ResponseEntity.ok(refundedSale);
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/reports/revenue")
     public RevenueReportDTO getRevenueReport(
             @RequestParam LocalDate startDate,
@@ -140,10 +150,45 @@ public class TicketSaleController {
         return ticketSaleService.getRevenueReport(start, end);
 
     }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PutMapping("/{id}/retry")
     public ResponseEntity<TicketSaleDTO> retryFailedSale(@PathVariable Long id) {
         TicketSale updatedSale = ticketSaleService.retryFailedSale(id);
         return ResponseEntity.ok(ticketSaleService.convertToDTO(updatedSale));
+    }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+    @GetMapping("/analytics/tier")
+    public ResponseEntity<List<TierRevenueDTO>> getTicketSalesByTier(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        if (startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "startDate cannot be after endDate");
+        }
+
+        ticketSaleService.logTierAnalyticsViewed(startDate, endDate);
+
+        List<TierRevenueDTO> result = ticketSaleService.getTierRevenue(startDate, endDate);
+
+        return ResponseEntity.ok(result);
+    }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+    @GetMapping("/{id}/audit-trail")
+    public ResponseEntity<SaleAuditTrailDTO> getSaleAuditTrail(@PathVariable Long id) {
+        return ResponseEntity.ok(ticketSaleService.getSaleAuditTrail(id));
+    }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+    @PostMapping("/{id}/refund-window-policy")
+    public ResponseEntity<TicketSaleDTO> processRefundWithWindowPolicy(
+            @PathVariable Long id,
+            @RequestBody RefundRequestDTO request
+    ) {
+        TicketSaleDTO refundedSale = ticketSaleService.processRefundWithWindowPolicy(id, request);
+        return ResponseEntity.ok(refundedSale);
     }
 }
 

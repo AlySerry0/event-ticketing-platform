@@ -1,11 +1,18 @@
 package com.team7.eventticketing.booking.controller;
 
+import com.team7.eventticketing.booking.dto.AttendanceRecordDTO;
 import com.team7.eventticketing.booking.dto.BookingAnalyticsDTO;
+import com.team7.eventticketing.booking.dto.BookingAnalyticsDashboardDTO;
 import com.team7.eventticketing.booking.dto.BookingCostEstimateDTO;
 import com.team7.eventticketing.booking.dto.BookingDTO;
 import com.team7.eventticketing.booking.dto.BookingEstimateRequestDTO;
-
+import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
+import com.team7.eventticketing.booking.dto.BookingItemDTO;
 import com.team7.eventticketing.booking.service.BookingService;
+import com.team7.eventticketing.booking.observer.MongoEventLogger;
+import com.team7.eventticketing.booking.dto.EventRecommendationDTO;
+import com.team7.eventticketing.booking.service.JwtService;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -13,12 +20,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.security.access.prepost.PreAuthorize;
-import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
-import com.team7.eventticketing.booking.dto.BookingItemDTO;
+
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 @RestController
@@ -27,6 +33,11 @@ public class BookingController {
 
 	@Autowired
 	private BookingService bookingService;
+
+
+  @Autowired
+  private JwtService jwtService;
+
 
 	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PostMapping
@@ -50,7 +61,6 @@ public class BookingController {
 
 	/**
 	 * [S3-F1] Get Bookings by Status and Date Range
-	 * GET /api/bookings/search?status={s}&startDate={d}&endDate={d}
 	 */
 	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/search")
@@ -74,25 +84,24 @@ public class BookingController {
 			BookingDTO confirmedBooking = bookingService.confirmBookingAndAssignEvent(id, eventId);
 			return ResponseEntity.ok(confirmedBooking);
 		} catch (NoSuchElementException e) {
-			// Catches "Booking not found" and "Event not found"
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
 		} catch (IllegalArgumentException e) {
-			// Catches "Booking is not PENDING" and "Event is not UPCOMING"
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
 		}
 	}
 
-    @PutMapping("/{id}/cancel")
-    public ResponseEntity<Void> cancelBooking(@PathVariable Long id) {
-        try {
-            bookingService.cancelBooking(id);
-            return ResponseEntity.ok().build();
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-        }
-    }
+  @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+  @PutMapping("/{id}/cancel")
+  public ResponseEntity<Void> cancelBooking(@PathVariable Long id) {
+      try {
+          bookingService.cancelBooking(id);
+          return ResponseEntity.ok().build();
+      } catch (NoSuchElementException e) {
+          throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+      } catch (IllegalArgumentException e) {
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+      }
+  }
 
 	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PutMapping("/{id}/complete")
@@ -129,6 +138,10 @@ public class BookingController {
 		}
 	}
 
+	/**
+	 * [M1 S3-F6] Original Analytics Endpoint
+	 * GET /api/bookings/analytics?startDate={d}&endDate={d}
+	 */
 	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/analytics")
 	public ResponseEntity<BookingAnalyticsDTO> getAnalytics(
@@ -139,6 +152,28 @@ public class BookingController {
 		return ResponseEntity.ok(report);
 	}
 
+	/**
+	 * [M2 S3-F10] Analytics Dashboard Endpoint (NEW)
+	 * GET /api/bookings/analytics/dashboard?startDate={d}&endDate={d}
+	 */
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@GetMapping("/analytics/dashboard")
+	public ResponseEntity<BookingAnalyticsDashboardDTO> getAnalyticsDashboard(
+			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+		// 1. Get the data (hits the cache if available)
+		BookingAnalyticsDashboardDTO report = bookingService.getAnalyticsDashboard(startDate, endDate);
+
+		// 2. Delegate the logging to the Service layer (runs even on cache hits!)
+		bookingService.recordAnalyticsView(startDate, endDate, report.getTotalRevenue());
+
+		return ResponseEntity.ok(report);
+	}
+
+	/**
+	 * [M1 S3-F5] Metadata Search
+	 */
 	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/metadata/search")
 	public ResponseEntity<List<BookingDTO>> searchByMetadata(
@@ -146,6 +181,9 @@ public class BookingController {
 			@RequestParam String value) {
 		return ResponseEntity.ok(bookingService.filterBookingsByMetadata(key, value));
 	}
+
+
+  @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/{id}/items")
 	public ResponseEntity<List<BookingItemDTO>> getBookingItems(@PathVariable Long id) {
 		return bookingService.findById(id)
@@ -153,26 +191,64 @@ public class BookingController {
 				.map(ResponseEntity::ok)
 				.orElse(ResponseEntity.notFound().build());
 	}
-    @PostMapping("/{bookingId}/items")
-    public ResponseEntity<BookingDTO> addItemsToBooking(
-            @PathVariable Long bookingId,
-            @RequestBody List<BookingItemDTO> items) {
-        try {
-            BookingDTO updatedBooking = bookingService.addItemsToBooking(bookingId, items);
-            return ResponseEntity.ok(updatedBooking);
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-        }
-    }
 
-    @GetMapping("/{bookingId}/details")
-    public ResponseEntity<BookingDetailsDTO> getBookingDetails(@PathVariable Long bookingId) {
-        try {
-            return ResponseEntity.ok(bookingService.getBookingDetails(bookingId));
-        } catch (NoSuchElementException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
-    }
+  @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+  @PostMapping("/{bookingId}/items")
+  public ResponseEntity<BookingDTO> addItemsToBooking(
+          @PathVariable Long bookingId,
+          @RequestBody List<BookingItemDTO> items) {
+      try {
+          BookingDTO updatedBooking = bookingService.addItemsToBooking(bookingId, items);
+          return ResponseEntity.ok(updatedBooking);
+      } catch (NoSuchElementException e) {
+          throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+      } catch (IllegalArgumentException e) {
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+      }
+  }
+
+  @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@GetMapping("/{bookingId}/details")
+	public ResponseEntity<BookingDetailsDTO> getBookingDetails(@PathVariable Long bookingId) {
+		try {
+			return ResponseEntity.ok(bookingService.getBookingDetails(bookingId));
+		} catch (NoSuchElementException e) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+		}
+	}
+
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@PostMapping("/{bookingId}/record-attendance")
+	public ResponseEntity<AttendanceRecordDTO> recordAttendance(@PathVariable Long bookingId) {
+		try {
+			int count = bookingService.recordAttendance(bookingId);
+			return ResponseEntity.ok(new AttendanceRecordDTO(count));
+		} catch (NoSuchElementException e) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+		} catch (ResponseStatusException e) {
+			throw e;
+		} catch (Exception e) {
+			throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error recording attendance: " + e.getMessage());
+		}
+	}
+
+  @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+  @GetMapping("/recommendations")
+  public ResponseEntity<List<EventRecommendationDTO>> getEventRecommendations(
+          @RequestParam Long userId,
+          @RequestParam(required = false) Integer limit,
+          @RequestHeader("Authorization") String authorizationHeader) {
+
+      if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+          throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing or invalid token");
+      }
+
+      String token = authorizationHeader.substring(7);
+      Long requesterId = jwtService.extractUserId(token);
+      String requesterRole = jwtService.extractRole(token);
+
+      return ResponseEntity.ok(
+              bookingService.getEventRecommendations(userId, limit, requesterId, requesterRole)
+      );
+  }
 }

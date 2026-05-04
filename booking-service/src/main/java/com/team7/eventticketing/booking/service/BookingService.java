@@ -1,38 +1,80 @@
 package com.team7.eventticketing.booking.service;
 
-import com.team7.eventticketing.booking.dto.BookingAnalyticsDTO;
-import com.team7.eventticketing.booking.dto.BookingCostEstimateDTO;
-import com.team7.eventticketing.booking.dto.BookingDTO;
-import com.team7.eventticketing.booking.dto.BookingEstimateRequestDTO;
+import com.team7.eventticketing.booking.adapter.BookingNodeAdapter;
+import com.team7.eventticketing.booking.dto.*;
 import com.team7.eventticketing.booking.model.Booking;
 import com.team7.eventticketing.booking.model.BookingItem;
 import com.team7.eventticketing.booking.model.BookingStatus;
+import com.team7.eventticketing.booking.model.neo4j.AttendedRelationship;
+import com.team7.eventticketing.booking.model.neo4j.EventNode;
+import com.team7.eventticketing.booking.model.neo4j.UserNode;
 import com.team7.eventticketing.booking.repository.BookingRepository;
+import com.team7.eventticketing.booking.repository.EventNodeRepository;
+import com.team7.eventticketing.booking.repository.UserNodeRepository;
+import com.team7.eventticketing.booking.adapter.Neo4jRecordAdapter;
+import com.team7.eventticketing.booking.model.BookingItemStatus;
+import com.team7.eventticketing.booking.observer.EntityObserver;
+import com.team7.eventticketing.booking.observer.EntitySubject;
+import com.team7.eventticketing.booking.observer.MongoEventLogger;
+import com.team7.eventticketing.booking.util.CacheInvalidationService;
+import com.team7.eventticketing.booking.adapter.EventDetailsAdapter;
+
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
-import com.team7.eventticketing.booking.dto.BookingItemDTO;
-import com.team7.eventticketing.booking.model.BookingItemStatus;
+import org.neo4j.driver.Driver;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.Comparator;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Optional;
 
 @Service
-public class BookingService {
+public class BookingService implements EntitySubject {
+
+    @Autowired
+    private BookingRepository bookingRepository;
+
+    @Autowired
+    private BookingItemService bookingItemService;
 
 	@Autowired
-	private BookingRepository bookingRepository;
+	private UserNodeRepository userNodeRepository;
 
 	@Autowired
-	private BookingItemService bookingItemService;
+	private EventNodeRepository eventNodeRepository;
+
+	@Autowired
+	private BookingNodeAdapter bookingNodeAdapter;
+
+    @Autowired
+    private CacheInvalidationService cacheInvalidationService;
+
+    private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
+
+    @Autowired
+    public void registerMongoLogger(MongoEventLogger mongoEventLogger) {
+        register(mongoEventLogger);
+    }
+
+    @Autowired
+    private Driver neo4jDriver;
+
+    @Autowired
+    private Neo4jRecordAdapter neo4jRecordAdapter;
+
+    @Autowired
+    private EventDetailsAdapter eventDetailsAdapter;
 
 	public BookingDTO save(BookingDTO bookingDTO) {
 		Booking booking = convertToEntity(bookingDTO);
@@ -45,9 +87,16 @@ public class BookingService {
 			booking.setStatus(BookingStatus.PENDING);
 		}
 
-		return convertToDTO(bookingRepository.save(booking));
+		Booking savedBooking = bookingRepository.save(booking);
+
+		this.notifyObservers("BOOKING_CREATED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::*");
+
+		return convertToDTO(savedBooking);
 	}
 
+	@Cacheable(value = "booking", key = "#id")
 	public Optional<BookingDTO> findById(Long id) {
 		return bookingRepository.findById(id).map(this::convertToDTO);
 	}
@@ -60,6 +109,12 @@ public class BookingService {
 
 	public void deleteById(Long id) {
 		bookingRepository.deleteById(id);
+		
+		this.notifyObservers("BOOKING_DELETED", Map.of("bookingId", id));
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + id);
+		cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
+
 	}
 
 	public Optional<BookingDTO> updateBooking(Long id, BookingDTO bookingDetails) {
@@ -87,10 +142,18 @@ public class BookingService {
 					booking.getMetadata().putAll(bookingDetails.getMetadata());
 				}
 			}
-			return convertToDTO(bookingRepository.save(booking));
+			Booking savedBooking = bookingRepository.save(booking);
+			
+			this.notifyObservers("BOOKING_UPDATED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
+			cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+			cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + id);
+			cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
+
+			return convertToDTO(savedBooking);
 		});
 	}
 
+	@Cacheable(value = "S3-F1", key = "#statusStr + '_' + #startDate + '_' + #endDate")
 	public List<BookingDTO> searchBookings(String statusStr, LocalDate startDate, LocalDate endDate) {
 		BookingStatus status = null;
 
@@ -148,7 +211,14 @@ public class BookingService {
 		booking.setStatus(BookingStatus.CONFIRMED);
 		booking.setConfirmedAt(LocalDateTime.now());
 
-		return convertToDTO(bookingRepository.save(booking));
+		Booking savedBooking = bookingRepository.save(booking);
+
+		this.notifyObservers("BOOKING_CONFIRMED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::*");
+		cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
+
+		return convertToDTO(savedBooking);
 	}
 
 	@Transactional
@@ -174,9 +244,16 @@ public class BookingService {
 				savedBooking.getId(),
 				savedBooking.getUserId(),
 				savedBooking.getTotalAmount());
+		
+		this.notifyObservers("BOOKING_COMPLETED", Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+		cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + id);
+		cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
+
 		return convertToDTO(savedBooking);
 	}
 
+	@Cacheable(value = "S3-F3", key = "#request.eventId + '-' + #request.ticketTier + '-' + #request.ticketCount")
 	public BookingCostEstimateDTO getCostEstimate(BookingEstimateRequestDTO request) {
 		Double avgCapacity = bookingRepository.getAverageSessionCapacityByEventId(request.getEventId());
 
@@ -254,13 +331,14 @@ public class BookingService {
 		return booking;
 	}
 
+	@Cacheable(value = "S3-F6", key = "#startDate.toString() + '_' + #endDate.toString()")
 	public BookingAnalyticsDTO getAnalytics(LocalDate startDate, LocalDate endDate) {
 		if (startDate.isAfter(endDate)) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be after end date");
 		}
 
-		LocalDateTime start = startDate.atStartOfDay(); // 2026-03-01 00:00:00
-		LocalDateTime end = endDate.atTime(23, 59, 59); // 2026-03-31 23:59:59
+		LocalDateTime start = startDate.atStartOfDay();
+		LocalDateTime end = endDate.atTime(23, 59, 59);
 		List<Object[]> results = bookingRepository.getBookingAnalytics(start, end);
 		Object[] row = results.get(0);
 
@@ -269,27 +347,20 @@ public class BookingService {
 		Long cancelled = ((Number) row[2]).longValue();
 		Double revenue = ((Number) row[3]).doubleValue();
 
-		Double average = 0.0;
-		if (completed > 0) {
-			average = revenue / completed;
-		}
+		Double average = completed > 0 ? revenue / completed : 0.0;
+		Double completionRate = total > 0 ? ((double) completed / total) * 100.0 : 0.0;
 
-		Double completionRate = 0.0;
-		if (total > 0) {
-			completionRate = ((double) completed / total) * 100.0;
-		}
-
-		BookingAnalyticsDTO dto = new BookingAnalyticsDTO();
-		dto.setTotalBookings(total);
-		dto.setCompletedBookings(completed);
-		dto.setCancelledBookings(cancelled);
-		dto.setTotalRevenue(revenue);
-		dto.setAverageBookingAmount(average);
-		dto.setCompletionRate(completionRate);
-
-		return dto;
+		// Utilizing the Phase 5 Builder
+		return BookingAnalyticsDTO.builder()
+				.totalBookings(total)
+				.completedBookings(completed)
+				.cancelledBookings(cancelled)
+				.totalRevenue(revenue)
+				.averageBookingAmount(average)
+				.completionRate(completionRate)
+				.build();
 	}
-
+	@Cacheable(value = "S3-F5", key = "#key + '_' + #value")
 	public List<BookingDTO> filterBookingsByMetadata(String key, String value) {
 		if (key == null || key.trim().isEmpty() || value == null || value.trim().isEmpty()) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Metadata key and value cannot be blank");
@@ -299,18 +370,11 @@ public class BookingService {
 				.toList();
 	}
 
-
+    @Cacheable(value = "S3-F9", key = "#bookingId")
 	public BookingDetailsDTO getBookingDetails(Long bookingId) {
 		Booking booking = bookingRepository.findById(bookingId)
 				.orElseThrow(() -> new NoSuchElementException("Booking not found"));
 
-		BookingDetailsDTO dto = new BookingDetailsDTO();
-		dto.setBookingId(booking.getId());
-		dto.setUserId(booking.getUserId());
-		dto.setEventId(booking.getEventId());
-		dto.setStatus(booking.getStatus());
-		dto.setTotalAmount(booking.getTotalAmount());
-		dto.setMetadata(booking.getMetadata());
 
 		List<BookingItem> bookingItems = booking.getBookingItems() == null ? List.of() : booking.getBookingItems();
 
@@ -323,12 +387,84 @@ public class BookingService {
 				.filter(item -> item.getStatus() == BookingItemStatus.CONFIRMED)
 				.count();
 
-		dto.setItems(itemDTOs);
-		dto.setTotalItems(itemDTOs.size());
-		dto.setConfirmedItems(confirmedItems);
 
-		return dto;
+        return BookingDetailsDTO.builder()
+                .bookingId(booking.getId())
+                .userId(booking.getUserId())
+                .eventId(booking.getEventId())
+                .status(booking.getStatus())
+                .totalAmount(booking.getTotalAmount())
+                .metadata(booking.getMetadata())
+                .items(itemDTOs)
+                .totalItems(itemDTOs.size())
+                .confirmedItems(confirmedItems)
+                .build();
 	}
+
+    @Cacheable(value = "S3-F12", key = "#userId + '-' + (#limit == null ? 5 : #limit)")
+    public List<EventRecommendationDTO> getEventRecommendations(Long userId, Integer limit, Long requesterId, String requesterRole) {
+        if (!userId.equals(requesterId) && !"ADMIN".equals(requesterRole)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only view your own recommendations");
+        }
+
+        if (!bookingRepository.userExistsById(userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+        }
+
+        int recommendationLimit = limit == null ? 5 : limit;
+
+        String cypher = """
+            MATCH (target:User {userId: $userId})-[:ATTENDED]->(shared:Event)<-[:ATTENDED]-(similar:User)-[:ATTENDED]->(recommended:Event)
+            WHERE NOT (target)-[:ATTENDED]->(recommended)
+            RETURN recommended.eventId AS eventId,
+                   recommended.name AS eventName,
+                   recommended.category AS category,
+                   count(similar) AS score
+            ORDER BY score DESC
+            LIMIT $limit
+            """;
+
+        try (var session = neo4jDriver.session()) {
+            List<EventRecommendationDTO> recommendations = session.executeRead(tx ->
+                    tx.run(cypher, Map.of("userId", userId, "limit", recommendationLimit))
+                            .list(neo4jRecordAdapter::adapt)
+            );
+
+            List<Long> eventIds = recommendations.stream()
+                    .map(EventRecommendationDTO::getEventId)
+                    .toList();
+
+            if (eventIds.isEmpty()) {
+                return recommendations;
+            }
+
+            Map<Long, Object[]> eventDetails = bookingRepository.findEventRecommendationDetails(eventIds)
+                    .stream()
+                    .collect(java.util.stream.Collectors.toMap(
+                            row -> ((Number) row[0]).longValue(),
+                            row -> row
+                    ));
+
+            return recommendations.stream()
+                    .map(recommendation -> {
+                        Object[] row = eventDetails.get(recommendation.getEventId());
+
+                        if (row == null) {
+                            return recommendation;
+                        }
+
+                        return eventDetailsAdapter.adapt(row, recommendation.getScore());
+                    })
+                    .toList();
+        }
+    }
+
+    private void invalidateBookingCaches(Long bookingId) {
+        cacheInvalidationService.invalidateCacheWildcard("booking-service::booking::" + bookingId);
+        cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F9::*");
+        cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("booking-service::S3-F12::*");
+    }
 
 	@Transactional
 	public BookingDTO addItemsToBooking(Long bookingId, List<BookingItemDTO> itemDTOs) {
@@ -372,8 +508,21 @@ public class BookingService {
 		}
 
 		Booking savedBooking = bookingRepository.save(booking);
-		return convertToDTO(savedBooking);
-	}
+
+    Map<String, Object> payload = new HashMap<>();
+    payload.put("bookingId", savedBooking.getId());
+    payload.put("userId", savedBooking.getUserId());
+    payload.put("eventId", savedBooking.getEventId());
+    payload.put("itemsAdded", itemDTOs.size());
+    payload.put("status", savedBooking.getStatus().name());
+
+    notifyObservers("ITEMS_ADDED", payload);
+
+    invalidateBookingCaches(savedBooking.getId());
+
+    return convertToDTO(savedBooking);
+    
+  }
 
 	@Transactional
 	public void cancelBooking(Long bookingId) {
@@ -390,8 +539,156 @@ public class BookingService {
 		if (bookingRepository.ticketsTableExists()) {
 			bookingRepository.cancelValidTicketsByBookingId(bookingId);
 		}
+  Booking savedBooking = bookingRepository.save(booking);
 
-		bookingRepository.save(booking);
+  Map<String, Object> payload = new HashMap<>();
+  payload.put("bookingId", savedBooking.getId());
+  payload.put("userId", savedBooking.getUserId());
+  payload.put("eventId", savedBooking.getEventId());
+  payload.put("status", savedBooking.getStatus().name());
+
+  notifyObservers("BOOKING_CANCELLED", payload);
+
+  invalidateBookingCaches(savedBooking.getId());
+  cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
+  }
+
+  @Cacheable(value = "S3-F10", key = "#startDate.toString() + '_' + #endDate.toString()")
+  public BookingAnalyticsDashboardDTO getAnalyticsDashboard(LocalDate startDate, LocalDate endDate) {
+      if (startDate.isAfter(endDate)) {
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be after end date");
+      }
+
+      LocalDateTime start = startDate.atStartOfDay();
+      LocalDateTime end = endDate.atTime(LocalTime.MAX);
+
+      List<Booking> bookings = bookingRepository.findByBookingDateBetweenOrderByBookingDateDesc(start, end);
+
+      long totalBookings = bookings.size();
+      double totalRevenue = 0.0;
+      long completedCount = 0;
+      long conversionCount = 0;
+      Map<String, Long> statusMap = new HashMap<>();
+
+      for (Booking b : bookings) {
+          String status = b.getStatus().name();
+          statusMap.put(status, statusMap.getOrDefault(status, 0L) + 1);
+
+          if (b.getStatus() == BookingStatus.COMPLETED) {
+              completedCount++;
+              if (b.getTotalAmount() != null) {
+                  totalRevenue += b.getTotalAmount();
+              }
+          }
+
+          if (b.getStatus() == BookingStatus.CONFIRMED
+                  || b.getStatus() == BookingStatus.CHECKED_IN
+                  || b.getStatus() == BookingStatus.COMPLETED) {
+              conversionCount++;
+          }
+      }
+
+      double avgValue = completedCount > 0 ? totalRevenue / completedCount : 0.0;
+      double convRate = totalBookings > 0 ? (double) conversionCount / totalBookings : 0.0;
+
+      return BookingAnalyticsDashboardDTO.builder()
+              .totalBookings(totalBookings)
+              .totalRevenue(totalRevenue)
+              .averageBookingValue(avgValue)
+              .conversionRate(convRate)
+              .bookingsByStatus(statusMap)
+              .build();
+  }
+
+  public void recordAnalyticsView(LocalDate startDate, LocalDate endDate, Double totalRevenueCalculated) {
+      Map<String, Object> payload = new HashMap<>();
+      payload.put("dashboardType", "BookingAnalytics");
+      payload.put("startDate", startDate.toString());
+      payload.put("endDate", endDate.toString());
+      payload.put("totalRevenueCalculated", totalRevenueCalculated);
+
+      notifyObservers("ANALYTICS_VIEWED", payload);
+  }
+
+  @Override
+  public void register(EntityObserver o) {
+      observers.add(o);
+  }
+
+  @Override
+  public void unregister(EntityObserver o) {
+      observers.remove(o);
+  }
+
+  @Override
+  public void notifyObservers(String action, Object payload) {
+      for (EntityObserver observer : observers) {
+          observer.onEvent(action, payload);
+      }
+  }
+
+	@Transactional
+	public int recordAttendance(Long bookingId) {
+		Booking booking = bookingRepository.findById(bookingId)
+				.orElseThrow(() -> new NoSuchElementException("Booking not found"));
+
+		if (booking.getStatus() != BookingStatus.COMPLETED) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking is not completed");
+		}
+
+		if (booking.getEventId() == null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking has no assigned event");
+		}
+
+		// Look up user node or create it
+		UserNode userNode = userNodeRepository.findByUserId(booking.getUserId())
+				.orElseGet(() -> {
+					String name = bookingRepository.findUserNameById(booking.getUserId());
+					return bookingNodeAdapter.toUserNode(booking.getUserId(), name);
+				});
+
+		// Check idempotency
+		Optional<AttendedRelationship> existingRel = userNode.getAttendedEvents().stream()
+				.filter(rel -> rel.getEvent() != null && rel.getEvent().getEventId().equals(booking.getEventId()))
+				.findFirst();
+
+		if (existingRel.isPresent() && existingRel.get().getRecordedBookingIds().contains(bookingId)) {
+			return existingRel.get().getAttendanceCount(); // Idempotent skip
+		}
+
+		int finalAttendanceCount;
+
+		if (existingRel.isPresent()) {
+			AttendedRelationship rel = existingRel.get();
+			rel.setAttendanceCount(rel.getAttendanceCount() + 1);
+			rel.setLastAttendedDate(LocalDateTime.now());
+			rel.getRecordedBookingIds().add(bookingId);
+			finalAttendanceCount = rel.getAttendanceCount();
+		} else {
+			AttendedRelationship rel = new AttendedRelationship();
+			EventNode eventNode = eventNodeRepository.findByEventId(booking.getEventId())
+					.orElseGet(() -> {
+						Object[] details = (Object[]) bookingRepository.findEventDetailsById(booking.getEventId());
+						return bookingNodeAdapter.toEventNode(booking.getEventId(), details);
+					});
+			rel.setEvent(eventNode);
+			rel.setAttendanceCount(1);
+			rel.setLastAttendedDate(LocalDateTime.now());
+			rel.getRecordedBookingIds().add(bookingId);
+			userNode.getAttendedEvents().add(rel);
+			finalAttendanceCount = 1;
+		}
+
+		userNodeRepository.save(userNode);
+
+		// Notify observers (MongoDB logging)
+		this.notifyObservers("INTERACTION_RECORDED", Map.of(
+				"bookingId", bookingId,
+				"userId", booking.getUserId(),
+				"eventId", booking.getEventId(),
+				"action", "INTERACTION_RECORDED"
+		));
+
+		return finalAttendanceCount;
 	}
 }
-

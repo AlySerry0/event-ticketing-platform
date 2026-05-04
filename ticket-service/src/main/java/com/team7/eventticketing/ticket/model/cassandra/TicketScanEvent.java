@@ -2,6 +2,7 @@ package com.team7.eventticketing.ticket.model.cassandra;
 
 import org.springframework.data.cassandra.core.cql.Ordering;
 import org.springframework.data.cassandra.core.cql.PrimaryKeyType;
+import org.springframework.data.cassandra.core.mapping.Column;
 import org.springframework.data.cassandra.core.mapping.PrimaryKeyColumn;
 import org.springframework.data.cassandra.core.mapping.Table;
 
@@ -16,11 +17,18 @@ public class TicketScanEvent {
     @PrimaryKeyColumn(name = "timestamp", type = PrimaryKeyType.CLUSTERED, ordering = Ordering.DESCENDING)
     private LocalDateTime timestamp;
 
+    @Column("scan_type")
     private String scanType;
+
+    @Column("attendee_name")
     private String attendeeName;
+
     private String gate;
     private String section;
+
+    @Column("seat_number")
     private String seatNumber;
+
     private String notes;
 
     public TicketScanEvent() {

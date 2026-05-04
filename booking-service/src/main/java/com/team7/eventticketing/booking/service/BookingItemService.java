@@ -4,6 +4,7 @@ import com.team7.eventticketing.booking.dto.BookingItemDTO;
 import com.team7.eventticketing.booking.model.BookingItem;
 import com.team7.eventticketing.booking.repository.BookingItemRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -20,6 +21,7 @@ public class BookingItemService {
 		return convertToDTO(bookingItemRepository.save(bookingItem));
 	}
 
+	@Cacheable(value = "booking-item", key = "#id")
 	public Optional<BookingItemDTO> findById(Long id) {
 		return bookingItemRepository.findById(id).map(this::convertToDTO);
 	}
