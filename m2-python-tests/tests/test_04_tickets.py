@@ -83,18 +83,12 @@ class TestS4F10TicketAnalytics:
     """
 
     def test_analytics_returns_correct_counts(
-        self, ticket_url, booking_url, auth_headers
+        self, ticket_url, booking_url, auth_headers, fresh_booking
     ):
         """Scenario a: 10 April 2026 tickets (6 USED, 2 VALID, 1 EXPIRED, 1 CANCELLED)
         → correct totalIssued, counts, attendanceRate.
         """
-        # Create a booking to attach tickets to
-        bk = requests.post(f"{booking_url}/api/bookings", json={
-            "eventId": 1, "userId": 1, "status": "COMPLETED",
-            "totalAmount": 0, "bookingDate": "2026-04-01T09:00:00",
-            "contactEmail": "contact@test.com",
-        }, headers=auth_headers, timeout=10)
-        bid = bk.json().get("id", 1) if bk.status_code in (200, 201) else 1
+        bid = fresh_booking["booking_id"]
 
         statuses = ["USED"] * 6 + ["VALID"] * 2 + ["EXPIRED"] + ["CANCELLED"]
         for i, st in enumerate(statuses):
@@ -233,16 +227,10 @@ class TestS4F11RecordScanEvent:
     """
 
     def test_scan_event_returns_201(
-        self, ticket_url, booking_url, auth_headers
+        self, ticket_url, booking_url, auth_headers, fresh_booking
     ):
         """Scenario a: POST scan → 201."""
-        bk = requests.post(f"{booking_url}/api/bookings", json={
-            "eventId": 1, "userId": 1, "status": "COMPLETED",
-            "totalAmount": 0, "bookingDate": "2026-04-01T09:00:00",
-            "contactEmail": "contact@test.com",
-        }, headers=auth_headers, timeout=10)
-        bid = bk.json().get("id", 1) if bk.status_code in (200, 201) else 1
-
+        bid    = fresh_booking["booking_id"]
         ticket = _create_ticket(ticket_url, auth_headers, booking_id=bid)
         resp   = _record_scan(ticket_url, ticket["id"], "CHECKED_IN",
                               auth_headers=auth_headers)
@@ -251,21 +239,15 @@ class TestS4F11RecordScanEvent:
         )
 
     def test_scan_event_stored_in_cassandra(
-        self, ticket_url, booking_url, auth_headers, cassandra_session
+        self, ticket_url, booking_url, auth_headers, cassandra_session, fresh_booking
     ):
         """Scenario a (Cassandra check): scan row must appear in ticket_scan_events.
 
         Section 7.4: partition key = ticket_id, clustering = timestamp DESC.
         """
-        bk = requests.post(f"{booking_url}/api/bookings", json={
-            "eventId": 1, "userId": 1, "status": "COMPLETED",
-            "totalAmount": 0, "bookingDate": "2026-04-01T09:00:00",
-            "contactEmail": "contact@test.com",
-        }, headers=auth_headers, timeout=10)
-        bid = bk.json().get("id", 1) if bk.status_code in (200, 201) else 1
-
-        ticket    = _create_ticket(ticket_url, auth_headers, booking_id=bid,
-                                   attendee_name="Cassandra User")
+        bid    = fresh_booking["booking_id"]
+        ticket = _create_ticket(ticket_url, auth_headers, booking_id=bid,
+                                attendee_name="Cassandra User")
         ticket_id = ticket["id"]
         _record_scan(ticket_url, ticket_id, "CHECKED_IN", auth_headers=auth_headers)
         time.sleep(0.5)
@@ -284,21 +266,15 @@ class TestS4F11RecordScanEvent:
         )
 
     def test_scan_event_writes_tracking_recorded_to_mongodb(
-        self, ticket_url, booking_url, auth_headers, mongo_db
+        self, ticket_url, booking_url, auth_headers, mongo_db, fresh_booking
     ):
         """Scenario a (MongoDB check): TRACKING_RECORDED must appear in ticket_events.
 
         Section 10.4.2 step d: both Cassandra AND MongoDB writes must happen.
         DP-2 Observer fires the MongoDB write independently.
         """
-        bk = requests.post(f"{booking_url}/api/bookings", json={
-            "eventId": 1, "userId": 1, "status": "COMPLETED",
-            "totalAmount": 0, "bookingDate": "2026-04-01T09:00:00",
-            "contactEmail": "contact@test.com",
-        }, headers=auth_headers, timeout=10)
-        bid = bk.json().get("id", 1) if bk.status_code in (200, 201) else 1
-
-        ticket    = _create_ticket(ticket_url, auth_headers, booking_id=bid)
+        bid    = fresh_booking["booking_id"]
+        ticket = _create_ticket(ticket_url, auth_headers, booking_id=bid)
         ticket_id = ticket["id"]
         _record_scan(ticket_url, ticket_id, "CHECKED_IN", auth_headers=auth_headers)
         time.sleep(0.5)
@@ -312,17 +288,11 @@ class TestS4F11RecordScanEvent:
         )
 
     def test_scan_multiple_events_shows_in_history(
-        self, ticket_url, booking_url, auth_headers
+        self, ticket_url, booking_url, auth_headers, fresh_booking
     ):
         """Scenario b: two scans → history shows both in reverse chrono order."""
-        bk = requests.post(f"{booking_url}/api/bookings", json={
-            "eventId": 1, "userId": 1, "status": "COMPLETED",
-            "totalAmount": 0, "bookingDate": "2026-04-01T09:00:00",
-            "contactEmail": "contact@test.com",
-        }, headers=auth_headers, timeout=10)
-        bid = bk.json().get("id", 1) if bk.status_code in (200, 201) else 1
-
-        ticket    = _create_ticket(ticket_url, auth_headers, booking_id=bid)
+        bid    = fresh_booking["booking_id"]
+        ticket = _create_ticket(ticket_url, auth_headers, booking_id=bid)
         ticket_id = ticket["id"]
 
         _record_scan(ticket_url, ticket_id, "CHECKED_IN", auth_headers=auth_headers)
@@ -359,19 +329,13 @@ class TestS4F11RecordScanEvent:
         assert resp.status_code == 401
 
     def test_scan_invalidates_scan_history_cache(
-        self, ticket_url, booking_url, auth_headers, redis_client
+        self, ticket_url, booking_url, auth_headers, redis_client, fresh_booking
     ):
         """Section 4.4.4 NoSQL-writer invalidation:
         POST /scan must invalidate ticket-service::S4-F12::{ticketId} key.
         """
-        bk = requests.post(f"{booking_url}/api/bookings", json={
-            "eventId": 1, "userId": 1, "status": "COMPLETED",
-            "totalAmount": 0, "bookingDate": "2026-04-01T09:00:00",
-            "contactEmail": "contact@test.com",
-        }, headers=auth_headers, timeout=10)
-        bid = bk.json().get("id", 1) if bk.status_code in (200, 201) else 1
-
-        ticket    = _create_ticket(ticket_url, auth_headers, booking_id=bid)
+        bid    = fresh_booking["booking_id"]
+        ticket = _create_ticket(ticket_url, auth_headers, booking_id=bid)
         ticket_id = ticket["id"]
 
         # Warm the S4-F12 cache
@@ -407,17 +371,11 @@ class TestS4F12ScanHistory:
     """
 
     def test_scan_history_returns_ordered_events(
-        self, ticket_url, booking_url, auth_headers
+        self, ticket_url, booking_url, auth_headers, fresh_booking
     ):
         """Scenario a: 3 scans → returned in reverse-chronological order (Cassandra DESC)."""
-        bk = requests.post(f"{booking_url}/api/bookings", json={
-            "eventId": 1, "userId": 1, "status": "COMPLETED",
-            "totalAmount": 0, "bookingDate": "2026-04-01T09:00:00",
-            "contactEmail": "contact@test.com",
-        }, headers=auth_headers, timeout=10)
-        bid = bk.json().get("id", 1) if bk.status_code in (200, 201) else 1
-
-        ticket    = _create_ticket(ticket_url, auth_headers, booking_id=bid)
+        bid    = fresh_booking["booking_id"]
+        ticket = _create_ticket(ticket_url, auth_headers, booking_id=bid)
         ticket_id = ticket["id"]
 
         for scan_type in ["ISSUED", "TRANSFERRED", "CHECKED_IN"]:
@@ -437,17 +395,11 @@ class TestS4F12ScanHistory:
         )
 
     def test_scan_history_time_range_filter(
-        self, ticket_url, booking_url, auth_headers
+        self, ticket_url, booking_url, auth_headers, fresh_booking
     ):
         """Scenario b: time range filter returns only matching events."""
-        bk = requests.post(f"{booking_url}/api/bookings", json={
-            "eventId": 1, "userId": 1, "status": "COMPLETED",
-            "totalAmount": 0, "bookingDate": "2026-04-01T09:00:00",
-            "contactEmail": "contact@test.com",
-        }, headers=auth_headers, timeout=10)
-        bid = bk.json().get("id", 1) if bk.status_code in (200, 201) else 1
-
-        ticket    = _create_ticket(ticket_url, auth_headers, booking_id=bid)
+        bid    = fresh_booking["booking_id"]
+        ticket = _create_ticket(ticket_url, auth_headers, booking_id=bid)
         ticket_id = ticket["id"]
 
         _record_scan(ticket_url, ticket_id, "ISSUED",    auth_headers=auth_headers)
@@ -480,16 +432,10 @@ class TestS4F12ScanHistory:
         assert resp.status_code == 404
 
     def test_scan_history_empty_returns_200_not_404(
-        self, ticket_url, booking_url, auth_headers
+        self, ticket_url, booking_url, auth_headers, fresh_booking
     ):
         """Scenario d: ticket with no scans → 200 empty list (not 404)."""
-        bk = requests.post(f"{booking_url}/api/bookings", json={
-            "eventId": 1, "userId": 1, "status": "COMPLETED",
-            "totalAmount": 0, "bookingDate": "2026-04-01T09:00:00",
-            "contactEmail": "contact@test.com",
-        }, headers=auth_headers, timeout=10)
-        bid = bk.json().get("id", 1) if bk.status_code in (200, 201) else 1
-
+        bid    = fresh_booking["booking_id"]
         ticket = _create_ticket(ticket_url, auth_headers, booking_id=bid)
         resp   = requests.get(f"{ticket_url}/api/tickets/{ticket['id']}/scans",
                               headers=auth_headers, timeout=10)
@@ -502,17 +448,11 @@ class TestS4F12ScanHistory:
         assert resp.status_code == 401
 
     def test_scan_history_cached_in_redis(
-        self, ticket_url, booking_url, auth_headers, redis_client
+        self, ticket_url, booking_url, auth_headers, redis_client, fresh_booking
     ):
         """CC-3: S4-F12 cached 5 min; key must appear in Redis after first call."""
-        bk = requests.post(f"{booking_url}/api/bookings", json={
-            "eventId": 1, "userId": 1, "status": "COMPLETED",
-            "totalAmount": 0, "bookingDate": "2026-04-01T09:00:00",
-            "contactEmail": "contact@test.com",
-        }, headers=auth_headers, timeout=10)
-        bid = bk.json().get("id", 1) if bk.status_code in (200, 201) else 1
-
-        ticket    = _create_ticket(ticket_url, auth_headers, booking_id=bid)
+        bid    = fresh_booking["booking_id"]
+        ticket = _create_ticket(ticket_url, auth_headers, booking_id=bid)
         ticket_id = ticket["id"]
         _record_scan(ticket_url, ticket_id, "ISSUED", auth_headers=auth_headers)
         time.sleep(0.3)

@@ -53,15 +53,22 @@ class TestS3F10BookingAnalyticsDashboard:
     """
 
     def test_dashboard_returns_correct_aggregations(
-        self, booking_url, auth_headers
+        self, booking_url, auth_headers, make_event, auth_user
     ):
-        """Scenario a: 10 bookings in March 2026 → correct totals & conversionRate.
+        """Scenario a: 10 bookings in Jan 2027 → correct totals & conversionRate.
 
         5 COMPLETED (100+200+300+400+500=1500), 2 CANCELLED, 2 CONFIRMED, 1 PENDING
         totalBookings=10, totalRevenue=1500, averageBookingValue=300,
         conversionRate=0.7 (5 COMPLETED + 2 CONFIRMED = 7/10).
         bookingsByStatus per status value.
+
+        Uses a fresh event and the session auth_user to avoid relying on any
+        pre-seeded rows. Uses the year 2027 to isolate from all other test data.
         """
+        event    = make_event(name=f"Analytics Event {uuid.uuid4().hex[:4]}")
+        event_id = event["id"]
+        user_id  = auth_user["user_id"]
+
         # Create 10 bookings
         statuses = (
             ["COMPLETED"] * 5 +
@@ -73,17 +80,17 @@ class TestS3F10BookingAnalyticsDashboard:
 
         for i, (status, amount) in enumerate(zip(statuses, amounts)):
             requests.post(f"{booking_url}/api/bookings", json={
-                "eventId":     1,
-                "userId":      1,
+                "eventId":     event_id,
+                "userId":      user_id,
                 "status":      status,
                 "totalAmount": amount,
-                "bookingDate": f"2026-03-{(i % 28) + 1:02d}T10:00:00",
+                "bookingDate": f"2027-01-{(i % 28) + 1:02d}T10:00:00",
                 "contactEmail": "contact@test.com",
             }, headers=auth_headers, timeout=10)
 
         resp = requests.get(
             f"{booking_url}/api/bookings/analytics/dashboard",
-            params={"startDate": "2026-03-01", "endDate": "2026-03-31"},
+            params={"startDate": "2027-01-01", "endDate": "2027-01-31"},
             headers=auth_headers, timeout=10,
         )
         assert resp.status_code == 200, (
@@ -424,7 +431,7 @@ class TestS3F11RecordAttendance:
 
     def test_record_attendance_confirmed_booking_returns_400(
         self, booking_url, auth_headers, admin_headers,
-        event_url, user_url
+        event_url, user_url, auth_user
     ):
         """Scenario d: CONFIRMED (not COMPLETED) booking → 400.
 
@@ -440,7 +447,7 @@ class TestS3F11RecordAttendance:
         eid = ev.json()["id"]
 
         bk = requests.post(f"{booking_url}/api/bookings", json={
-            "eventId": eid, "userId": 1, "status": "CONFIRMED",
+            "eventId": eid, "userId": auth_user["user_id"], "status": "CONFIRMED",
             "totalAmount": 0.0, "bookingDate": "2026-04-01T10:00:00",
             "contactEmail": "contact@test.com",
         }, headers=auth_headers, timeout=10)
