@@ -96,6 +96,7 @@ public class BookingService implements EntitySubject {
 		return convertToDTO(savedBooking);
 	}
 
+	@Cacheable(value = "booking", key = "#id")
 	public Optional<BookingDTO> findById(Long id) {
 		return bookingRepository.findById(id).map(this::convertToDTO);
 	}
@@ -152,6 +153,7 @@ public class BookingService implements EntitySubject {
 		});
 	}
 
+	@Cacheable(value = "S3-F1", key = "#statusStr + '_' + #startDate + '_' + #endDate")
 	public List<BookingDTO> searchBookings(String statusStr, LocalDate startDate, LocalDate endDate) {
 		BookingStatus status = null;
 
@@ -251,6 +253,7 @@ public class BookingService implements EntitySubject {
 		return convertToDTO(savedBooking);
 	}
 
+	@Cacheable(value = "S3-F3", key = "#request.eventId + '-' + #request.ticketTier + '-' + #request.ticketCount")
 	public BookingCostEstimateDTO getCostEstimate(BookingEstimateRequestDTO request) {
 		Double avgCapacity = bookingRepository.getAverageSessionCapacityByEventId(request.getEventId());
 
@@ -328,7 +331,7 @@ public class BookingService implements EntitySubject {
 		return booking;
 	}
 
-	@Cacheable(value = "booking-service", key = "'S3-F6::' + #startDate.toString() + '_' + #endDate.toString()")
+	@Cacheable(value = "S3-F6", key = "#startDate.toString() + '_' + #endDate.toString()")
 	public BookingAnalyticsDTO getAnalytics(LocalDate startDate, LocalDate endDate) {
 		if (startDate.isAfter(endDate)) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be after end date");
@@ -357,7 +360,7 @@ public class BookingService implements EntitySubject {
 				.completionRate(completionRate)
 				.build();
 	}
-	@Cacheable(value = "booking-service", key = "'S3-F5::' + #key + '_' + #value")
+	@Cacheable(value = "S3-F5", key = "#key + '_' + #value")
 	public List<BookingDTO> filterBookingsByMetadata(String key, String value) {
 		if (key == null || key.trim().isEmpty() || value == null || value.trim().isEmpty()) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Metadata key and value cannot be blank");
@@ -550,7 +553,7 @@ public class BookingService implements EntitySubject {
   cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
   }
 
-  @Cacheable(value = "booking-service", key = "'S3-F10::' + #startDate.toString() + '_' + #endDate.toString()")
+  @Cacheable(value = "S3-F10", key = "#startDate.toString() + '_' + #endDate.toString()")
   public BookingAnalyticsDashboardDTO getAnalyticsDashboard(LocalDate startDate, LocalDate endDate) {
       if (startDate.isAfter(endDate)) {
           throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be after end date");
