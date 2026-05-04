@@ -11,8 +11,8 @@ public class EventDetailsAdapter {
     public EventRecommendationDTO adapt(Object[] row, Long score) {
         return new EventRecommendationDTO.Builder()
                 .eventId(((Number) row[0]).longValue())
-                .name((String) row[1])
-                .category((String) row[2])
+                .name(row[1] != null ? row[1].toString() : null)
+                .category(row[2] != null ? row[2].toString() : null)
                 .eventDate(toLocalDateTime(row[3]))
                 .score(score)
                 .build();

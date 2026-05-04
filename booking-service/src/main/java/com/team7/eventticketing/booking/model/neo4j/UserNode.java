@@ -1,5 +1,6 @@
 package com.team7.eventticketing.booking.model.neo4j;
 
+import org.springframework.data.neo4j.core.schema.GeneratedValue;
 import org.springframework.data.neo4j.core.schema.Id;
 import org.springframework.data.neo4j.core.schema.Node;
 import org.springframework.data.neo4j.core.schema.Relationship;
@@ -10,6 +11,8 @@ import java.util.Set;
 @Node("User")
 public class UserNode {
     @Id
+    @GeneratedValue
+    private Long internalId;
     private Long userId;
     private String name;
 
