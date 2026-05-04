@@ -13,10 +13,12 @@ import com.team7.eventticketing.event.repository.EventRepository;
 import com.team7.eventticketing.event.util.CacheInvalidationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.query.Criteria;
 import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
+import org.springframework.data.elasticsearch.core.query.StringQuery;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -578,79 +580,118 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
         notifyObservers("EVENT_DELETED", buildPayload(eventId, extra));
     }
 
-    @Cacheable(value = "S2-F10", key = "#query + '_' + #category + '_' + #venue + '_'+ #status + '_' + #startDate + '_' + #endDate + '_' + #minRating + '_' + #maxRating")
+    @Cacheable(value = "S2-F10", key = "#query + '_' + #category + '_' + #venue + '_' + #status + '_' + #startDate + '_' + #endDate + '_' + #minRating + '_' + #maxRating")
     public List<EventDTO> searchEventsFullText(
             String query, String category, String venue, String status,
             LocalDate startDate, LocalDate endDate, Double minRating, Double maxRating) {
 
-        if(query == null || query.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Query parameter is required for full-text search");
-        }
-
-        String wildcard = "*" + query.toLowerCase() + "*";
-
-        Criteria textCriteria = new Criteria("name").expression(wildcard)
-                .or(new Criteria("description").expression(wildcard))
-                .or(new Criteria("venue").expression(wildcard));
-
-        Criteria criteria = new Criteria().and(textCriteria);
-
-        // c) Optional Exact Match & Range Filters
-        if (category != null && !category.isBlank()) {
-            criteria.and(new Criteria("category").is(category));
-        }
-        if (venue != null && !venue.isBlank()) {
-            criteria.and(new Criteria("venue").is(venue));
-        }
-        if (status != null && !status.isBlank()) {
-            criteria.and(new Criteria("status").is(status));
-        }
-
-        if(minRating != null && (minRating < 0 || minRating > 5)) {
+        // 🔹 Validate inputs
+        if (minRating != null && (minRating < 0 || minRating > 5)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "minRating must be between 0 and 5");
         }
-        if(maxRating != null && (maxRating < 0 || maxRating > 5)) {
+        if (maxRating != null && (maxRating < 0 || maxRating > 5)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "maxRating must be between 0 and 5");
         }
-        if(minRating != null && maxRating != null) {
-            if(minRating > maxRating) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "minRating must be less than or equal to maxRating");
-            }
+        if (minRating != null && maxRating != null && minRating > maxRating) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "minRating must be <= maxRating");
         }
         if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "startDate must be before or equal to endDate");
         }
 
-        // Rating Range Filter
-        if (minRating != null) {
-            criteria.and(new Criteria("rating").greaterThanEqual(minRating));
-        }
-        if (maxRating != null) {
-            criteria.and(new Criteria("rating").lessThanEqual(maxRating));
+        // 🔹 Build filters
+        List<String> filters = new ArrayList<>();
+
+        if (category != null && !category.isBlank()) {
+            filters.add("""
+            { "term": { "category": "%s" } }
+        """.formatted(category));
         }
 
-        // Date Range Filter (Expanding to cover the entire day constraints)
+        if (venue != null && !venue.isBlank()) {
+            filters.add("""
+            { "term": { "venue.keyword": "%s" } }
+        """.formatted(venue));
+        }
+
+        if (status != null && !status.isBlank()) {
+            filters.add("""
+            { "term": { "status": "%s" } }
+        """.formatted(status));
+        }
+
+        if (minRating != null || maxRating != null) {
+            StringBuilder range = new StringBuilder();
+            if (minRating != null) {
+                range.append("\"gte\": ").append(minRating);
+            }
+            if (maxRating != null) {
+                if (range.length() > 0) range.append(",");
+                range.append("\"lte\": ").append(maxRating);
+            }
+
+            filters.add("""
+            { "range": { "rating": { %s } } }
+        """.formatted(range));
+        }
+
         if (startDate != null || endDate != null) {
-            Criteria dateCriteria = new Criteria("eventDate");
+            StringBuilder range = new StringBuilder();
             if (startDate != null) {
-                dateCriteria.greaterThanEqual(startDate.atStartOfDay());
+                range.append("\"gte\": \"").append(startDate.atStartOfDay()).append("\"");
             }
             if (endDate != null) {
-                dateCriteria.lessThanEqual(endDate.atTime(LocalTime.MAX));
+                if (range.length() > 0) range.append(",");
+                range.append("\"lte\": \"").append(endDate.atTime(LocalTime.MAX)).append("\"");
             }
-            criteria.and(dateCriteria);
+
+            filters.add("""
+            { "range": { "eventDate": { %s } } }
+        """.formatted(range));
         }
 
-        CriteriaQuery criteriaQuery = new CriteriaQuery(criteria);
+        // 🔹 Build MUST (only if query exists)
+        String mustClause = "";
 
-        // Execute query
-        SearchHits<EventSearchDocument> searchHits = elasticsearchOperations.search(criteriaQuery, EventSearchDocument.class);
+        if (query != null && !query.isBlank()) {
+            mustClause = """
+        "must": [
+          {
+            "multi_match": {
+              "query": "%s",
+              "fields": ["name^3", "venue^2", "details.description"],
+              "fuzziness": "AUTO"
+            }
+          }
+        ],
+        """.formatted(query.replace("\"", "\\\""));
+        }
 
-        // d) Map hits using the required Adapter Pattern
+        // 🔹 Final query
+        String jsonQuery = """
+    {
+      "bool": {
+        %s
+        "filter": [
+          %s
+        ]
+      }
+    }
+    """.formatted(
+                mustClause,
+                String.join(",", filters)
+        );
+
+        // 🔹 Execute using StringQuery
+        StringQuery searchQuery = new StringQuery(jsonQuery);
+
+        SearchHits<EventSearchDocument> searchHits =
+                elasticsearchOperations.search(searchQuery, EventSearchDocument.class);
+
         return searchHits.getSearchHits().stream()
                 .map(elasticsearchHitAdapter::adapt)
                 .collect(Collectors.toList());
