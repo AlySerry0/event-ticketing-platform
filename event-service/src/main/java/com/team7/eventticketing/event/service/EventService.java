@@ -583,14 +583,17 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
             String query, String category, String venue, String status,
             LocalDate startDate, LocalDate endDate, Double minRating, Double maxRating) {
 
-        Criteria criteria = new Criteria();
-
-        // b) Full-text search on query against name, description, and venue
-        if (query != null && !query.isBlank()) {
-            criteria.subCriteria(new Criteria("name").contains(query)
-                    .or(new Criteria("description").contains(query))
-                    .or(new Criteria("venue").contains(query)));
+        if(query == null || query.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Query parameter is required for full-text search");
         }
+
+        String wildcard = "*" + query.toLowerCase() + "*";
+
+        Criteria textCriteria = new Criteria("name").expression(wildcard)
+                .or(new Criteria("description").expression(wildcard))
+                .or(new Criteria("venue").expression(wildcard));
+
+        Criteria criteria = new Criteria().and(textCriteria);
 
         // c) Optional Exact Match & Range Filters
         if (category != null && !category.isBlank()) {
@@ -601,6 +604,25 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
         }
         if (status != null && !status.isBlank()) {
             criteria.and(new Criteria("status").is(status));
+        }
+
+        if(minRating != null && (minRating < 0 || minRating > 5)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "minRating must be between 0 and 5");
+        }
+        if(maxRating != null && (maxRating < 0 || maxRating > 5)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "maxRating must be between 0 and 5");
+        }
+        if(minRating != null && maxRating != null) {
+            if(minRating > maxRating) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "minRating must be less than or equal to maxRating");
+            }
+        }
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "startDate must be before or equal to endDate");
         }
 
         // Rating Range Filter
