@@ -568,6 +568,25 @@ public class EventService {
             criteria.and(new Criteria("status").is(status));
         }
 
+        if(minRating != null && (minRating < 0 || minRating > 5)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "minRating must be between 0 and 5");
+        }
+        if(maxRating != null && (maxRating < 0 || maxRating > 5)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "maxRating must be between 0 and 5");
+        }
+        if(minRating != null && maxRating != null) {
+            if(minRating > maxRating) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "minRating must be less than or equal to maxRating");
+            }
+        }
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "startDate must be before or equal to endDate");
+        }
+
         // Rating Range Filter
         if (minRating != null) {
             criteria.and(new Criteria("rating").greaterThanEqual(minRating));
