@@ -25,6 +25,9 @@ import java.util.Map;
 
 import java.util.List;
 
+import com.team7.eventticketing.user.security.OwnershipChecker;
+import org.springframework.web.bind.annotation.RequestHeader;
+
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
@@ -32,13 +35,16 @@ public class UserController {
     private final UserService userService;
     private final ActivityFeedService activityFeedService;
     private final JwtService jwtService;
+    private final OwnershipChecker ownershipChecker;
 
     public UserController(UserService userService,
                           ActivityFeedService activityFeedService,
-                          JwtService jwtService) {
+                          JwtService jwtService,
+                          OwnershipChecker ownershipChecker) {
         this.userService = userService;
         this.activityFeedService = activityFeedService;
         this.jwtService = jwtService;
+        this.ownershipChecker = ownershipChecker;
     }
 
     /**
@@ -52,11 +58,13 @@ public class UserController {
     }
 
     /**
-     * Get user by ID
+     * Get user by ID — Owner OR Admin
      * GET /api/users/{id}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<UserDTO> getUserById(@PathVariable Long id) {
+    public ResponseEntity<UserDTO> getUserById(@PathVariable Long id,
+                                               @RequestHeader("Authorization") String authHeader) {
+        ownershipChecker.requireOwnerOrAdmin(id, authHeader);
         UserDTO userDTO = userService.getUserById(id);
         return ResponseEntity.ok(userDTO);
     }
@@ -92,41 +100,50 @@ public class UserController {
     }
 
     /**
-     * Update user
+     * Update user — Owner OR Admin
      * PUT /api/users/{id}
      */
     @PutMapping("/{id}")
-    public ResponseEntity<UserDTO> updateUser(@PathVariable Long id, @RequestBody UpdateUserDTO userDTO) {
+    public ResponseEntity<UserDTO> updateUser(@PathVariable Long id,
+                                              @RequestBody UpdateUserDTO userDTO,
+                                              @RequestHeader("Authorization") String authHeader) {
+        ownershipChecker.requireOwnerOrAdmin(id, authHeader);
         UserDTO updatedUserDTO = userService.updateUser(id, userDTO);
         return ResponseEntity.ok(updatedUserDTO);
     }
 
     /**
-     * Deactivate user
+     * Deactivate user — Owner OR Admin
      * PATCH /api/users/{id}/deactivate
      */
     @PutMapping("/{id}/deactivate")
-    public ResponseEntity<UserDTO> deactivateUser(@PathVariable Long id) {
+    public ResponseEntity<UserDTO> deactivateUser(@PathVariable Long id,
+                                                  @RequestHeader("Authorization") String authHeader) {
+        ownershipChecker.requireOwnerOrAdmin(id, authHeader);
         UserDTO userDTO = userService.deactivateUser(id);
         return ResponseEntity.ok(userDTO);
     }
 
     /**
-     * Activate user
+     * Activate user — Owner OR Admin
      * PATCH /api/users/{id}/activate
      */
     @PatchMapping("/{id}/activate")
-    public ResponseEntity<UserDTO> activateUser(@PathVariable Long id) {
+    public ResponseEntity<UserDTO> activateUser(@PathVariable Long id,
+                                                @RequestHeader("Authorization") String authHeader) {
+        ownershipChecker.requireOwnerOrAdmin(id, authHeader);
         UserDTO userDTO = userService.activateUser(id);
         return ResponseEntity.ok(userDTO);
     }
 
     /**
-     * Delete user
+     * Delete user — Owner OR Admin
      * DELETE /api/users/{id}
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id,
+                                           @RequestHeader("Authorization") String authHeader) {
+        ownershipChecker.requireOwnerOrAdmin(id, authHeader);
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
     }
@@ -146,26 +163,33 @@ public class UserController {
     }
 
     /**
-     * [S1-F2] Update User Preferences (JSONB)
+     * [S1-F2] Update User Preferences (JSONB) — Owner OR Admin
      * PUT /api/users/{id}/preferences
      */
     @PutMapping("/{id}/preferences")
     public ResponseEntity<UserDTO> updateUserPreferences(
             @PathVariable Long id,
-            @RequestBody Map<String, Object> preferences) {
+            @RequestBody Map<String, Object> preferences,
+            @RequestHeader("Authorization") String authHeader) {
 
+        ownershipChecker.requireOwnerOrAdmin(id, authHeader);
         UserDTO updatedUser = userService.updateUserPreferences(id, preferences);
         return ResponseEntity.ok(updatedUser);
     }
 
     /**
-     * [S1-F3]
+     * [S1-F3] Booking Summary — Owner OR Admin
      */
     @GetMapping("/{id}/booking-summary")
-    public ResponseEntity<UserBookingSummaryDTO> getUserBookingSummary(@PathVariable Long id) {
+    public ResponseEntity<UserBookingSummaryDTO> getUserBookingSummary(
+            @PathVariable Long id,
+            @RequestHeader("Authorization") String authHeader) {
+
+        ownershipChecker.requireOwnerOrAdmin(id, authHeader);
         UserBookingSummaryDTO summary = userService.getBookingSummary(id);
         return ResponseEntity.ok(summary);
     }
+
     /**
      * [S1-F6] Top Attendees by Spending (Report DTO)
      * GET /api/users/reports/top-attendees?startDate={date}&endDate={date}&limit={n}
@@ -194,11 +218,15 @@ public class UserController {
     }
 
     /**
-     * [S1-F8] Get User Profile with Favorite Venues
+     * [S1-F8] Get User Profile with Favorite Venues — Owner OR Admin
      * GET /api/users/{id}/profile
      */
     @GetMapping("/{id}/profile")
-    public ResponseEntity<UserProfileDTO> getUserProfile(@PathVariable Long id) {
+    public ResponseEntity<UserProfileDTO> getUserProfile(
+            @PathVariable Long id,
+            @RequestHeader("Authorization") String authHeader) {
+
+        ownershipChecker.requireOwnerOrAdmin(id, authHeader);
         UserProfileDTO userProfile = userService.getUserProfileWithFavoriteVenues(id);
         return ResponseEntity.ok(userProfile);
     }
