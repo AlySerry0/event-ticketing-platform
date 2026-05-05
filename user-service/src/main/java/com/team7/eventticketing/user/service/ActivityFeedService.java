@@ -55,6 +55,11 @@ public class ActivityFeedService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "User not found"));
 
+        if (page < 0 || size < 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Page and size must be positive integers");
+        }
+
         // Cap size at 100 per spec Section 10.1.3
         int cappedSize = Math.min(size, 100);
 
