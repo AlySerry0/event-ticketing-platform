@@ -139,6 +139,7 @@ services:
       SPRING_DATA_REDIS_PASSWORD: redispass
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
+      TZ: Africa/Cairo
     depends_on:
       postgres:
         condition: service_healthy
@@ -159,6 +160,7 @@ services:
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
+      TZ: Africa/Cairo
     depends_on:
       postgres:
         condition: service_healthy
@@ -180,6 +182,7 @@ services:
       SPRING_NEO4J_AUTHENTICATION_PASSWORD: neo4jpass
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
+      TZ: Africa/Cairo
     depends_on:
       postgres:
         condition: service_healthy
@@ -203,6 +206,7 @@ services:
       SPRING_CASSANDRA_KEYSPACE_NAME: eventticketingks
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
+      TZ: Africa/Cairo
     depends_on:
       postgres:
         condition: service_healthy
@@ -220,6 +224,7 @@ services:
       SPRING_DATA_REDIS_PASSWORD: redispass
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
+      TZ: Africa/Cairo
     depends_on:
       postgres:
         condition: service_healthy
