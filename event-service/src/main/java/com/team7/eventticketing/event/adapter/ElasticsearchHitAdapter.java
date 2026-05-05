@@ -1,7 +1,10 @@
 package com.team7.eventticketing.event.adapter;
 
 import co.elastic.clients.elasticsearch.core.search.Hit;
+import com.team7.eventticketing.event.dto.EventDTO;
 import com.team7.eventticketing.event.elasticsearch.EventSearchDocument;
+import org.springframework.data.elasticsearch.core.SearchHit;
+import org.springframework.stereotype.Component;
 
 import java.util.Map;
 import java.util.HashMap;
@@ -28,6 +31,7 @@ import java.util.HashMap;
  * If S2-F10 needs to enrich results with PG data (e.g. live rating),
  * do that in the service layer after adapting.
  */
+@Component
 public class ElasticsearchHitAdapter {
 
     /**
@@ -71,24 +75,19 @@ public class ElasticsearchHitAdapter {
         return map;
     }
 
-    // -----------------------------------------------------------------------
-    // Extension point for S2-F10 implementor:
-    //
-    // Add a typed adapt method here when you define a search result DTO, e.g.:
-    //
-    //   public EventSearchResultDTO adaptToSearchResult(Hit<EventSearchDocument> hit) {
-    //       EventSearchDocument doc = hit.source();
-    //       return EventSearchResultDTO.builder()
-    //           .id(doc.getId())
-    //           .name(doc.getName())
-    //           .category(doc.getCategory())
-    //           .venue(doc.getVenue())
-    //           .description(doc.getDescription())
-    //           .eventDate(doc.getEventDate())
-    //           .rating(doc.getRating())
-    //           .status(doc.getStatus())
-    //           .relevanceScore(hit.score())
-    //           .build();
-    //   }
-    // -----------------------------------------------------------------------
+
+    public EventDTO adapt(SearchHit<EventSearchDocument> searchHit) {
+        EventSearchDocument document = searchHit.getContent();
+
+        return EventDTO.builder()
+                .id(document.getId())
+                .name(document.getName())
+                .category(document.getCategory())
+                .venue(document.getVenue())
+                .description(document.getDescription())
+                .eventDate(document.getEventDate())
+                .rating(document.getRating())
+                .status(document.getStatus())
+                .build();
+    }
 }

@@ -20,7 +20,6 @@ public class SaleDetailsDTO {
     private Double totalDiscount;
     private Double finalAmount;
 
-
     public static class AppliedPromotionDTO {
         private String promotionCode;
         private String discountType;
@@ -70,4 +69,67 @@ public class SaleDetailsDTO {
 
     public Double getFinalAmount() { return finalAmount; }
     public void setFinalAmount(Double finalAmount) { this.finalAmount = finalAmount; }
+
+    // ===== Builder Pattern for Phase 5 =====
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private final SaleDetailsDTO dto = new SaleDetailsDTO();
+
+        public Builder saleId(Long saleId) {
+            dto.saleId = saleId;
+            return this;
+        }
+
+        public Builder bookingId(Long bookingId) {
+            dto.bookingId = bookingId;
+            return this;
+        }
+
+        public Builder userId(Long userId) {
+            dto.userId = userId;
+            return this;
+        }
+
+        public Builder originalAmount(Double originalAmount) {
+            dto.originalAmount = originalAmount;
+            return this;
+        }
+
+        public Builder method(PaymentMethod method) {
+            dto.method = method;
+            return this;
+        }
+
+        public Builder status(TicketSaleStatus status) {
+            dto.status = status;
+            return this;
+        }
+
+        public Builder transactionDetails(Map<String, Object> transactionDetails) {
+            dto.transactionDetails = transactionDetails;
+            return this;
+        }
+
+        public Builder appliedPromotions(List<AppliedPromotionDTO> appliedPromotions) {
+            dto.appliedPromotions = appliedPromotions;
+            return this;
+        }
+
+        public Builder totalDiscount(Double totalDiscount) {
+            dto.totalDiscount = totalDiscount;
+            return this;
+        }
+
+        public Builder finalAmount(Double finalAmount) {
+            dto.finalAmount = finalAmount;
+            return this;
+        }
+
+        public SaleDetailsDTO build() {
+            return dto;
+        }
+    }
 }

@@ -9,14 +9,19 @@ import com.team7.eventticketing.user.dto.UserDTO;
 
 import java.util.List;
 
+import com.team7.eventticketing.user.security.OwnershipChecker;
+import org.springframework.web.bind.annotation.RequestHeader;
+
 @RestController
 @RequestMapping("/api/users/{userId}/venues")
 public class FavoriteVenueController {
-
     private final FavoriteVenueService favoriteVenueService;
+    private final OwnershipChecker ownershipChecker;
 
-    public FavoriteVenueController(FavoriteVenueService favoriteVenueService) {
+    public FavoriteVenueController(FavoriteVenueService favoriteVenueService,
+                                   OwnershipChecker ownershipChecker) {
         this.favoriteVenueService = favoriteVenueService;
+        this.ownershipChecker = ownershipChecker;
     }
 
     /**
@@ -26,7 +31,9 @@ public class FavoriteVenueController {
     @PostMapping
     public ResponseEntity<FavoriteVenueDTO> addFavoriteVenue(
             @PathVariable Long userId,
-            @RequestBody FavoriteVenueDTO favoriteVenueDTO) {
+            @RequestBody FavoriteVenueDTO favoriteVenueDTO,
+            @RequestHeader("Authorization") String authHeader) {
+        ownershipChecker.requireOwnerOrAdmin(userId, authHeader);
         FavoriteVenueDTO createdVenue = favoriteVenueService.addFavoriteVenue(userId, favoriteVenueDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdVenue);
     }
@@ -36,7 +43,10 @@ public class FavoriteVenueController {
      * GET /api/users/{userId}/venues
      */
     @GetMapping
-    public ResponseEntity<List<FavoriteVenueDTO>> getUserFavoriteVenues(@PathVariable Long userId) {
+    public ResponseEntity<List<FavoriteVenueDTO>> getUserFavoriteVenues(
+            @PathVariable Long userId,
+            @RequestHeader("Authorization") String authHeader) {
+        ownershipChecker.requireOwnerOrAdmin(userId, authHeader);
         List<FavoriteVenueDTO> venues = favoriteVenueService.getUserFavoriteVenues(userId);
         return ResponseEntity.ok(venues);
     }
@@ -48,7 +58,9 @@ public class FavoriteVenueController {
     @GetMapping("/{venueId}")
     public ResponseEntity<FavoriteVenueDTO> getFavoriteVenueById(
             @PathVariable Long userId,
-            @PathVariable Long venueId) {
+            @PathVariable Long venueId,
+            @RequestHeader("Authorization") String authHeader) {
+        ownershipChecker.requireOwnerOrAdmin(userId, authHeader);
         FavoriteVenueDTO venue = favoriteVenueService.getFavoriteVenueById(venueId);
         return ResponseEntity.ok(venue);
     }
@@ -61,7 +73,9 @@ public class FavoriteVenueController {
     public ResponseEntity<FavoriteVenueDTO> updateFavoriteVenue(
             @PathVariable Long userId,
             @PathVariable Long venueId,
-            @RequestBody FavoriteVenueDTO favoriteVenueDTO) {
+            @RequestBody FavoriteVenueDTO favoriteVenueDTO,
+            @RequestHeader("Authorization") String authHeader) {
+        ownershipChecker.requireOwnerOrAdmin(userId, authHeader);
         FavoriteVenueDTO updatedVenue = favoriteVenueService.updateFavoriteVenue(venueId, favoriteVenueDTO);
         return ResponseEntity.ok(updatedVenue);
     }
@@ -73,7 +87,9 @@ public class FavoriteVenueController {
     @DeleteMapping("/{venueId}")
     public ResponseEntity<Void> deleteFavoriteVenue(
             @PathVariable Long userId,
-            @PathVariable Long venueId) {
+            @PathVariable Long venueId,
+            @RequestHeader("Authorization") String authHeader) {
+        ownershipChecker.requireOwnerOrAdmin(userId, authHeader);
         favoriteVenueService.deleteFavoriteVenue(venueId);
         return ResponseEntity.noContent().build();
     }
@@ -83,7 +99,10 @@ public class FavoriteVenueController {
      * GET /api/users/{userId}/venues/default
      */
     @GetMapping("/default")
-    public ResponseEntity<FavoriteVenueDTO> getDefaultFavoriteVenue(@PathVariable Long userId) {
+    public ResponseEntity<FavoriteVenueDTO> getDefaultFavoriteVenue(
+            @PathVariable Long userId,
+            @RequestHeader("Authorization") String authHeader) {
+        ownershipChecker.requireOwnerOrAdmin(userId, authHeader);
         FavoriteVenueDTO venue = favoriteVenueService.getDefaultFavoriteVenue(userId);
         return ResponseEntity.ok(venue);
     }
@@ -95,7 +114,9 @@ public class FavoriteVenueController {
     @PutMapping("/{venueId}/default")
     public ResponseEntity<UserDTO> setDefaultFavoriteVenue(
             @PathVariable Long userId,
-            @PathVariable Long venueId) {
+            @PathVariable Long venueId,
+            @RequestHeader("Authorization") String authHeader) {
+        ownershipChecker.requireOwnerOrAdmin(userId, authHeader);
         UserDTO updatedUser = favoriteVenueService.setDefaultFavoriteVenue(userId, venueId);
         return ResponseEntity.ok(updatedUser);
     }

@@ -4,6 +4,9 @@ import com.team7.eventticketing.user.dto.FavoriteVenueDTO;
 import com.team7.eventticketing.user.dto.UserDTO;
 import com.team7.eventticketing.user.model.FavoriteVenue;
 import com.team7.eventticketing.user.model.User;
+import com.team7.eventticketing.user.observer.EntityObserver;
+import com.team7.eventticketing.user.observer.MongoEventLogger;
+import com.team7.eventticketing.user.repository.AuthEventRepository;
 import com.team7.eventticketing.user.repository.FavoriteVenueRepository;
 import com.team7.eventticketing.user.repository.UserRepository;
 import com.team7.eventticketing.user.util.CacheInvalidationService;
@@ -13,7 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,14 +28,43 @@ public class FavoriteVenueService {
     private final FavoriteVenueRepository favoriteVenueRepository;
     private final UserRepository userRepository;
     private final CacheInvalidationService cacheInvalidationService;
+    private final List<EntityObserver> observers = new ArrayList<>();
+
 
     public FavoriteVenueService(FavoriteVenueRepository favoriteVenueRepository,
                                 UserRepository userRepository,
-                                CacheInvalidationService cacheInvalidationService) {
+                                CacheInvalidationService cacheInvalidationService,
+                                AuthEventRepository authEventRepository) {
         this.favoriteVenueRepository = favoriteVenueRepository;
         this.userRepository = userRepository;
         this.cacheInvalidationService = cacheInvalidationService;
+//        this.registerObserver(new MongoEventLogger(authEventRepository));
+        this.registerObserver(new MongoEventLogger(authEventRepository, cacheInvalidationService));
     }
+
+    // -----------------------------------------------------------------------
+    // Observer management methods (Section 3.3)
+    // -----------------------------------------------------------------------
+
+    public void registerObserver(EntityObserver observer) {
+        observers.add(observer);
+    }
+
+    public void unregisterObserver(EntityObserver observer) {
+        observers.remove(observer);
+    }
+
+    /**
+     * Notifies all registered observers of a state change.
+     * The first argument is the action string (what happened).
+     * The second argument is the payload (relevant data).
+     */
+    private void notifyObservers(String eventType, Object payload) {
+        for (EntityObserver observer : observers) {
+            observer.onEvent(eventType, payload);
+        }
+    }
+
 
     /**
      * Add a favorite venue.
@@ -196,6 +230,12 @@ public class FavoriteVenueService {
         User updatedUser = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "User not found with ID: " + userId));
+
+        notifyObservers("DEFAULT_VENUE_SET", Map.of(
+                "userId", userId,
+                "venueId", venueId,
+                "timestamp", System.currentTimeMillis()
+        ));
 
         // Multiple venue rows changed → wildcard their detail cache + invalidate profile
         cacheInvalidationService.invalidateCacheWildcard("user-service::favorite-venue::*");

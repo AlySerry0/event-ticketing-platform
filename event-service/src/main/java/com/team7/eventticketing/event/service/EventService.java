@@ -1,13 +1,24 @@
 package com.team7.eventticketing.event.service;
 
+import com.team7.eventticketing.event.adapter.ElasticsearchHitAdapter;
 import com.team7.eventticketing.event.adapter.ObjectArrayDtoAdapter;
 import com.team7.eventticketing.event.dto.*;
+import com.team7.eventticketing.event.elasticsearch.EventSearchDocument;
 import com.team7.eventticketing.event.model.Event;
 import com.team7.eventticketing.event.model.EventCategory;
 import com.team7.eventticketing.event.model.EventStatus;
 import com.team7.eventticketing.event.observer.EntityObserver;
 import com.team7.eventticketing.event.observer.MongoEventLogger;
 import com.team7.eventticketing.event.repository.EventRepository;
+import com.team7.eventticketing.event.util.CacheInvalidationService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.elasticsearch.client.elc.NativeQuery;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.elasticsearch.core.query.Criteria;
+import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
+import org.springframework.data.elasticsearch.core.query.StringQuery;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,17 +31,6 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
-/**
- * Service for Event operations.
- *
- * Observer Pattern: maintains a list of EntityObserver instances.
- * On every write (M1 features + CRUD), calls notifyObservers(action, payload)
- * AFTER the PostgreSQL transaction commits — Mongo failure never rolls back PG.
- *
- * Adapter Pattern: Object[] rows from native SQL queries are converted to DTOs
- * via EventRevenueAdapter (S2-F3) and TopEventAdapter (S2-F6) instead of
- * inline casting inside this service.
- */
 @Service
 @Transactional(readOnly = true)
 public class EventService {
@@ -40,8 +40,10 @@ public class EventService {
     // -----------------------------------------------------------------------
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
     private final  EventIndexService eventIndexService;  // needed to trigger re-indexing on updates
-
-
+    private final ElasticsearchOperations elasticsearchOperations;
+    private final ElasticsearchHitAdapter elasticsearchHitAdapter;
+//    @Autowired
+//    private EventService self;
 
     public void register(EntityObserver observer) {
         if (!observers.contains(observer)) {
@@ -63,30 +65,63 @@ public class EventService {
     // Dependencies
     // -----------------------------------------------------------------------
     private final EventRepository eventRepository;
-
-    // Adapters (Adapter Pattern)
+    private final CacheInvalidationService cacheInvalidationService;
     private final ObjectArrayDtoAdapter objectArrayDtoAdapter = new ObjectArrayDtoAdapter();
+    private EventCacheService eventCacheService;
 
     /**
      * Constructor — MongoEventLogger is injected by Spring and registered
      * as the single observer for this service.
      */
-    public EventService(EventRepository eventRepository, MongoEventLogger mongoEventLogger, EventIndexService eventIndexService) {
+    public EventService(EventRepository eventRepository, MongoEventLogger mongoEventLogger, EventIndexService eventIndexService, ElasticsearchOperations elasticsearchOperations, ElasticsearchHitAdapter elasticsearchHitAdapter,
+CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheService) {
         this.eventRepository = eventRepository;
         this.eventIndexService = eventIndexService;
+        this.elasticsearchOperations = elasticsearchOperations;
+        this.elasticsearchHitAdapter = elasticsearchHitAdapter;
         this.register(mongoEventLogger);
+        this.cacheInvalidationService = cacheInvalidationService;
+        this.eventCacheService = eventCacheService;
     }
 
     // -----------------------------------------------------------------------
-    // Helpers shared by both Observer calls and payload builders
+    // Helpers
     // -----------------------------------------------------------------------
 
-    /** Builds the standard payload map that MongoEventLogger expects. */
     private Map<String, Object> buildPayload(Long eventId, Map<String, Object> extra) {
         Map<String, Object> payload = new HashMap<>();
         if (eventId != null) payload.put("eventId", eventId);
         if (extra != null) payload.putAll(extra);
         return payload;
+    }
+
+    /**
+     * Invalidates the entity detail cache + all feature caches that involve events.
+     * Called after every write that touches an Event row.
+     * Uses over-invalidation (§4.4.6) — correctness beats hit ratio.
+     */
+    private void invalidateEventCaches(Long eventId) {
+        // Entity detail cache (CRUD GET /api/events/{id}) — 15 min TTL
+        cacheInvalidationService.invalidateCacheWildcard("event-service::event::" + eventId);
+
+        // Feature caches — all wildcard because params vary per caller
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F1::*");
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F3::*");
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F6::*");
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F9::*");
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F10::*");
+        // S2-F12 dashboard is keyed by eventId so we can be precise
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::" + eventId + "::*");
+    }
+
+    /**
+     * Invalidates only session-related caches.
+     * Called after writes that touch EventSession rows but not the Event itself.
+     */
+    private void invalidateSessionCaches(Long sessionId) {
+        cacheInvalidationService.invalidateCacheWildcard("event-service::event-session::" + sessionId + "::*");
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F9::*");
     }
 
     // -----------------------------------------------------------------------
@@ -114,7 +149,14 @@ public class EventService {
         eventIndexService.indexEvent(savedEvent.getId(), "auto_crud_create");
         EventDTO result = convertToDTO(savedEvent);
 
-        // Observer notification — EVENT_CREATED
+        // No entity detail to invalidate (new entity has no cached detail yet).
+        // But bust search/filter caches because result lists now change.
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F1::*");
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F6::*");
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F9::*");
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F10::*");
+
         Map<String, Object> extra = new HashMap<>();
         extra.put("name", savedEvent.getName());
         extra.put("category", savedEvent.getCategory().name());
@@ -124,9 +166,13 @@ public class EventService {
     }
 
     // -----------------------------------------------------------------------
-    // Read
+    // Read — CRUD detail (15 min)
     // -----------------------------------------------------------------------
 
+    /**
+     * GET /api/events/{id} — cached per §4.4.2 (only get-by-ID is cached, not list)
+     */
+    @Cacheable(value = "event", key = "#eventId")
     public EventDTO getEventById(Long eventId) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -134,6 +180,9 @@ public class EventService {
         return convertToDTO(event);
     }
 
+    /**
+     * GET /api/events — NOT cached (list endpoints are never cached per §4.4.2)
+     */
     public List<EventDTO> getAllEvents() {
         return eventRepository.findAll()
                 .stream().map(this::convertToDTO).collect(Collectors.toList());
@@ -168,33 +217,6 @@ public class EventService {
                 .stream().map(this::convertToDTO).collect(Collectors.toList());
     }
 
-    /** S2-F1 — search by optional category and required date range. */
-    public List<EventDTO> searchEvents(String category, LocalDate startDate, LocalDate endDate) {
-        if (startDate == null || endDate == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Start date and end date are required");
-        }
-        if (startDate.isAfter(endDate)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Start date must be before or equal to end date");
-        }
-
-        EventCategory eventCategory = null;
-        if (category != null && !category.isBlank()) {
-            eventCategory = parseEventCategory(category.trim());
-        }
-
-        LocalDateTime startDateTime = startDate.atStartOfDay();
-        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
-
-        List<Event> events = (eventCategory == null)
-                ? eventRepository.findByEventDateBetweenOrderByEventDateAsc(startDateTime, endDateTime)
-                : eventRepository.findByCategoryAndEventDateBetweenOrderByEventDateAsc(
-                eventCategory, startDateTime, endDateTime);
-
-        return events.stream().map(this::convertToDTO).collect(Collectors.toList());
-    }
-
     public List<EventDTO> getUpcomingEvents() {
         return eventRepository.findUpcomingEvents(LocalDateTime.now())
                 .stream().map(this::convertToDTO).collect(Collectors.toList());
@@ -226,7 +248,58 @@ public class EventService {
     }
 
     // -----------------------------------------------------------------------
-    // Update — S2-F2
+    // S2-F1 — Search by category + date range (cached 5 min)
+    // -----------------------------------------------------------------------
+
+    @Cacheable(value = "S2-F1", key = "#category + '_' + #startDate + '_' + #endDate")
+    public List<EventDTO> searchEvents(String category, LocalDate startDate, LocalDate endDate) {
+
+        // Only one date provided — reject
+        if ((startDate == null) != (endDate == null)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Both startDate and endDate must be provided together, or both omitted");
+        }
+
+        // Both dates provided — validate order
+        if (startDate != null && startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Start date must be before or equal to end date");
+        }
+
+        // Parse category — null means no category filter
+        EventCategory eventCategory = null;
+        if (category != null && !category.isBlank()) {
+            eventCategory = parseEventCategory(category.trim());
+        }
+
+        // 4 cases
+        List<Event> events;
+
+        if (eventCategory != null && startDate != null) {
+            LocalDateTime startDateTime = startDate.atStartOfDay();
+            LocalDateTime endDateTime   = endDate.atTime(LocalTime.MAX);
+            events = eventRepository.findByCategoryAndEventDateBetweenOrderByEventDateAsc(
+                    eventCategory, startDateTime, endDateTime);
+
+        } else if (eventCategory == null && startDate != null) {
+            LocalDateTime startDateTime = startDate.atStartOfDay();
+            LocalDateTime endDateTime   = endDate.atTime(LocalTime.MAX);
+            events = eventRepository.findByEventDateBetweenOrderByEventDateAsc(
+                    startDateTime, endDateTime);
+
+        } else if (eventCategory != null) {
+
+            events = eventRepository.findByCategory(eventCategory);
+
+        } else {
+
+            events = eventRepository.findAllByOrderByEventDateAsc();
+        }
+
+        return events.stream().map(this::convertToDTO).collect(Collectors.toList());
+    }
+    // -----------------------------------------------------------------------
+    // S2-F2 — JSONB partial update (write — invalidate)
     // -----------------------------------------------------------------------
 
     @Transactional
@@ -244,10 +317,10 @@ public class EventService {
 
         Event updatedEvent = eventRepository.save(event);
         eventIndexService.indexEvent(updatedEvent.getId(), "auto_crud_update");
-
         EventDTO result = convertToDTO(updatedEvent);
 
-        // Observer notification — EVENT_UPDATED
+        invalidateEventCaches(eventId);
+
         Map<String, Object> extra = new HashMap<>();
         extra.put("name", updatedEvent.getName());
         notifyObservers("EVENT_UPDATED", buildPayload(eventId, extra));
@@ -255,7 +328,6 @@ public class EventService {
         return result;
     }
 
-    /** S2-F2 — JSONB partial update. */
     @Transactional
     public EventDTO updateEventDetails(Long eventId, Map<String, Object> detailsUpdate) {
         Event event = eventRepository.findById(eventId)
@@ -275,7 +347,9 @@ public class EventService {
         Event updatedEvent = eventRepository.save(event);
         EventDTO result = convertToDTO(updatedEvent);
 
-        // Observer notification — DETAILS_UPDATED (S2-F2)
+        // S2-F2 is a write — invalidate
+        invalidateEventCaches(eventId);
+
         Map<String, Object> extra = new HashMap<>();
         extra.put("updatedKeys", new ArrayList<>(detailsUpdate.keySet()));
         notifyObservers("DETAILS_UPDATED", buildPayload(eventId, extra));
@@ -284,9 +358,10 @@ public class EventService {
     }
 
     // -----------------------------------------------------------------------
-    // S2-F3 — Revenue summary (uses Adapter)
+    // S2-F3 — Revenue summary (cached 10 min)
     // -----------------------------------------------------------------------
 
+    @Cacheable(value = "S2-F3", key = "#eventId + '_' + #startDate + '_' + #endDate")
     public EventRevenueDTO getEventRevenueSummary(Long eventId, LocalDate startDate, LocalDate endDate) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -316,16 +391,11 @@ public class EventService {
                     "Unexpected revenue query result format");
         }
 
-        // Adapter Pattern — delegates Object[] → EventRevenueDTO conversion
-        return objectArrayDtoAdapter.toEventRevenueDTO(
-                row,
-                event.getId(),
-                event.getName()
-        );
+        return objectArrayDtoAdapter.toEventRevenueDTO(row, event.getId(), event.getName());
     }
 
     // -----------------------------------------------------------------------
-    // S2-F4 — Status update
+    // S2-F4 — Status update (write — invalidate)
     // -----------------------------------------------------------------------
 
     @Transactional
@@ -348,7 +418,9 @@ public class EventService {
         event.setStatus(newStatus);
         eventRepository.save(event);
 
-        // Observer notification — STATUS_CHANGED (S2-F4)
+        // S2-F4 is a write — invalidate
+        invalidateEventCaches(eventId);
+
         Map<String, Object> extra = new HashMap<>();
         extra.put("oldStatus", oldStatus);
         extra.put("newStatus", newStatus.name());
@@ -356,9 +428,10 @@ public class EventService {
     }
 
     // -----------------------------------------------------------------------
-    // S2-F5 — JSONB attribute search (read — no observer needed)
+    // S2-F5 — JSONB attribute filter (cached 5 min)
     // -----------------------------------------------------------------------
 
+    @Cacheable(value = "S2-F5", key = "#key + '_' + #value + '_' + #status")
     public List<EventDTO> searchEventsByDetailAttribute(String key, String value, String status) {
         List<Event> events;
         if (status == null || status.isBlank()) {
@@ -376,19 +449,19 @@ public class EventService {
     }
 
     // -----------------------------------------------------------------------
-    // S2-F6 — Top rated (uses Adapter)
+    // S2-F6 — Top rated report (cached 10 min)
     // -----------------------------------------------------------------------
 
+    @Cacheable(value = "S2-F6", key = "#limit")
     public List<TopEventDTO> getTopRatedEvents(int limit) {
         List<Object[]> results = eventRepository.findTopRatedEvents(limit);
-        // Adapter Pattern — delegates Object[] → TopEventDTO conversion
         return results.stream()
                 .map(objectArrayDtoAdapter::toTopEventDTO)
                 .toList();
     }
 
     // -----------------------------------------------------------------------
-    // S2-F7 — Rate after attendance
+    // S2-F7 — Rate after attendance (write — invalidate)
     // -----------------------------------------------------------------------
 
     @Transactional
@@ -425,17 +498,17 @@ public class EventService {
         event.setTotalRatings(currentTotal + 1);
         eventRepository.save(event);
 
-        // Observer notification — RATED (S2-F7)
+        // Rating changes event detail + top-rated list + dashboard averageRating
+        cacheInvalidationService.invalidateCacheWildcard("event-service::event::" + eventId + "::*");
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F6::*");
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::" + eventId + "::*");
+
         Map<String, Object> extra = new HashMap<>();
         extra.put("bookingId", bookingId);
         extra.put("rating", rating);
         extra.put("newAverageRating", newAvg);
         notifyObservers("RATED", buildPayload(eventId, extra));
     }
-
-    // -----------------------------------------------------------------------
-    // S2-F7 (legacy overload kept for compatibility)
-    // -----------------------------------------------------------------------
 
     @Transactional
     public EventDTO updateEventRating(Long eventId, Double newRating) {
@@ -459,6 +532,10 @@ public class EventService {
         event.setTotalRatings(totalRatings + 1);
         Event updatedEvent = eventRepository.save(event);
 
+        cacheInvalidationService.invalidateCacheWildcard("event-service::event::" + eventId + "::*");
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F6::*");
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::" + eventId + "::*");
+
         Map<String, Object> extra = new HashMap<>();
         extra.put("rating", newRating);
         notifyObservers("RATED", buildPayload(eventId, extra));
@@ -466,10 +543,24 @@ public class EventService {
         return convertToDTO(updatedEvent);
     }
 
-
+    // -----------------------------------------------------------------------
+    // S2-F9 — Unverified sessions report (cached 10 min)
+    // -----------------------------------------------------------------------
 
     // -----------------------------------------------------------------------
-    // Delete
+    // S2-F12 — Event Performance Dashboard
+    // IMPORTANT: MongoDB log runs on EVERY call including cache hits.
+    // Split into cached inner method + public wrapper per spec §10.2.3 step g.
+    // -----------------------------------------------------------------------
+
+    public EventDashboardDTO getEventDashboard(Long eventId) {
+        EventDashboardDTO result = eventCacheService.getEventDashboardCached(eventId);
+        notifyObservers("DASHBOARD_VIEWED", buildPayload(eventId, Collections.emptyMap()));
+        return result;
+    }
+
+    // -----------------------------------------------------------------------
+    // Delete (write — invalidate)
     // -----------------------------------------------------------------------
 
     @Transactional
@@ -478,14 +569,132 @@ public class EventService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Event not found with id: " + eventId));
 
-        eventIndexService.removeFromIndex(eventId, event.getName()); // ES only
+        eventIndexService.removeFromIndex(eventId, event.getName());
         eventRepository.delete(event);
 
-        // Observer notification — EVENT_DELETED
+        invalidateEventCaches(eventId);
+
         Map<String, Object> extra = new HashMap<>();
         extra.put("name", event.getName());
         extra.put("source", "auto_crud_delete");
         notifyObservers("EVENT_DELETED", buildPayload(eventId, extra));
+    }
+
+    @Cacheable(value = "S2-F10", key = "#query + '_' + #category + '_' + #venue + '_' + #status + '_' + #startDate + '_' + #endDate + '_' + #minRating + '_' + #maxRating")
+    public List<EventDTO> searchEventsFullText(
+            String query, String category, String venue, String status,
+            LocalDate startDate, LocalDate endDate, Double minRating, Double maxRating) {
+
+        // 🔹 Validate inputs
+        if (minRating != null && (minRating < 0 || minRating > 5)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "minRating must be between 0 and 5");
+        }
+        if (maxRating != null && (maxRating < 0 || maxRating > 5)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "maxRating must be between 0 and 5");
+        }
+        if (minRating != null && maxRating != null && minRating > maxRating) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "minRating must be <= maxRating");
+        }
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "startDate must be before or equal to endDate");
+        }
+
+        // 🔹 Build filters
+        List<String> filters = new ArrayList<>();
+
+        if (category != null && !category.isBlank()) {
+            filters.add("""
+            { "term": { "category": "%s" } }
+        """.formatted(category));
+        }
+
+        if (venue != null && !venue.isBlank()) {
+            filters.add("""
+            { "term": { "venue.keyword": "%s" } }
+        """.formatted(venue));
+        }
+
+        if (status != null && !status.isBlank()) {
+            filters.add("""
+            { "term": { "status": "%s" } }
+        """.formatted(status));
+        }
+
+        if (minRating != null || maxRating != null) {
+            StringBuilder range = new StringBuilder();
+            if (minRating != null) {
+                range.append("\"gte\": ").append(minRating);
+            }
+            if (maxRating != null) {
+                if (range.length() > 0) range.append(",");
+                range.append("\"lte\": ").append(maxRating);
+            }
+
+            filters.add("""
+            { "range": { "rating": { %s } } }
+        """.formatted(range));
+        }
+
+        if (startDate != null || endDate != null) {
+            StringBuilder range = new StringBuilder();
+            if (startDate != null) {
+                range.append("\"gte\": \"").append(startDate.atStartOfDay()).append("\"");
+            }
+            if (endDate != null) {
+                if (range.length() > 0) range.append(",");
+                range.append("\"lte\": \"").append(endDate.atTime(LocalTime.MAX)).append("\"");
+            }
+
+            filters.add("""
+            { "range": { "eventDate": { %s } } }
+        """.formatted(range));
+        }
+
+        // 🔹 Build MUST (only if query exists)
+        String mustClause = "";
+
+        if (query != null && !query.isBlank()) {
+            mustClause = """
+        "must": [
+          {
+            "multi_match": {
+              "query": "%s",
+              "fields": ["name^3", "venue^2", "details.description"],
+              "fuzziness": "AUTO"
+            }
+          }
+        ],
+        """.formatted(query.replace("\"", "\\\""));
+        }
+
+        // 🔹 Final query
+        String jsonQuery = """
+    {
+      "bool": {
+        %s
+        "filter": [
+          %s
+        ]
+      }
+    }
+    """.formatted(
+                mustClause,
+                String.join(",", filters)
+        );
+
+        // 🔹 Execute using StringQuery
+        StringQuery searchQuery = new StringQuery(jsonQuery);
+
+        SearchHits<EventSearchDocument> searchHits =
+                elasticsearchOperations.search(searchQuery, EventSearchDocument.class);
+
+        return searchHits.getSearchHits().stream()
+                .map(elasticsearchHitAdapter::adapt)
+                .collect(Collectors.toList());
     }
 
     // -----------------------------------------------------------------------

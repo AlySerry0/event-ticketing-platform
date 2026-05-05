@@ -1,11 +1,14 @@
 package com.team7.eventticketing.booking.model.neo4j;
 
+import org.springframework.data.neo4j.core.schema.GeneratedValue;
 import org.springframework.data.neo4j.core.schema.Id;
 import org.springframework.data.neo4j.core.schema.Node;
 
 @Node("Event")
 public class EventNode {
     @Id
+    @GeneratedValue
+    private Long internalId;
     private Long eventId;
     private String name;
     private String category;

@@ -1,14 +1,12 @@
 package com.team7.eventticketing.event.controller;
 
-import com.team7.eventticketing.event.dto.CreateEventDTO;
-import com.team7.eventticketing.event.dto.EventDTO;
-import com.team7.eventticketing.event.dto.EventRevenueDTO;
-import com.team7.eventticketing.event.dto.TopEventDTO;
-import com.team7.eventticketing.event.dto.UpdateEventDTO;
+import com.team7.eventticketing.event.dto.*;
 import com.team7.eventticketing.event.service.EventIndexService;
 import com.team7.eventticketing.event.service.EventService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -37,6 +35,7 @@ public class EventController {
      * POST /api/events
      */
     @PostMapping
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<EventDTO> createEvent(@RequestBody CreateEventDTO request) {
         EventDTO event = eventService.createEvent(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(event);
@@ -47,6 +46,7 @@ public class EventController {
      * GET /api/events/{id}
      */
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<EventDTO> getEventById(@PathVariable Long id) {
         EventDTO event = eventService.getEventById(id);
         return ResponseEntity.ok(event);
@@ -57,6 +57,7 @@ public class EventController {
      * GET /api/events
      */
     @GetMapping
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventDTO>> getAllEvents() {
         List<EventDTO> events = eventService.getAllEvents();
         return ResponseEntity.ok(events);
@@ -67,6 +68,7 @@ public class EventController {
      * GET /api/events/category/{category}
      */
     @GetMapping("/category/{category}")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventDTO>> getEventsByCategory(@PathVariable String category) {
         List<EventDTO> events = eventService.getEventsByCategory(category);
         return ResponseEntity.ok(events);
@@ -77,6 +79,7 @@ public class EventController {
      * GET /api/events/status/{status}
      */
     @GetMapping("/status/{status}")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventDTO>> getEventsByStatus(@PathVariable String status) {
         List<EventDTO> events = eventService.getEventsByStatus(status);
         return ResponseEntity.ok(events);
@@ -87,6 +90,7 @@ public class EventController {
      * GET /api/events/category/{category}/status/{status}
      */
     @GetMapping("/category/{category}/status/{status}")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventDTO>> getEventsByCategoryAndStatus(
             @PathVariable String category,
             @PathVariable String status) {
@@ -99,6 +103,7 @@ public class EventController {
      * GET /api/events/search/name?query=xyz
      */
     @GetMapping("/search/name")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventDTO>> searchEventsByName(@RequestParam String query) {
         List<EventDTO> events = eventService.searchEventsByName(query);
         return ResponseEntity.ok(events);
@@ -109,10 +114,11 @@ public class EventController {
      * GET /api/events/search?category=CONCERT&startDate=2026-03-01&endDate=2026-03-31
      */
     @GetMapping("/search")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventDTO>> searchEvents(
             @RequestParam(required = false) String category,
-            @RequestParam LocalDate startDate,
-            @RequestParam LocalDate endDate) {
+            @RequestParam (required = false)LocalDate startDate,
+            @RequestParam(required = false) LocalDate endDate) {
         List<EventDTO> events = eventService.searchEvents(category, startDate, endDate);
         return ResponseEntity.ok(events);
     }
@@ -122,6 +128,7 @@ public class EventController {
      * GET /api/events/search/venue?query=xyz
      */
     @GetMapping("/search/venue")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventDTO>> searchEventsByVenue(@RequestParam String query) {
         List<EventDTO> events = eventService.searchEventsByVenue(query);
         return ResponseEntity.ok(events);
@@ -132,6 +139,7 @@ public class EventController {
      * GET /api/events/upcoming
      */
     @GetMapping("/upcoming")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventDTO>> getUpcomingEvents() {
         List<EventDTO> events = eventService.getUpcomingEvents();
         return ResponseEntity.ok(events);
@@ -142,6 +150,7 @@ public class EventController {
      * GET /api/events/between?startDate=2024-01-01T00:00:00&endDate=2024-12-31T23:59:59
      */
     @GetMapping("/between")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventDTO>> getEventsBetweenDates(
             @RequestParam LocalDateTime startDate,
             @RequestParam LocalDateTime endDate) {
@@ -154,6 +163,7 @@ public class EventController {
      * GET /api/events/rating/{rating}
      */
     @GetMapping("/rating/{rating}")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventDTO>> getEventsByMinimumRating(@PathVariable Double rating) {
         List<EventDTO> events = eventService.getEventsByMinimumRating(rating);
         return ResponseEntity.ok(events);
@@ -164,6 +174,7 @@ public class EventController {
      * PUT /api/events/{id}
      */
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<EventDTO> updateEvent(
             @PathVariable Long id,
             @RequestBody UpdateEventDTO request) {
@@ -176,6 +187,7 @@ public class EventController {
      * PUT /api/events/{id}/details
      */
     @PutMapping("/{id}/details")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<EventDTO> updateEventDetails(
             @PathVariable Long id,
             @RequestBody Map<String, Object> request) {
@@ -188,6 +200,7 @@ public class EventController {
      * GET /api/events/{id}/revenue?startDate=2026-03-01&endDate=2026-03-31
      */
     @GetMapping("/{id}/revenue")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<EventRevenueDTO> getEventRevenueSummary(
             @PathVariable Long id,
             @RequestParam LocalDate startDate,
@@ -197,11 +210,21 @@ public class EventController {
     }
 
     /**
+     * Get event performance dashboard according to S2-F12
+     * GET /api/events/{id}/dashboard
+     */
+    @GetMapping("/{id}/dashboard")
+    public ResponseEntity<EventDashboardDTO> getEventDashboard(@PathVariable Long id) {
+        return ResponseEntity.ok(eventService.getEventDashboard(id));
+    }
+
+    /**
      * Update event status according to S2-F4
      * PUT /api/events/{id}/status
      * Body: {"status":"CANCELLED"}
      */
     @PutMapping("/{id}/status")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<Void> updateEventStatus(
             @PathVariable Long id,
             @RequestBody Map<String, String> request) {
@@ -224,6 +247,7 @@ public class EventController {
      * PATCH /api/events/{id}/rating/{rating}
      */
     @PatchMapping("/{id}/rating/{rating}")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<EventDTO> updateEventRating(
             @PathVariable Long id,
             @PathVariable Double rating) {
@@ -236,6 +260,7 @@ public class EventController {
      * DELETE /api/events/{id}
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<Void> deleteEvent(@PathVariable Long id) {
         eventService.deleteEvent(id);
         return ResponseEntity.noContent().build();
@@ -246,6 +271,7 @@ public class EventController {
      * GET /api/events/details/search?key=organizer&value=LiveNation&status=UPCOMING
      */
     @GetMapping("/details/search")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventDTO>> searchEventsByDetailAttribute(
             @RequestParam String key,
             @RequestParam String value,
@@ -256,6 +282,7 @@ public class EventController {
     }
 
     @GetMapping("/reports/top-rated")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<TopEventDTO>> getTopRatedEvents(
             @RequestParam(defaultValue = "5") int limit) {
 
@@ -268,6 +295,7 @@ public class EventController {
      * Body: {"bookingId":1,"rating":5}
      */
     @PostMapping("/{id}/rate")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<Void> rateEventAfterAttendance(
             @PathVariable Long id,
             @RequestBody Map<String, Object> request) {
@@ -298,8 +326,26 @@ public class EventController {
     }
 
     @PostMapping("/{id}/index")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<Void> indexEvent(@PathVariable Long id) {
         eventIndexService.indexEvent(id, "explicit");
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/search/full-text")
+    public ResponseEntity<List<EventDTO>> searchEventsFullText(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String venue,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) Double minRating,
+            @RequestParam(required = false) Double maxRating) {
+
+        List<EventDTO> results = eventService.searchEventsFullText(
+                query, category, venue, status, startDate, endDate, minRating, maxRating);
+
+        return ResponseEntity.ok(results);
     }
 }

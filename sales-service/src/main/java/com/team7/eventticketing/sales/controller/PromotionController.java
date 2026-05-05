@@ -5,8 +5,8 @@ import com.team7.eventticketing.sales.dto.PromotionUsageDTO;
 import com.team7.eventticketing.sales.service.PromotionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -62,7 +62,7 @@ public class PromotionController {
         }
         return ResponseEntity.notFound().build();
     }
-
+    @PreAuthorize("hasAnyRole('ADMIN')")
     @GetMapping("/top-used")
     public List<PromotionUsageDTO> getTopUsedPromotions(@RequestParam(defaultValue = "10")  int limit) {
         if (limit <= 0) {

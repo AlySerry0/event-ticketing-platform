@@ -67,6 +67,9 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             LocalDateTime endDate
     );
 
+    List<Event> findAllByOrderByEventDateAsc();
+
+
     /**
      * Find events by rating (greater than or equal to)
      */
@@ -133,6 +136,28 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     Object[] findEventRevenueSummary(@Param("eventId") Long eventId,
                                      @Param("startDate") LocalDateTime startDate,
                                      @Param("endDate") LocalDateTime endDate);
+
+    @Query(value = """
+            SELECT
+                (SELECT COUNT(*)
+                 FROM bookings b
+                 WHERE b.event_id = :eventId) AS total_bookings,
+                (SELECT COALESCE(SUM(b.total_amount), 0)
+                 FROM bookings b
+                 WHERE b.event_id = :eventId
+                   AND b.status = 'COMPLETED') AS total_revenue,
+                (SELECT COUNT(*)
+                 FROM tickets t
+                 JOIN bookings b ON b.id = t.booking_id
+                 WHERE b.event_id = :eventId) AS total_tickets_sold,
+                (SELECT COUNT(*)
+                 FROM tickets t
+                 JOIN bookings b ON b.id = t.booking_id
+                 WHERE b.event_id = :eventId
+                   AND t.status = 'USED') AS used_tickets
+            """, nativeQuery = true)
+    Object[] findEventDashboardMetrics(@Param("eventId") Long eventId);
+
     /**
      * Check whether a booking exists by ID
      */

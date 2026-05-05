@@ -2,6 +2,9 @@ package com.team7.eventticketing.user.service;
 
 import com.team7.eventticketing.user.dto.*;
 import com.team7.eventticketing.user.model.*;
+import com.team7.eventticketing.user.observer.EntityObserver;
+import com.team7.eventticketing.user.observer.MongoEventLogger;
+import com.team7.eventticketing.user.repository.AuthEventRepository;
 import com.team7.eventticketing.user.repository.UserRepository;
 import com.team7.eventticketing.user.util.CacheInvalidationService;
 import org.springframework.cache.annotation.Cacheable;
@@ -18,16 +21,14 @@ import com.team7.eventticketing.user.model.UserRole;
 import com.team7.eventticketing.user.model.User;
 
 import java.time.LocalTime;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
-import java.util.List;
 import java.util.stream.Collectors;
 
 import com.team7.eventticketing.user.dto.UserBookingSummaryDTO;
 import com.team7.eventticketing.user.repository.BookingSummaryProjection;
 
-import java.util.Arrays;
+import com.team7.eventticketing.user.adapter.ObjectArrayDtoAdapter;
 
 @Service
 @Transactional(readOnly = true)
@@ -35,11 +36,40 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final CacheInvalidationService cacheInvalidationService;
+    private final ObjectArrayDtoAdapter objectArrayDtoAdapter = new ObjectArrayDtoAdapter();
+
+    private final List<EntityObserver> observers = new ArrayList<>();
 
     public UserService(UserRepository userRepository,
-                       CacheInvalidationService cacheInvalidationService) {
+                       CacheInvalidationService cacheInvalidationService,
+                       AuthEventRepository authEventRepository) {
         this.userRepository = userRepository;
         this.cacheInvalidationService = cacheInvalidationService;
+//        this.registerObserver(new MongoEventLogger(authEventRepository));
+        this.registerObserver(new MongoEventLogger(authEventRepository, cacheInvalidationService));
+    }
+
+    // -----------------------------------------------------------------------
+    // Observer management methods (Section 3.3)
+    // -----------------------------------------------------------------------
+
+    public void registerObserver(EntityObserver observer) {
+        observers.add(observer);
+    }
+
+    public void unregisterObserver(EntityObserver observer) {
+        observers.remove(observer);
+    }
+
+    /**
+     * Notifies all registered observers of a state change.
+     * The first argument is the action string (what happened).
+     * The second argument is the payload (relevant data).
+     */
+    private void notifyObservers(String eventType, Object payload) {
+        for (EntityObserver observer : observers) {
+            observer.onEvent(eventType, payload);
+        }
     }
 
     /**
@@ -67,7 +97,7 @@ public class UserService {
                 createUserDTO.getEmail(),
                 createUserDTO.getPassword(),
                 createUserDTO.getPhone(),
-                createUserDTO.getRole()
+                UserRole.ATTENDEE
         );
 
         if (createUserDTO.getPreferences() != null) {
@@ -75,6 +105,12 @@ public class UserService {
         }
 
         User savedUser = userRepository.save(user);
+        notifyObservers("USER_CREATED", Map.of(
+                "userId", savedUser.getId(),
+                "email", savedUser.getEmail(),
+                "role", savedUser.getRole(),
+                "timestamp", savedUser.getCreatedAt()
+        ));
         return convertToDTO(savedUser);
     }
 
@@ -166,6 +202,12 @@ public class UserService {
 
         User updatedUser = userRepository.save(user);
         invalidateUserCaches(id);
+        notifyObservers("USER_UPDATED", Map.of(
+                "userId", updatedUser.getId(),
+                "email", updatedUser.getEmail(),
+                "role", updatedUser.getRole(),
+                "timestamp", LocalDateTime.now()
+        ));
         return convertToDTO(updatedUser);
     }
 
@@ -192,6 +234,12 @@ public class UserService {
         user.setStatus(UserStatus.DEACTIVATED);
         User updatedUser = userRepository.save(user);
         invalidateUserCaches(id);
+        notifyObservers("USER_DEACTIVATED", Map.of(
+                "userId", updatedUser.getId(),
+                "email", updatedUser.getEmail(),
+                "role", updatedUser.getRole(),
+                "timestamp", LocalDateTime.now()
+        ));
         return convertToDTO(updatedUser);
     }
 
@@ -209,6 +257,12 @@ public class UserService {
         user.setStatus(UserStatus.ACTIVE);
         User updatedUser = userRepository.save(user);
         invalidateUserCaches(id);
+        notifyObservers("USER_ACTIVATED", Map.of(
+                "userId", updatedUser.getId(),
+                "email", updatedUser.getEmail(),
+                "role", updatedUser.getRole(),
+                "timestamp", LocalDateTime.now()
+        ));
         return convertToDTO(updatedUser);
     }
 
@@ -225,6 +279,10 @@ public class UserService {
         }
         userRepository.deleteById(id);
         invalidateUserCaches(id);
+        notifyObservers("USER_DELETED", Map.of(
+                "userId", id,
+                "timestamp", LocalDateTime.now()
+        ));
     }
 
     /**
@@ -265,6 +323,13 @@ public class UserService {
             currentPreferences.putAll(newPreferences);
         }
 
+        notifyObservers("USER_UPDATED", Map.of(
+                "userId", user.getId(),
+                "email", user.getEmail(),
+                "role", user.getRole(),
+                "updatedFields", List.of("preferences"),
+                "timestamp", LocalDateTime.now()
+        ));
         user.setPreferences(currentPreferences);
         User updatedUser = userRepository.save(user);
         invalidateUserCaches(id);
@@ -275,24 +340,41 @@ public class UserService {
     /**
      * [S1-F3] Get User Booking Summary — cached (10 min)
      */
+//    @Cacheable(value = "S1-F3", key = "#id")
+//    public UserBookingSummaryDTO getBookingSummary(Long id) {
+//        userRepository.findById(id)
+//                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with ID: " + id));
+//
+//        BookingSummaryProjection projection = userRepository.getUserBookingSummary(id);
+//
+//        UserBookingSummaryDTO dto = new UserBookingSummaryDTO();
+//        dto.setUserId(projection.getUserId());
+//        dto.setName(projection.getName());
+//        dto.setTotalBookings(projection.getTotalBookings());
+//        dto.setCompletedBookings(projection.getCompletedBookings());
+//        dto.setCancelledBookings(projection.getCancelledBookings());
+//        dto.setTotalSpent(projection.getTotalSpent());
+//        dto.setAverageBookingAmount(projection.getAverageBookingAmount());
+//
+//        return dto;
+//    }
+    /**
+     * [S1-F3] Get User Booking Summary
+     * Native SQL Object[] row → UserBookingSummaryDTO via ObjectArrayDtoAdapter (PDF §3.8).
+     */
     @Cacheable(value = "S1-F3", key = "#id")
     public UserBookingSummaryDTO getBookingSummary(Long id) {
         userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with ID: " + id));
 
-        BookingSummaryProjection projection = userRepository.getUserBookingSummary(id);
-
-        UserBookingSummaryDTO dto = new UserBookingSummaryDTO();
-        dto.setUserId(projection.getUserId());
-        dto.setName(projection.getName());
-        dto.setTotalBookings(projection.getTotalBookings());
-        dto.setCompletedBookings(projection.getCompletedBookings());
-        dto.setCancelledBookings(projection.getCancelledBookings());
-        dto.setTotalSpent(projection.getTotalSpent());
-        dto.setAverageBookingAmount(projection.getAverageBookingAmount());
-
-        return dto;
+        List<Object[]> rows = userRepository.getUserBookingSummary(id);
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "No booking summary found for user ID: " + id);
+        }
+        return objectArrayDtoAdapter.toUserBookingSummaryDTO(rows.get(0));
     }
+
 
     /**
      * [S1-F5] Filter Users by Preference (JSONB Query) — cached (5 min)
@@ -327,15 +409,21 @@ public class UserService {
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
 
+//        List<Object[]> results = userRepository
+//                .findTopAttendeesBySpending(startDateTime, endDateTime, limit);
+//
+//        return results.stream().map(row -> new TopAttendeeDTO(
+//                ((Number) row[0]).longValue(),
+//                (String) row[1],
+//                ((Number) row[2]).doubleValue(),
+//                ((Number) row[3]).longValue()
+//        )).collect(Collectors.toList());
         List<Object[]> results = userRepository
                 .findTopAttendeesBySpending(startDateTime, endDateTime, limit);
 
-        return results.stream().map(row -> new TopAttendeeDTO(
-                ((Number) row[0]).longValue(),
-                (String) row[1],
-                ((Number) row[2]).doubleValue(),
-                ((Number) row[3]).longValue()
-        )).collect(Collectors.toList());
+        return results.stream()
+                .map(objectArrayDtoAdapter::toTopAttendeeDTO)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -349,19 +437,18 @@ public class UserService {
                         "User not found with ID: " + id
                 ));
 
-        UserProfileDTO userProfileDTO = new UserProfileDTO();
-        userProfileDTO.setUserId(user.getId());
-        userProfileDTO.setName(user.getName());
-        userProfileDTO.setEmail(user.getEmail());
-        userProfileDTO.setPhone(user.getPhone());
-        userProfileDTO.setPreferences(user.getPreferences());
-        userProfileDTO.setFavoriteVenues(user.getFavoriteVenues()
-                .stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList()));
-        userProfileDTO.setTotalFavoriteVenues(user.getFavoriteVenues().size());
-
-        return userProfileDTO;
+        return UserProfileDTO.builder()
+                .userId(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .preferences(user.getPreferences())
+                .favoriteVenues(user.getFavoriteVenues()
+                        .stream()
+                        .map(this::convertToDTO)
+                        .collect(Collectors.toList()))
+                .totalFavoriteVenues(user.getFavoriteVenues().size())
+                .build();
     }
 
     /**
@@ -398,8 +485,13 @@ public class UserService {
         user.setRole(newRole);
         user = userRepository.save(user);
 
-        // TODO: fire Observer → MongoDB ROLE_CHANGED event (details: oldRole, newRole)
-
+        notifyObservers("ROLE_CHANGED", Map.of(
+                "userId", user.getId(),
+                "email", user.getEmail(),
+                "oldRole", oldRole,
+                "newRole", newRole.name(),
+                "timestamp", LocalDateTime.now()
+        ));
         // Invalidate user detail + activity feed (S1-F12) per PDF §4.4.4 M2 rule
         cacheInvalidationService.invalidateCacheWildcard("user-service::user::" + id);
         cacheInvalidationService.invalidateCacheWildcard("user-service::S1-F12::*");
@@ -431,27 +523,27 @@ public class UserService {
      * Convert User entity to UserDTO
      */
     private UserDTO convertToDTO(User user) {
-        UserDTO userDTO = new UserDTO();
-        userDTO.setId(user.getId());
-        userDTO.setName(user.getName());
-        userDTO.setEmail(user.getEmail());
-        userDTO.setPhone(user.getPhone());
-        userDTO.setRole(user.getRole());
-        userDTO.setStatus(user.getStatus());
-        userDTO.setPreferences(user.getPreferences());
-        userDTO.setCreatedAt(user.getCreatedAt());
-        return userDTO;
+        return UserDTO.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .role(user.getRole())
+                .status(user.getStatus())
+                .preferences(user.getPreferences())
+                .createdAt(user.getCreatedAt())
+                .build();
     }
 
     private FavoriteVenueDTO convertToDTO(FavoriteVenue favoriteVenue) {
-        FavoriteVenueDTO dto = new FavoriteVenueDTO();
-        dto.setId(favoriteVenue.getId());
-        dto.setLabel(favoriteVenue.getLabel());
-        dto.setVenueName(favoriteVenue.getVenueName());
-        dto.setLocation(favoriteVenue.getLocation());
-        dto.setCapacity(favoriteVenue.getCapacity());
-        dto.setIsDefault(favoriteVenue.getIsDefault());
-        dto.setMetadata(favoriteVenue.getMetadata());
-        return dto;
+        return FavoriteVenueDTO.builder()
+                .id(favoriteVenue.getId())
+                .label(favoriteVenue.getLabel())
+                .venueName(favoriteVenue.getVenueName())
+                .location(favoriteVenue.getLocation())
+                .capacity(favoriteVenue.getCapacity())
+                .isDefault(favoriteVenue.getIsDefault())
+                .metadata(favoriteVenue.getMetadata())
+                .build();
     }
 }

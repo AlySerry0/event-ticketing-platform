@@ -9,36 +9,60 @@ public class NearbyTicketDTO {
     private Double eventLon;
     private Double distanceKm;
 
-    public NearbyTicketDTO() {}
+    private NearbyTicketDTO() {}
 
-    public NearbyTicketDTO(Long ticketId, String attendeeName, Long bookingId, String eventName, Double eventLat, Double eventLon, Double distanceKm) {
-        this.ticketId = ticketId;
-        this.attendeeName = attendeeName;
-        this.bookingId = bookingId;
-        this.eventName = eventName;
-        this.eventLat = eventLat;
-        this.eventLon = eventLon;
-        this.distanceKm = distanceKm;
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private final NearbyTicketDTO dto = new NearbyTicketDTO();
+
+        public Builder ticketId(Long ticketId) {
+            dto.ticketId = ticketId;
+            return this;
+        }
+
+        public Builder attendeeName(String attendeeName) {
+            dto.attendeeName = attendeeName;
+            return this;
+        }
+
+        public Builder bookingId(Long bookingId) {
+            dto.bookingId = bookingId;
+            return this;
+        }
+
+        public Builder eventName(String eventName) {
+            dto.eventName = eventName;
+            return this;
+        }
+
+        public Builder eventLat(Double eventLat) {
+            dto.eventLat = eventLat;
+            return this;
+        }
+
+        public Builder eventLon(Double eventLon) {
+            dto.eventLon = eventLon;
+            return this;
+        }
+
+        public Builder distanceKm(Double distanceKm) {
+            dto.distanceKm = distanceKm;
+            return this;
+        }
+
+        public NearbyTicketDTO build() {
+            return dto;
+        }
     }
 
     public Long getTicketId() { return ticketId; }
-    public void setTicketId(Long ticketId) { this.ticketId = ticketId; }
-
     public String getAttendeeName() { return attendeeName; }
-    public void setAttendeeName(String attendeeName) { this.attendeeName = attendeeName; }
-
     public Long getBookingId() { return bookingId; }
-    public void setBookingId(Long bookingId) { this.bookingId = bookingId; }
-
     public String getEventName() { return eventName; }
-    public void setEventName(String eventName) { this.eventName = eventName; }
-
     public Double getEventLat() { return eventLat; }
-    public void setEventLat(Double eventLat) { this.eventLat = eventLat; }
-
     public Double getEventLon() { return eventLon; }
-    public void setEventLon(Double eventLon) { this.eventLon = eventLon; }
-
     public Double getDistanceKm() { return distanceKm; }
-    public void setDistanceKm(Double distanceKm) { this.distanceKm = distanceKm; }
 }
