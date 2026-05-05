@@ -252,11 +252,7 @@ public class UserController {
                     "Access denied: you can only view your own activity feed");
         }
 
-        // Clamp page/size defaults per spec
-        int safePage = Math.max(page, 0);
-        int safeSize = (size <= 0) ? 10 : size; // cap to 100 handled inside service
-
-        ActivityFeedDTO feed = activityFeedService.getActivityFeed(id, safePage, safeSize);
+        ActivityFeedDTO feed = activityFeedService.getActivityFeed(id, page, size);
         return ResponseEntity.ok(feed);
     }
 }
