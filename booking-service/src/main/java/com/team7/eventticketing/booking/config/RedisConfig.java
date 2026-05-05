@@ -1,7 +1,17 @@
-package com.team7.eventticketing.event.config;
+package com.team7.eventticketing.booking.config;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.Cache;
+import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -10,10 +20,6 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -21,48 +27,85 @@ import java.util.Map;
 
 @Configuration
 @EnableCaching
-public class RedisConfig {
+public class RedisConfig implements CachingConfigurer {
+
+    private static final Logger log = LoggerFactory.getLogger(RedisConfig.class);
 
     @Value("${spring.application.name}")
     private String serviceName;
 
     @Bean
     public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
+        GenericJackson2JsonRedisSerializer serializer = buildJsonSerializer();
 
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.registerModule(new JavaTimeModule());
-        mapper.activateDefaultTyping(
-                LaissezFaireSubTypeValidator.instance,
-                ObjectMapper.DefaultTyping.NON_FINAL,
-                JsonTypeInfo.As.PROPERTY
-        );
-
-        // Base config — shared serializer and key prefix, no default TTL yet
-        RedisCacheConfiguration base = RedisCacheConfiguration.defaultCacheConfig()
-                .computePrefixWith(cacheName -> serviceName + "::" + cacheName + "::")
-                .serializeValuesWith(RedisSerializationContext.SerializationPair
-                        .fromSerializer(new GenericJackson2JsonRedisSerializer(mapper)));
+        RedisCacheConfiguration base = baseConfig(Duration.ofMinutes(10), serializer);
 
         Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
-        cacheConfigs.put("booking", base.entryTtl(Duration.ofMinutes(15)));
-        cacheConfigs.put("booking-item", base.entryTtl(Duration.ofMinutes(15)));
-        cacheConfigs.put("S3-F1", base.entryTtl(Duration.ofMinutes(5)));
-        cacheConfigs.put("S3-F3", base.entryTtl(Duration.ofMinutes(10)));
-        cacheConfigs.put("S3-F5", base.entryTtl(Duration.ofMinutes(5)));
-        cacheConfigs.put("S3-F6", base.entryTtl(Duration.ofMinutes(10)));
-        cacheConfigs.put("S3-F9", base.entryTtl(Duration.ofMinutes(10)));
-        cacheConfigs.put("S3-F10", base.entryTtl(Duration.ofMinutes(10)));
-        cacheConfigs.put("S3-F12", base.entryTtl(Duration.ofMinutes(5)));
-
+        cacheConfigs.put("booking", baseConfig(Duration.ofMinutes(15), serializer));
+        cacheConfigs.put("booking-item", baseConfig(Duration.ofMinutes(15), serializer));
+        cacheConfigs.put("S3-F1", baseConfig(Duration.ofMinutes(5), serializer));
+        cacheConfigs.put("S3-F3", baseConfig(Duration.ofMinutes(10), serializer));
+        cacheConfigs.put("S3-F5", baseConfig(Duration.ofMinutes(5), serializer));
+        cacheConfigs.put("S3-F6", baseConfig(Duration.ofMinutes(10), serializer));
+        cacheConfigs.put("S3-F9", baseConfig(Duration.ofMinutes(10), serializer));
+        cacheConfigs.put("S3-F10", baseConfig(Duration.ofMinutes(10), serializer));
+        cacheConfigs.put("S3-F12", baseConfig(Duration.ofMinutes(5), serializer));
 
         return RedisCacheManager.builder(connectionFactory)
-                .cacheDefaults(base.entryTtl(Duration.ofMinutes(10))) // fallback for anything not listed
+                .cacheDefaults(base)
                 .withInitialCacheConfigurations(cacheConfigs)
                 .build();
+    }
+
+    private RedisCacheConfiguration baseConfig(Duration ttl,
+            GenericJackson2JsonRedisSerializer serializer) {
+        return RedisCacheConfiguration.defaultCacheConfig()
+                .entryTtl(ttl)
+                .computePrefixWith(cacheName -> serviceName + "::" + cacheName + "::")
+                .serializeValuesWith(
+                        RedisSerializationContext.SerializationPair.fromSerializer(serializer));
+    }
+
+    private GenericJackson2JsonRedisSerializer buildJsonSerializer() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        mapper.activateDefaultTyping(
+                BasicPolymorphicTypeValidator.builder()
+                        .allowIfSubType(Object.class)
+                        .build(),
+                ObjectMapper.DefaultTyping.NON_FINAL,
+                JsonTypeInfo.As.PROPERTY);
+        return new GenericJackson2JsonRedisSerializer(mapper);
     }
 
     @Bean
     public StringRedisTemplate stringRedisTemplate(RedisConnectionFactory connectionFactory) {
         return new StringRedisTemplate(connectionFactory);
+    }
+
+    @Override
+    public CacheErrorHandler errorHandler() {
+        return new CacheErrorHandler() {
+            @Override
+            public void handleCacheGetError(RuntimeException ex, Cache cache, Object key) {
+                log.warn("Redis GET failed (cache={}, key={}): {}", cache.getName(), key, ex.getMessage());
+            }
+
+            @Override
+            public void handleCachePutError(RuntimeException ex, Cache cache, Object key, Object value) {
+                log.warn("Redis PUT failed (cache={}, key={}): {}", cache.getName(), key, ex.getMessage());
+            }
+
+            @Override
+            public void handleCacheEvictError(RuntimeException ex, Cache cache, Object key) {
+                log.warn("Redis EVICT failed (cache={}, key={}): {}", cache.getName(), key, ex.getMessage());
+            }
+
+            @Override
+            public void handleCacheClearError(RuntimeException ex, Cache cache) {
+                log.warn("Redis CLEAR failed (cache={}): {}", cache.getName(), ex.getMessage());
+            }
+        };
     }
 }

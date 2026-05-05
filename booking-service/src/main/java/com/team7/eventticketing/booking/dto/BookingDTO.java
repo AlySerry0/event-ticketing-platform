@@ -1,5 +1,9 @@
 package com.team7.eventticketing.booking.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
+import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
 import com.team7.eventticketing.booking.model.BookingStatus;
 
 import java.time.LocalDateTime;
@@ -14,8 +18,14 @@ public class BookingDTO {
 	private BookingStatus status;
 	private Double totalAmount;
 	private Map<String, Object> metadata;
+	@JsonSerialize(using = LocalDateTimeSerializer.class)
+	@JsonDeserialize(using = LocalDateTimeDeserializer.class)
 	private LocalDateTime bookingDate;
+	@JsonSerialize(using = LocalDateTimeSerializer.class)
+	@JsonDeserialize(using = LocalDateTimeDeserializer.class)
 	private LocalDateTime confirmedAt;
+	@JsonSerialize(using = LocalDateTimeSerializer.class)
+	@JsonDeserialize(using = LocalDateTimeDeserializer.class)
 	private LocalDateTime createdAt;
 	private List<BookingItemDTO> bookingItems;
 

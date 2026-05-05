@@ -54,6 +54,7 @@ public class FullSystemTestsPart2 {
     @Autowired private ObjectMapper mapper;
     @Autowired private org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
     @Autowired private org.neo4j.driver.Driver neo4j;
+    @Autowired private org.springframework.data.redis.connection.RedisConnectionFactory redisConnectionFactory;
 
     private long neoCount(String cypher) {
         try (var session = neo4j.session()) {
@@ -77,7 +78,14 @@ public class FullSystemTestsPart2 {
     @BeforeEach
     void cleanup() {
         jdbc.execute("TRUNCATE TABLE users, events, bookings, tickets, ticket_sales CASCADE");
+        jdbc.execute("SELECT setval('public.users_id_seq', 1, false)");
         mongoTemplate.dropCollection("booking_events");
+        try (var conn = redisConnectionFactory.getConnection()) {
+            conn.serverCommands().flushAll();
+        }
+        try (var session = neo4j.session()) {
+            session.run("MATCH (n) DETACH DELETE n");
+        }
     }
 
     // --- INSERTION HELPERS ---
@@ -292,8 +300,8 @@ public class FullSystemTestsPart2 {
         restTemplate.exchange(BOOKING_SVC + "/api/bookings/732/record-attendance", HttpMethod.POST, new HttpEntity<>(authHeader(token)), String.class);
 
         // Verify two distinct ATTENDED edges exist in Neo4j
-        assertThat(neoCount("MATCH (u:User {id: "+uid+"})-[r:ATTENDED]->(e:Event {id: 1}) RETURN count(r)")).isEqualTo(1);
-        assertThat(neoCount("MATCH (u:User {id: "+uid+"})-[r:ATTENDED]->(e:Event {id: 2}) RETURN count(r)")).isEqualTo(1);
+        assertThat(neoCount("MATCH (u:User {userId: "+uid+"})-[r:ATTENDED]->(e:Event {eventId: 1}) RETURN count(r)")).isEqualTo(1);
+        assertThat(neoCount("MATCH (u:User {userId: "+uid+"})-[r:ATTENDED]->(e:Event {eventId: 2}) RETURN count(r)")).isEqualTo(1);
     }
     
     @Test void tc74_recordPendingReturns400() {
@@ -342,7 +350,7 @@ public class FullSystemTestsPart2 {
         restTemplate.exchange(BOOKING_SVC + "/api/bookings/810/record-attendance", HttpMethod.POST, new HttpEntity<>(authHeader(token)), String.class);
 
         // Verify edge has lastAttendedDate property
-        org.neo4j.driver.Value dateProp = neoProp("MATCH (:User {id: "+uid+"})-[r:ATTENDED]->(:Event {id: 1}) RETURN r.lastAttendedDate");
+        org.neo4j.driver.Value dateProp = neoProp("MATCH (:User {userId: "+uid+"})-[r:ATTENDED]->(:Event {eventId: 1}) RETURN r.lastAttendedDate");
         assertThat(dateProp.isNull()).isFalse();
     }
 
@@ -353,7 +361,7 @@ public class FullSystemTestsPart2 {
         restTemplate.exchange(BOOKING_SVC + "/api/bookings/820/record-attendance", HttpMethod.POST, new HttpEntity<>(authHeader(token)), String.class);
 
         // Verify Event node exists with correct ID
-        assertThat(neoCount("MATCH (e:Event {id: 100}) RETURN count(e)")).isEqualTo(1);
+        assertThat(neoCount("MATCH (e:Event {eventId: 100}) RETURN count(e)")).isEqualTo(1);
     }
 
     @Test void tc83_userNodeExists() {
@@ -364,7 +372,7 @@ public class FullSystemTestsPart2 {
         restTemplate.exchange(BOOKING_SVC + "/api/bookings/830/record-attendance", HttpMethod.POST, new HttpEntity<>(authHeader(token)), String.class);
 
         // Verify User node exists with correct ID
-        assertThat(neoCount("MATCH (u:User {id: "+uid+"}) RETURN count(u)")).isEqualTo(1);
+        assertThat(neoCount("MATCH (u:User {userId: "+uid+"}) RETURN count(u)")).isEqualTo(1);
     }
     
     @Test void tc84_logsInteractionToMongo() {
