@@ -288,6 +288,10 @@ public class TicketService implements EntitySubject {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
         }
 
+        if (batchRequest.getTickets() == null || batchRequest.getTickets().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ticket list cannot be empty");
+        }
+
         List<IssueTicketDTO> ticketRequests = batchRequest.getTickets();
 
         List<String> incomingTicketCodes = ticketRequests.stream()
