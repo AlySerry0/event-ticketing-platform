@@ -28,7 +28,7 @@ public class PromotionService {
     private CacheInvalidationService cacheInvalidationService;
     private void invalidateAfterPromotionWrite(Long promotionId) {
         // CRUD get-by-ID cache
-        cacheInvalidationService.invalidateCacheWildcard("sales-service::Promotion::" + promotionId);
+        cacheInvalidationService.invalidateCacheWildcard("sales-service::ppPromotion::" + promotionId);
 
         // S5-F9: Most Used Promotions Report
         cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F9::*");

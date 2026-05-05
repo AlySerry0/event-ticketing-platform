@@ -642,10 +642,21 @@ public class TicketSaleService {
     }
 
     public void logTierAnalyticsViewed(LocalDate startDate, LocalDate endDate) {
-        PaymentAuditEvent event = eventFactory.createAnalyticsViewedEvent(
-                "ANALYTICS_VIEWED", startDate, endDate);
-        entitySubject.notifyObservers("ANALYTICS_VIEWED", event);
+        Map<String, Object> details = new HashMap<>();
+        details.put("feature", "S5-F10");
+        details.put("startDate", startDate.toString());
+        details.put("endDate", endDate.toString());
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("saleId", null);
+        payload.put("method", null);
+        payload.put("amount", null);
+        payload.put("details", details);
+
+        entitySubject.notifyObservers("ANALYTICS_VIEWED", payload);
     }
+
+
     @Cacheable(value = "S5-F11", key = "#saleId")
     public SaleAuditTrailDTO getSaleAuditTrail(Long saleId) {
 
