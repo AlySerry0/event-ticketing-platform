@@ -54,7 +54,14 @@ public class AuthService {
         user.setStatus(UserStatus.ACTIVE);
         user.setCreatedAt(LocalDateTime.now());
 
-        user = userRepository.save(user);
+//        user = userRepository.save(user);
+        try {
+            user = userRepository.save(user);
+        } catch (Exception e) {
+            // Sequence out of sync — reset it and retry
+            userRepository.resetSequence();
+            user = userRepository.save(user);
+        }
 
         // TODO: fire Observer → MongoDB REGISTERED event here (M2 Observer pattern)
 

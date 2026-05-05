@@ -1,7 +1,9 @@
 package com.team7.eventticketing.user.repository;
 
 import com.team7.eventticketing.user.model.User;
+import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -85,4 +87,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
         """, nativeQuery = true)
     List<User> findUsersByFavoriteCategoryWithMinBookings(@Param("category") String category,
                                                           @Param("minBookings") int minBookings);
+
+    @Modifying
+    @Transactional
+    @Query(value = "ALTER SEQUENCE users_id_seq RESTART WITH 10000", nativeQuery = true)
+    void resetSequence();
 }
