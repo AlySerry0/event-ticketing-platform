@@ -45,7 +45,6 @@ public class AuthService {
 //
 //        // Register the MongoEventLogger observer at construction time.
 //        // MongoEventLogger is NOT a Spring bean — we instantiate it manually
-//        // as required by Section 3.3 (classical GoF, not Spring @EventListener).
 //        this.registerObserver(new MongoEventLogger(authEventRepository));
 //    }
 
@@ -61,7 +60,6 @@ public class AuthService {
 
         // Register the MongoEventLogger observer at construction time.
         // MongoEventLogger is NOT a Spring bean — we instantiate it manually
-        // as required by Section 3.3 (classical GoF, not Spring @EventListener).
         this.registerObserver(new MongoEventLogger(authEventRepository, cacheInvalidationService));
     }
 
