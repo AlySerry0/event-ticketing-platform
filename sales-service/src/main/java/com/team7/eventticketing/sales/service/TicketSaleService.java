@@ -435,12 +435,12 @@ public class TicketSaleService {
             totalAmount += amount;
         }
 
-        return new UserSaleSummaryDTO(
-                userId,
-                totalSales,
-                totalAmount,
-                methodBreakdown
-        );
+        return UserSaleSummaryDTO.builder()
+                .userId(userId)
+                .totalSales(totalSales)
+                .totalAmount(totalAmount)
+                .methodBreakdown(methodBreakdown)
+                .build();
     }
     @Transactional
     public TicketSaleDTO processRefund(Long saleId, String reason) {
