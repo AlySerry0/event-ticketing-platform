@@ -13,6 +13,47 @@ public class SaleDetailsDTO {
     private Long bookingId;
     private Long userId;
     private Double originalAmount;
+
+    public void setSaleId(Long saleId) {
+        this.saleId = saleId;
+    }
+
+    public void setBookingId(Long bookingId) {
+        this.bookingId = bookingId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
+    }
+
+    public void setOriginalAmount(Double originalAmount) {
+        this.originalAmount = originalAmount;
+    }
+
+    public void setMethod(PaymentMethod method) {
+        this.method = method;
+    }
+
+    public void setStatus(TicketSaleStatus status) {
+        this.status = status;
+    }
+
+    public void setTransactionDetails(Map<String, Object> transactionDetails) {
+        this.transactionDetails = transactionDetails;
+    }
+
+    public void setAppliedPromotions(List<AppliedPromotionDTO> appliedPromotions) {
+        this.appliedPromotions = appliedPromotions;
+    }
+
+    public void setTotalDiscount(Double totalDiscount) {
+        this.totalDiscount = totalDiscount;
+    }
+
+    public void setFinalAmount(Double finalAmount) {
+        this.finalAmount = finalAmount;
+    }
+
     private PaymentMethod method;
     private TicketSaleStatus status;
     private Map<String, Object> transactionDetails;

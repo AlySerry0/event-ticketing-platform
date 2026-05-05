@@ -8,6 +8,26 @@ public class RevenueReportDTO {
     private Double refundedAmount;
     private Long refundCount;
 
+    public void setTotalRevenue(Double totalRevenue) {
+        this.totalRevenue = totalRevenue;
+    }
+
+    public void setTotalTransactions(Long totalTransactions) {
+        this.totalTransactions = totalTransactions;
+    }
+
+    public void setAverageSale(Double averageSale) {
+        this.averageSale = averageSale;
+    }
+
+    public void setRefundedAmount(Double refundedAmount) {
+        this.refundedAmount = refundedAmount;
+    }
+
+    public void setRefundCount(Long refundCount) {
+        this.refundCount = refundCount;
+    }
+
     private RevenueReportDTO(Builder builder) {
         this.totalRevenue = builder.totalRevenue;
         this.totalTransactions = builder.totalTransactions;

@@ -17,6 +17,22 @@ public class UserSaleSummaryDTO {
         this.methodBreakdown = builder.methodBreakdown;
     }
 
+    public void setUserId(Long userId) {
+        this.userId = userId;
+    }
+
+    public void setTotalSales(Integer totalSales) {
+        this.totalSales = totalSales;
+    }
+
+    public void setTotalAmount(Double totalAmount) {
+        this.totalAmount = totalAmount;
+    }
+
+    public void setMethodBreakdown(Map<String, Double> methodBreakdown) {
+        this.methodBreakdown = methodBreakdown;
+    }
+
     // Getters
     public Long getUserId() {
         return userId;

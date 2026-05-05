@@ -11,6 +11,38 @@ public class PromotionUsageDTO {
     private Boolean active;
     private Boolean expired;
 
+    public void setPromotionId(Long promotionId) {
+        this.promotionId = promotionId;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
+    }
+
+    public void setDiscountType(String discountType) {
+        this.discountType = discountType;
+    }
+
+    public void setTimesUsed(Integer timesUsed) {
+        this.timesUsed = timesUsed;
+    }
+
+    public void setDiscountValue(Double discountValue) {
+        this.discountValue = discountValue;
+    }
+
+    public void setTotalDiscountGiven(Double totalDiscountGiven) {
+        this.totalDiscountGiven = totalDiscountGiven;
+    }
+
+    public void setActive(Boolean active) {
+        this.active = active;
+    }
+
+    public void setExpired(Boolean expired) {
+        this.expired = expired;
+    }
+
     // Private constructor
     private PromotionUsageDTO(Builder builder) {
         this.promotionId = builder.promotionId;
