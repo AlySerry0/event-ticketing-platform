@@ -37,7 +37,7 @@ public class ObjectArrayDtoAdapter {
 
         Boolean expired = expiryDate != null && expiryDate.isBefore(LocalDateTime.now());
 
-        return new PromotionUsageDTO.Builder()
+        return PromotionUsageDTO.builder()
                 .promotionId(id)
                 .code(code)
                 .discountType(discountType)
