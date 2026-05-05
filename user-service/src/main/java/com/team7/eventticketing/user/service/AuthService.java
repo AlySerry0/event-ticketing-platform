@@ -117,7 +117,14 @@ public class AuthService {
         user.setStatus(UserStatus.ACTIVE);
         user.setCreatedAt(LocalDateTime.now());
 
-        user = userRepository.save(user);
+//        user = userRepository.save(user);
+        try {
+            user = userRepository.save(user);
+        } catch (Exception e) {
+            // Sequence out of sync — reset it and retry
+            userRepository.resetSequence();
+            user = userRepository.save(user);
+        }
 
         // S1-P11 + S1-L1: Trigger Observer on user creation → logs REGISTERED to MongoDB
         notifyObservers("REGISTERED", Map.of(
