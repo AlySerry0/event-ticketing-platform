@@ -72,4 +72,16 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     @Query(value = "SELECT id, name, category, event_date FROM events WHERE id IN (:eventIds)", nativeQuery = true)
     List<Object[]> findEventRecommendationDetails(@Param("eventIds") List<Long> eventIds);
+
+    @Query(value = """
+        SELECT COALESCE(SUM(ts.amount), 0)
+        FROM ticket_sales ts
+        JOIN bookings b ON ts.booking_id = b.id
+        WHERE b.status = 'COMPLETED'
+          AND b.booking_date >= :startDate
+          AND b.booking_date <= :endDate
+        """, nativeQuery = true)
+    Double sumTicketSalesRevenueForCompletedBookings(
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
 }

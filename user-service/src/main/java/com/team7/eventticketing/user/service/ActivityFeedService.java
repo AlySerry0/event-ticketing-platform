@@ -60,7 +60,7 @@ public class ActivityFeedService {
                     HttpStatus.BAD_REQUEST, "Page and size must be positive integers");
         }
 
-        // Cap size at 100 per spec Section 10.1.3
+        size = (size == 0) ? 10 : size;
         int cappedSize = Math.min(size, 100);
 
         // Let Spring Data handle pagination and sorting — no manual subList needed

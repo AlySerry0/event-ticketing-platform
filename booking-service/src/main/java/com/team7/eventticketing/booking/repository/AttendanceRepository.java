@@ -13,10 +13,10 @@ import java.util.Map;
 public class AttendanceRepository {
 
     private static final String RECORD_ATTENDANCE_CYPHER = """
-            MERGE (u:User {userId: $userId})
+            MERGE (u:User {id: $userId})
             ON CREATE SET u.name = $userName
             SET u:UserNode
-            MERGE (e:Event {eventId: $eventId})
+            MERGE (e:Event {id: $eventId})
             SET e.name = $eventName, e.category = $category
             SET e:EventNode
             MERGE (u)-[r:ATTENDED]->(e)
@@ -31,9 +31,9 @@ public class AttendanceRepository {
             """;
 
     private static final String GET_RECOMMENDATIONS_CYPHER = """
-            MATCH (target:User {userId: $userId})-[:ATTENDED]->(shared:Event)<-[:ATTENDED]-(similar:User)-[:ATTENDED]->(recommended:Event)
+            MATCH (target:User {id: $userId})-[:ATTENDED]->(shared:Event)<-[:ATTENDED]-(similar:User)-[:ATTENDED]->(recommended:Event)
             WHERE NOT (target)-[:ATTENDED]->(recommended)
-            RETURN recommended.eventId AS eventId,
+            RETURN recommended.id AS eventId,
                    recommended.name AS eventName,
                    recommended.category AS category,
                    count(similar) AS score
