@@ -88,40 +88,72 @@ services:
       retries: 10
       start_period: 30s
 
-  cassandra-init:
-    image: cassandra:latest
-    depends_on:
-      cassandra:
-        condition: service_healthy
-    entrypoint: >
-      bash -c "
-      echo 'Waiting for Cassandra...';
-      sleep 10;
-      cqlsh cassandra 9042 -e \"
-      CREATE KEYSPACE IF NOT EXISTS eventticketingks
-      WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
-      \";
-      "
+#  cassandra-init:
+#    image: cassandra:5.0
+#
+#    depends_on:
+#      cassandra:
+#        condition: service_healthy
+#
+#    entrypoint: >
+#      bash -c "
+#      echo 'Waiting for Cassandra...';
+#
+#      for i in {1..20}; do
+#        cqlsh cassandra 9042 -e 'DESCRIBE KEYSPACES' && break;
+#        echo 'Retrying Cassandra connection...';
+#        sleep 5;
+#      done;
+#
+#      cqlsh cassandra 9042 -e \"
+#      CREATE KEYSPACE IF NOT EXISTS eventticketingks
+#      WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+#      \";
+#
+#      echo 'Keyspace created successfully';
+#      "
 
   cassandra:
-    image: cassandra:latest
+    image: cassandra:5.0
     container_name: eventticketing-cassandra
     ports:
       - "9042:9042"
+
     environment:
-      CASSANDRA_CLUSTER_NAME: eventticketingcluster
+      CASSANDRA_CLUSTER_NAME: M2GraderCluster
+      CASSANDRA_ENDPOINT_SNITCH: SimpleSnitch
       CASSANDRA_DC: datacenter1
-      CASSANDRA_KEYSPACE: eventticketingks
-      MAX_HEAP_SIZE: 512M
-      HEAP_NEWSIZE: 128M
+      CASSANDRA_RACK: rack1
+      MAX_HEAP_SIZE: 1024M
+      HEAP_NEWSIZE: 200M
+      CASSANDRA_NUM_TOKENS: 1
+      CASSANDRA_AUTHENTICATOR: AllowAllAuthenticator
+
+      JVM_EXTRA_OPTS: >-
+        -Dcassandra.skip_wait_for_gossip_to_settle=0
+        -Dcassandra.consistent.rangemovement=false
+        -Dcassandra.ring_delay_ms=1000
+        -Dcassandra.write_request_timeout_in_ms=30000
+        -Dcassandra.skip_jvm_check=true
+        -Djna.tmpdir=/var/lib/cassandra/tmp
+        -Djava.io.tmpdir=/var/lib/cassandra/tmp
+
     volumes:
       - cassandra-data:/var/lib/cassandra
+
+    command: >
+      bash -c "
+        mkdir -p /var/lib/cassandra/tmp &&
+        export JVM_OPTS=\"\$JVM_OPTS -Djna.tmpdir=/var/lib/cassandra/tmp -Djava.io.tmpdir=/var/lib/cassandra/tmp\" &&
+        exec /usr/local/bin/docker-entrypoint.sh cassandra -f
+      "
+
     healthcheck:
       test: ["CMD-SHELL", "cqlsh -e 'DESCRIBE KEYSPACES'"]
       interval: 15s
       timeout: 10s
-      retries: 10
-      start_period: 60s
+      retries: 15
+      start_period: 90s
 
   # ─── Application Services ────────────────────────────────────
 
@@ -139,6 +171,7 @@ services:
       SPRING_DATA_REDIS_PASSWORD: redispass
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
+      TZ: Africa/Cairo
     depends_on:
       postgres:
         condition: service_healthy
@@ -159,6 +192,7 @@ services:
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
+      TZ: Africa/Cairo
     depends_on:
       postgres:
         condition: service_healthy
@@ -180,6 +214,7 @@ services:
       SPRING_NEO4J_AUTHENTICATION_PASSWORD: neo4jpass
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
+      TZ: Africa/Cairo
     depends_on:
       postgres:
         condition: service_healthy
@@ -201,8 +236,10 @@ services:
       SPRING_CASSANDRA_PORT: "9042"
       SPRING_CASSANDRA_LOCAL_DATACENTER: datacenter1
       SPRING_CASSANDRA_KEYSPACE_NAME: eventticketingks
+      SPRING_CASSANDRA_SCHEMA_ACTION: CREATE_IF_NOT_EXISTS
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
+      TZ: Africa/Cairo
     depends_on:
       postgres:
         condition: service_healthy
@@ -220,6 +257,7 @@ services:
       SPRING_DATA_REDIS_PASSWORD: redispass
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
+      TZ: Africa/Cairo
     depends_on:
       postgres:
         condition: service_healthy
