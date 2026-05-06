@@ -104,24 +104,37 @@ services:
       "
 
   cassandra:
-    image: cassandra:latest
+    image: cassandra:5.0
     container_name: eventticketing-cassandra
     ports:
       - "9042:9042"
+    tmpfs:
+      - /tmp:exec,size=256m
     environment:
-      CASSANDRA_CLUSTER_NAME: eventticketingcluster
+      CASSANDRA_CLUSTER_NAME: M2GraderCluster
+      CASSANDRA_ENDPOINT_SNITCH: SimpleSnitch
       CASSANDRA_DC: datacenter1
-      CASSANDRA_KEYSPACE: eventticketingks
-      MAX_HEAP_SIZE: 512M
-      HEAP_NEWSIZE: 128M
+      CASSANDRA_RACK: rack1
+      MAX_HEAP_SIZE: 1024M
+      HEAP_NEWSIZE: 200M
+      CASSANDRA_NUM_TOKENS: 1
+      CASSANDRA_AUTHENTICATOR: AllowAllAuthenticator
+      JVM_EXTRA_OPTS: >-
+        -Dcassandra.skip_wait_for_gossip_to_settle=0
+        -Dcassandra.consistent.rangemovement=false
+        -Dcassandra.ring_delay_ms=1000
+        -Dcassandra.write_request_timeout_in_ms=30000
+        -Dcassandra.skip_jvm_check=true
+        -Djna.tmpdir=/tmp
+        -Djava.io.tmpdir=/tmp
     volumes:
       - cassandra-data:/var/lib/cassandra
     healthcheck:
       test: ["CMD-SHELL", "cqlsh -e 'DESCRIBE KEYSPACES'"]
       interval: 15s
       timeout: 10s
-      retries: 10
-      start_period: 60s
+      retries: 15
+      start_period: 90s
 
   # ─── Application Services ────────────────────────────────────
 
@@ -139,6 +152,7 @@ services:
       SPRING_DATA_REDIS_PASSWORD: redispass
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
+      TZ: Africa/Cairo
     depends_on:
       postgres:
         condition: service_healthy
@@ -159,6 +173,7 @@ services:
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
+      TZ: Africa/Cairo
     depends_on:
       postgres:
         condition: service_healthy
@@ -180,6 +195,7 @@ services:
       SPRING_NEO4J_AUTHENTICATION_PASSWORD: neo4jpass
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
+      TZ: Africa/Cairo
     depends_on:
       postgres:
         condition: service_healthy
@@ -203,6 +219,7 @@ services:
       SPRING_CASSANDRA_KEYSPACE_NAME: eventticketingks
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
+      TZ: Africa/Cairo
     depends_on:
       postgres:
         condition: service_healthy
@@ -220,6 +237,7 @@ services:
       SPRING_DATA_REDIS_PASSWORD: redispass
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
+      TZ: Africa/Cairo
     depends_on:
       postgres:
         condition: service_healthy

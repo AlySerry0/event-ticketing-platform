@@ -668,9 +668,9 @@ public class TicketSaleService {
         }
 
         List<PaymentAuditEvent> events =
-                paymentAuditEventRepository.findBySaleIdAndActionNotOrderByTimestampAsc(
+                paymentAuditEventRepository.findBySaleIdAndActionNotInOrderByTimestampAsc(
                         saleId,
-                        "ANALYTICS_VIEWED"
+                        java.util.List.of("ANALYTICS_VIEWED")
                 );
 
         return mongoDocumentAdapter.adapt(saleId, events);

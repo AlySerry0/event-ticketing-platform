@@ -11,5 +11,5 @@ public interface PaymentAuditEventRepository extends MongoRepository<PaymentAudi
 
     List<PaymentAuditEvent> findBySaleIdOrderByTimestampAsc(Long saleId);
 
-    List<PaymentAuditEvent> findBySaleIdAndActionNotOrderByTimestampAsc(Long saleId, String action);
+    List<PaymentAuditEvent> findBySaleIdAndActionNotInOrderByTimestampAsc(Long saleId, java.util.Collection<String> actions);
 }

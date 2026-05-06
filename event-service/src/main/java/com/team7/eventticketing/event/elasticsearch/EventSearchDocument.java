@@ -5,6 +5,8 @@ import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 import org.springframework.data.elasticsearch.annotations.DateFormat;
+import org.springframework.data.elasticsearch.annotations.MultiField;
+import org.springframework.data.elasticsearch.annotations.InnerField;
 
 import java.time.LocalDateTime;
 
@@ -15,7 +17,10 @@ public class EventSearchDocument {
     @Field(type = FieldType.Keyword)
     private Long id;
 
-    @Field(type = FieldType.Text)
+    @MultiField(
+        mainField = @Field(type = FieldType.Text),
+        otherFields = { @InnerField(suffix = "keyword", type = FieldType.Keyword) }
+    )
     private String name;
 
     @Field(type = FieldType.Keyword)

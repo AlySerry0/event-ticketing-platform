@@ -557,9 +557,6 @@ public class BookingService implements EntitySubject {
 
 			if (b.getStatus() == BookingStatus.COMPLETED) {
 				completedCount++;
-				if (b.getTotalAmount() != null) {
-					totalRevenue += b.getTotalAmount();
-				}
 			}
 
 			if (b.getStatus() == BookingStatus.CONFIRMED
@@ -568,6 +565,9 @@ public class BookingService implements EntitySubject {
 				conversionCount++;
 			}
 		}
+
+		Double revenueFromSales = bookingRepository.sumTicketSalesRevenueForCompletedBookings(start, end);
+		totalRevenue = revenueFromSales != null ? revenueFromSales : 0.0;
 
 		double avgValue = completedCount > 0 ? totalRevenue / completedCount : 0.0;
 		double convRate = totalBookings > 0 ? (double) conversionCount / totalBookings : 0.0;
