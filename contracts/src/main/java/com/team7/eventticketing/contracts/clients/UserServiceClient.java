@@ -1,6 +1,5 @@
 package com.team7.eventticketing.contracts.clients;
 
-import com.team7.eventticketing.contracts.dto.*;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
