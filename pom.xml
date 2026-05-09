@@ -16,6 +16,7 @@
     </properties>
 
     <modules>
+        <module>contracts</module>
         <module>user-service</module>
         <module>event-service</module>
         <module>booking-service</module>
