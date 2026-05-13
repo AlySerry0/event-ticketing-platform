@@ -1,0 +1,105 @@
+{
+  "title": "User Service — Logs & Metrics",
+  "uid": "user-service-dashboard",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Error Rate — user-service (LogQL)",
+      "description": "Count of ERROR-level log lines per minute. Spike = something is broken.",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum(rate({service=\"user-service\"} | json | level=\"ERROR\" [1m]))",
+          "legendFormat": "errors/min",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "red" },
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Authentication Events (LogQL)",
+      "description": "REGISTERED and LOGGED_IN events over time — monitors auth traffic.",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum by(action) (count_over_time({service=\"user-service\"} | json | message=~\".*REGISTERED.*|.*LOGGED_IN.*\" [5m]))",
+          "legendFormat": "{{action}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Booking Service Feign Errors (LogQL)",
+      "description": "Warning logs from BookingServiceClientWrapper — booking-service unavailability.",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "count_over_time({service=\"user-service\"} | json | logger=\"com.teamXX.eventticketing.user.client.BookingServiceClientWrapper\" | level=\"WARN\" [1m])",
+          "legendFormat": "feign-warn/min",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Request Log Volume by Path (LogQL)",
+      "description": "Breaks down log volume by HTTP path — identifies hot endpoints.",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum by(requestPath) (count_over_time({service=\"user-service\"} | json | requestPath != \"\" [5m]))",
+          "legendFormat": "{{requestPath}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Correlation ID Trace (LogQL — Explore)",
+      "description": "Filter all logs for a specific request. Use the Explore panel — paste a correlationId to trace the full request across services.",
+      "type": "logs",
+      "gridPos": { "x": 0, "y": 16, "w": 24, "h": 10 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "{service=\"user-service\"} | json | correlationId=\"$correlationId\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "wrapLogMessage": true
+      }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "correlationId",
+        "type": "textbox",
+        "label": "Correlation ID",
+        "description": "Paste a correlationId to trace a specific request"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "30s"
+}

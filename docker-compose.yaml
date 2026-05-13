@@ -18,6 +18,23 @@ services:
       timeout: 5s
       retries: 5
 
+  user-postgres:
+    image: postgres:17
+    container_name: eventticketing-user-postgres
+    ports:
+      - "5433:5432"   # 5433 on host to avoid conflict with the shared postgres on 5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: etdb-users
+    volumes:
+      - user-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d etdb-users" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   mongo:
     image: mongo:latest
     container_name: eventticketing-mongo
@@ -172,8 +189,10 @@ services:
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
       TZ: Africa/Cairo
+      SPRING_PROFILES_ACTIVE: docker
+      FEIGN_BOOKING_SERVICE_URL: http://booking-service:8080
     depends_on:
-      postgres:
+      user-postgres:
         condition: service_healthy
     restart: on-failure
 
@@ -270,3 +289,4 @@ volumes:
   es-data:
   neo4j-data:
   cassandra-data:
+  user-pgdata:
