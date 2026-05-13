@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@FeignClient(name = "booking-service", url = "${services.booking.url:http://booking-service:8080}")
+@FeignClient(name = "booking-service", url = "${feign.booking-service.url:http://booking-service:8080}")
 public interface BookingServiceClient {
 
 }

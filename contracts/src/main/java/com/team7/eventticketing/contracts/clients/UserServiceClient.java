@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
-@FeignClient(name = "user-service", url = "${services.user.url:http://user-service:8080}")
+@FeignClient(name = "user-service", url = "${feign.user-service.url:http://user-service:8080}")
 public interface UserServiceClient {
 
 }
