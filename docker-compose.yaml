@@ -155,6 +155,24 @@ services:
       retries: 15
       start_period: 90s
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: eventticketing-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   # ─── Application Services ────────────────────────────────────
 
   user-service:
@@ -169,11 +187,15 @@ services:
       SPRING_DATA_MONGODB_URI: mongodb://root:rootpass@mongo:27017/eventticketingmongo?authSource=admin
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PASSWORD: redispass
+      SPRING_RABBITMQ_HOST: rabbitmq
+      FEIGN_BOOKING_SERVICE_URL: http://booking-service:8080
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
       TZ: Africa/Cairo
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     restart: on-failure
 
@@ -270,3 +292,4 @@ volumes:
   es-data:
   neo4j-data:
   cassandra-data:
+  rabbitmq-data:
