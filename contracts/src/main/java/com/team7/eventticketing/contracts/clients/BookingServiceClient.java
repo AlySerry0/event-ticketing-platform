@@ -1,11 +1,8 @@
 package com.team7.eventticketing.contracts.clients;
 
-import com.team7.eventticketing.contracts.dto.UserBookingSummaryDTO;
+import com.team7.eventticketing.contracts.dto.BookingSummaryDTO;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @FeignClient(name = "booking-service", url = "${services.booking.url:http://booking-service:8080}")
 public interface BookingServiceClient {
@@ -13,10 +10,10 @@ public interface BookingServiceClient {
      * Returns aggregated booking stats for a user.
      * Used by user-service to enrich user profile responses.
      */
-    @GetMapping("/{id}/booking-summary")
-    UserBookingSummaryDTO getUserBookingSummary(
-            @PathVariable Long id,
-            @RequestHeader("Authorization") String authHeader,
+    @GetMapping("/api/bookings/user/{userId}/summary")
+    BookingSummaryDTO getUserBookingSummary(
+            @PathVariable("userId") Long userId,
+            @RequestHeader("Authorization") String token,
             @RequestHeader(value = "X-Correlation-ID", required = false)
             String correlationId);
 

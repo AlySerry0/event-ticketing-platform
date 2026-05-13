@@ -1,5 +1,6 @@
 package com.team7.eventticketing.user.service;
 
+import com.team7.eventticketing.contracts.dto.BookingSummaryDTO;
 import com.team7.eventticketing.contracts.wrappers.BookingServiceClientWrapper;
 import com.team7.eventticketing.user.dto.*;
 import com.team7.eventticketing.user.model.*;
@@ -8,7 +9,6 @@ import com.team7.eventticketing.user.observer.MongoEventLogger;
 import com.team7.eventticketing.user.repository.AuthEventRepository;
 import com.team7.eventticketing.user.repository.UserRepository;
 import com.team7.eventticketing.user.util.CacheInvalidationService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -26,9 +26,6 @@ import java.time.LocalTime;
 import java.util.*;
 
 import java.util.stream.Collectors;
-
-import com.team7.eventticketing.contracts.dto.UserBookingSummaryDTO;
-import com.team7.eventticketing.user.repository.BookingSummaryProjection;
 
 import com.team7.eventticketing.user.adapter.ObjectArrayDtoAdapter;
 
@@ -379,7 +376,16 @@ public class UserService {
 //                    "No booking summary found for user ID: " + id);
 //        }
 //        return objectArrayDtoAdapter.toUserBookingSummaryDTO(rows.get(0));
-        return bookingClient.getUserBookingSummary(id);
+        BookingSummaryDTO bookingSummary = bookingClient.getUserBookingSummary(id);
+        return UserBookingSummaryDTO.builder()
+                .userId(id)
+                .name(getUserById(id).getName()) // Get name from user-service DB, not booking-service
+                .totalBookings(bookingSummary.getTotalBookings())
+                .completedBookings(bookingSummary.getCompletedBookings())
+                .cancelledBookings(bookingSummary.getCancelledBookings())
+                .totalSpent(bookingSummary.getTotalSpent())
+                .averageBookingAmount(bookingSummary.getAverageBookingAmount())
+                .build();
     }
 
 
