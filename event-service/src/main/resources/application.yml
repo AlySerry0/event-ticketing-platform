@@ -1,11 +1,13 @@
 spring:
   application:
     name: event-service
+
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/eventticketingdb}
-    username: postgres
-    password: postgres
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -13,18 +15,32 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+
   data:
     mongodb:
       uri: ${SPRING_DATA_MONGODB_URI:mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin}
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
-      port: 6379
+      port: ${SPRING_DATA_REDIS_PORT:6379}
       password: ${SPRING_DATA_REDIS_PASSWORD:redispass}
+
   elasticsearch:
     uris: ${SPRING_ELASTICSEARCH_URIS:http://localhost:9200}
 
-  mongodb:
-    uri: ${SPRING_DATA_MONGODB_URI:mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin}
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:guest}
+    password: ${SPRING_RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 3
+
   web:
     error:
       include-message: always
@@ -36,6 +52,24 @@ server:
 jwt:
   secret: ${JWT_SECRET:XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw=}
   expiration: ${JWT_EXPIRATION_MS:86400000}
+
+feign:
+  booking-service:
+    url: ${FEIGN_BOOKING_SERVICE_URL:http://localhost:8083}
+  user-service:
+    url: ${FEIGN_USER_SERVICE_URL:http://localhost:8081}
+  ticket-service:
+    url: ${FEIGN_TICKET_SERVICE_URL:http://localhost:8084}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus,health,info"
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
 
 logging:
   level:
