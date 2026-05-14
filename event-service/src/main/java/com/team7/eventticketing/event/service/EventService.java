@@ -762,4 +762,17 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
                     "Invalid event status: " + status);
         }
     }
+
+    public void invalidateRevenueCacheForEvent(Long eventId) {
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F3::" + eventId + "_*");
+    }
+
+    public void invalidateDashboardCacheForEvent(Long eventId) {
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::" + eventId + "::*");
+    }
+
+    public void invalidateBookingDependentCaches(Long eventId) {
+        invalidateRevenueCacheForEvent(eventId);
+        invalidateDashboardCacheForEvent(eventId);
+    }
 }

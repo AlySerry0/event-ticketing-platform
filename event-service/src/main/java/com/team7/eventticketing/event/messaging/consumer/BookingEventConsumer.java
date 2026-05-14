@@ -4,6 +4,7 @@ import com.team7.eventticketing.contracts.events.BookingCancelledEvent;
 import com.team7.eventticketing.contracts.events.BookingCompletedEvent;
 import com.team7.eventticketing.contracts.events.BookingPlacedEvent;
 import com.team7.eventticketing.event.messaging.config.RabbitMQConfig;
+import com.team7.eventticketing.event.service.EventService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,9 +20,11 @@ public class BookingEventConsumer {
             LoggerFactory.getLogger(BookingEventConsumer.class);
 
     private final ObjectMapper objectMapper;
+    private final EventService eventService;
 
-    public BookingEventConsumer(ObjectMapper objectMapper) {
+    public BookingEventConsumer(ObjectMapper objectMapper, EventService eventService) {
         this.objectMapper = objectMapper;
+        this.eventService = eventService;
     }
 
     @RabbitListener(queues = RabbitMQConfig.BOOKING_SAGA_QUEUE)
@@ -54,7 +57,7 @@ public class BookingEventConsumer {
                                         event.eventId()
                                 );
 
-                                // future logic here
+                                eventService.invalidateBookingDependentCaches(event.eventId());
 
                                 log.info(
                                         "Processed booking.placed for bookingId={} eventId={}",
@@ -85,7 +88,7 @@ public class BookingEventConsumer {
                                         event.eventId()
                                 );
 
-                                // future logic here
+                                eventService.invalidateBookingDependentCaches(event.eventId());
 
                                 log.info(
                                         "Processed booking.completed for bookingId={} eventId={}",
@@ -117,7 +120,7 @@ public class BookingEventConsumer {
                                         event.reason()
                                 );
 
-                                // future logic here
+                                eventService.invalidateBookingDependentCaches(event.eventId());
 
                                 log.info(
                                         "Processed booking.cancelled for bookingId={} eventId={}",
