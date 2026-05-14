@@ -23,6 +23,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.team7.eventticketing.contracts.events.EventRatedEvent;
+import com.team7.eventticketing.contracts.events.EventStatusChangedEvent;
+import com.team7.eventticketing.event.messaging.publisher.EventPublisher;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -42,6 +45,7 @@ public class EventService {
     private final  EventIndexService eventIndexService;  // needed to trigger re-indexing on updates
     private final ElasticsearchOperations elasticsearchOperations;
     private final ElasticsearchHitAdapter elasticsearchHitAdapter;
+    private final EventPublisher eventPublisher;
 //    @Autowired
 //    private EventService self;
 
@@ -74,7 +78,7 @@ public class EventService {
      * as the single observer for this service.
      */
     public EventService(EventRepository eventRepository, MongoEventLogger mongoEventLogger, EventIndexService eventIndexService, ElasticsearchOperations elasticsearchOperations, ElasticsearchHitAdapter elasticsearchHitAdapter,
-CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheService) {
+CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheService, EventPublisher eventPublisher) {
         this.eventRepository = eventRepository;
         this.eventIndexService = eventIndexService;
         this.elasticsearchOperations = elasticsearchOperations;
@@ -82,6 +86,8 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
         this.register(mongoEventLogger);
         this.cacheInvalidationService = cacheInvalidationService;
         this.eventCacheService = eventCacheService;
+        this.eventPublisher = eventPublisher;
+
     }
 
     // -----------------------------------------------------------------------
@@ -425,6 +431,15 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
         extra.put("oldStatus", oldStatus);
         extra.put("newStatus", newStatus.name());
         notifyObservers("STATUS_CHANGED", buildPayload(eventId, extra));
+        eventPublisher.publishStatusChanged(
+                new EventStatusChangedEvent(
+                        event.getId(),
+                        event.getName(),
+                        oldStatus,
+                        newStatus.name(),
+                        LocalDateTime.now()
+                )
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -508,6 +523,16 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
         extra.put("rating", rating);
         extra.put("newAverageRating", newAvg);
         notifyObservers("RATED", buildPayload(eventId, extra));
+        eventPublisher.publishRated(
+                new EventRatedEvent(
+                        event.getId(),
+                        bookingId,
+                        rating,
+                        newAvg,
+                        event.getTotalRatings(),
+                        LocalDateTime.now()
+                )
+        );
     }
 
     @Transactional

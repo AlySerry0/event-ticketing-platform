@@ -43,6 +43,12 @@ public class RabbitMQConfig {
     public static final String DLQ_ROUTING_KEY =
             "event.booking.dlq";
 
+    public static final String EVENT_STATUS_CHANGED =
+            "event.status-changed";
+
+    public static final String EVENT_RATED =
+            "event.rated";
+
     // =========================================================
     // EXCHANGE BEANS
     // =========================================================
