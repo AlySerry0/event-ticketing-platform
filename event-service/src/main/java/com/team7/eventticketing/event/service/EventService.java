@@ -26,7 +26,9 @@ import org.springframework.web.server.ResponseStatusException;
 import com.team7.eventticketing.contracts.events.EventRatedEvent;
 import com.team7.eventticketing.contracts.events.EventStatusChangedEvent;
 import com.team7.eventticketing.event.messaging.publisher.EventPublisher;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -37,6 +39,7 @@ import java.util.stream.Collectors;
 @Service
 @Transactional(readOnly = true)
 public class EventService {
+    private static final Logger log = LoggerFactory.getLogger(EventService.class);
 
     // -----------------------------------------------------------------------
     // Observer registry (classical GoF — not Spring ApplicationEventPublisher)
@@ -579,9 +582,30 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
     // -----------------------------------------------------------------------
 
     public EventDashboardDTO getEventDashboard(Long eventId) {
-        EventDashboardDTO result = eventCacheService.getEventDashboardCached(eventId);
-        notifyObservers("DASHBOARD_VIEWED", buildPayload(eventId, Collections.emptyMap()));
-        return result;
+        long start = System.currentTimeMillis();
+
+        try {
+            MDC.put("eventId", eventId.toString());
+
+            log.info("Received S2-F12 dashboard request for eventId={}", eventId);
+
+            EventDashboardDTO result = eventCacheService.getEventDashboardCached(eventId);
+
+            notifyObservers("DASHBOARD_VIEWED", buildPayload(eventId, Collections.emptyMap()));
+
+            long elapsed = System.currentTimeMillis() - start;
+
+            if (elapsed > 1000) {
+                log.warn("Slow S2-F12 dashboard took {}ms for eventId={}", elapsed, eventId);
+            }
+
+            log.info("Returning S2-F12 dashboard for eventId={}", eventId);
+
+            return result;
+
+        } finally {
+            MDC.remove("eventId");
+        }
     }
 
     // -----------------------------------------------------------------------
