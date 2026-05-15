@@ -1,16 +1,23 @@
 package com.team7.eventticketing.apigateway.filter;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.util.Base64;
 import java.util.UUID;
 
 @Component
 public class JwtGatewayFilter implements GlobalFilter {
+
+    private final String secret = System.getenv("JWT_SECRET");
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -26,19 +33,35 @@ public class JwtGatewayFilter implements GlobalFilter {
         String correlationId = exchange.getRequest().getHeaders().getFirst("X-Correlation-ID");
         if (correlationId == null) correlationId = UUID.randomUUID().toString();
 
-        // 3. Logic: Re-use your M2 utility class for token validation [cite: 1274]
-        // If invalid, return exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-        
-        String uid = "extracted-id"; // TODO: extract from JWT
-        String role = "extracted-role"; // TODO: extract from JWT
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+            return exchange.getResponse().setComplete();
+        }
 
-        // 4. Mutate and Forward [cite: 1267-1273]
-        ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
-                .header("X-User-Id", uid)
-                .header("X-User-Role", role)
-                .header("X-Correlation-ID", correlationId)
-                .build();
+        String token = authHeader.substring(7);
 
-        return chain.filter(exchange.mutate().request(mutatedRequest).build());
+        try {
+            // Validate JWT and extract claims [cite: 1274]
+            Claims claims = Jwts.parser()
+                    .verifyWith(Keys.hmacShaKeyFor(Base64.getDecoder().decode(secret)))
+                    .build()
+                    .parseClaimsJws(token)
+                    .getPayload();
+
+            String userId = claims.get("uid", String.class);
+            String role   = claims.get("role", String.class);
+
+            ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
+                    .header("X-User-Id", userId)
+                    .header("X-User-Role", role)
+                    .header("X-Correlation-ID", correlationId)
+                    .build();
+
+            return chain.filter(exchange.mutate().request(mutatedRequest).build());
+
+        } catch (Exception e) {
+            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+            return exchange.getResponse().setComplete();
+        }
     }
 }

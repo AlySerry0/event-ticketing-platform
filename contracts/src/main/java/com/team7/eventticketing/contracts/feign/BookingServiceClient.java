@@ -4,7 +4,7 @@ import com.team7.eventticketing.contracts.dto.UserBookingSummaryDTO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
-@FeignClient(name = "booking-service", url = "${services.booking.url:http://booking-service:8080}")
+@FeignClient(name = "booking-service", url = "${feign.booking-service.url:http://booking-service:8080}")
 public interface BookingServiceClient {
     /**
      * Returns aggregated booking stats for a user.

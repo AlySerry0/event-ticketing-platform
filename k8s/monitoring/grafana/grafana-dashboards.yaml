@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: 'Event Ticketing'
+        orgId: 1
+        folder: 'Microservices'
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /etc/grafana/provisioning/dashboards
+  # Placeholders for the JSON files to be embedded by each slice owner [cite: 1692]
+  user-dashboard.json: '{"title": "User Service Dashboard"}'
+  event-dashboard.json: '{"title": "Event Service Dashboard"}'
+  booking-dashboard.json: '{"title": "Booking Service Dashboard"}'
+  ticket-dashboard.json: '{"title": "Ticket Service Dashboard"}'
+  sales-dashboard.json: '{"title": "Sales Service Dashboard"}'
