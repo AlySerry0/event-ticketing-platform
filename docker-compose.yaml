@@ -279,7 +279,6 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PASSWORD: redispass
       SPRING_RABBITMQ_HOST: rabbitmq
-      FEIGN_BOOKING_SERVICE_URL: http://booking-service:8080
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
       TZ: Africa/Cairo
