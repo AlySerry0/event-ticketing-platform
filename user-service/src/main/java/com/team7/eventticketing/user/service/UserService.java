@@ -1,7 +1,7 @@
 package com.team7.eventticketing.user.service;
 
 import com.team7.eventticketing.contracts.dto.BookingSummaryDTO;
-import com.team7.eventticketing.contracts.wrappers.BookingServiceClientWrapper;
+import com.team7.eventticketing.contracts.feign.BookingServiceClient;
 import com.team7.eventticketing.user.dto.*;
 import com.team7.eventticketing.user.model.*;
 import com.team7.eventticketing.user.observer.EntityObserver;
@@ -39,7 +39,7 @@ public class UserService {
     private final CacheInvalidationService cacheInvalidationService;
     private final UserEventPublisher userEventPublisher;
     private final ObjectArrayDtoAdapter objectArrayDtoAdapter = new ObjectArrayDtoAdapter();
-    private BookingServiceClientWrapper bookingClient;
+    private final BookingServiceClient bookingClient;
 
     private final List<EntityObserver> observers = new ArrayList<>();
 
@@ -47,7 +47,7 @@ public class UserService {
                        CacheInvalidationService cacheInvalidationService,
                        AuthEventRepository authEventRepository,
                        UserEventPublisher userEventPublisher,
-                       BookingServiceClientWrapper bookingClient) {
+                       BookingServiceClient bookingClient) {
         this.userRepository = userRepository;
         this.cacheInvalidationService = cacheInvalidationService;
         this.userEventPublisher = userEventPublisher;

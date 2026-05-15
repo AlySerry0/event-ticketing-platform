@@ -12,6 +12,11 @@ public class FeignCorrelationConfig {
     @Bean
     public RequestInterceptor correlationIdInterceptor() {
         return template -> {
+            String token = MDC.get("jwtToken");
+            if (token != null && !token.isBlank()) {
+                template.header("Authorization", "Bearer " + token);
+            }
+
             String id = MDC.get("correlationId");
             if (id == null || id.isBlank()) {
                 id = UUID.randomUUID().toString();
