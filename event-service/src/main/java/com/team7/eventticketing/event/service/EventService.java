@@ -6,6 +6,7 @@ import com.team7.eventticketing.event.dto.*;
 import com.team7.eventticketing.event.elasticsearch.EventSearchDocument;
 import com.team7.eventticketing.event.model.Event;
 import com.team7.eventticketing.event.model.EventCategory;
+import com.team7.eventticketing.event.model.EventSession;
 import com.team7.eventticketing.event.model.EventStatus;
 import com.team7.eventticketing.event.observer.EntityObserver;
 import com.team7.eventticketing.event.observer.MongoEventLogger;
@@ -695,6 +696,31 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
         return searchHits.getSearchHits().stream()
                 .map(elasticsearchHitAdapter::adapt)
                 .collect(Collectors.toList());
+    }
+
+    public AvgCapacityDTO calculateAvgCapacity(Long id) {
+        Event event = eventRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Event not found with id: " + id));
+
+        double avg = event.getEventSessions().stream()
+                .mapToDouble(EventSession::getCapacity)
+                .average()
+                .orElse(0.0);
+
+        return new AvgCapacityDTO(avg);
+    }
+
+    public VenueCoordsDTO getVenueCoords(Long id) {
+        Event event = eventRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Event not found with id: " + id));
+
+        // Logic to extract from Event.details JSONB
+        Double lat = (Double) event.getDetails().get("venueLat");
+        Double lon = (Double) event.getDetails().get("venueLon");
+
+        return new VenueCoordsDTO(lat, lon);
     }
 
     // -----------------------------------------------------------------------

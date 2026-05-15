@@ -348,4 +348,14 @@ public class EventController {
 
         return ResponseEntity.ok(results);
     }
+
+    @GetMapping("/{id}/sessions/avg-capacity")
+    public ResponseEntity<AvgCapacityDTO> getAvgCapacity(@PathVariable Long id) {
+        return ResponseEntity.ok(eventService.calculateAvgCapacity(id));
+    }
+
+    @GetMapping("/{id}/venue-coords")
+    public ResponseEntity<VenueCoordsDTO> getVenueCoords(@PathVariable Long id) {
+        return ResponseEntity.ok(eventService.getVenueCoords(id));
+    }
 }
