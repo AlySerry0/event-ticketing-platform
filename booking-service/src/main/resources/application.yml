@@ -2,7 +2,7 @@ spring:
   application:
     name: booking-service
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://booking-postgres:5432/etdb-booking}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://booking-postgres:5432/etdb-bookings}
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
