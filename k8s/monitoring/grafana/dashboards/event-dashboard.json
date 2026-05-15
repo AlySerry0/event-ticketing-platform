@@ -1,0 +1,71 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Service Error Rate (LogQL)",
+      "description": "Spike detection: Count of ERROR-level log lines per minute [cite: 1617-1618].",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum(rate({app=\"eventticketing\", service=\"${service_name}\"} | json | level=\"ERROR\" [1m]))",
+          "legendFormat": "errors/min",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "fixed", "fixedColor": "red" } }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Inter-Service Feign Outcomes",
+      "description": "Monitors successful calls vs exceptions for read dependencies .",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum by(level) (count_over_time({service=\"${service_name}\"} | json | message=~ \".*Feign.*\" [5m]))",
+          "legendFormat": "{{level}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Correlation ID Trace (Global)",
+      "description": "Trace a single request across the entire cluster using the $correlationId variable .",
+      "type": "logs",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 8 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "{app=\"eventticketing\"} | json | correlationId=\"$correlationId\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "wrapLogMessage": true
+      }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "correlationId",
+        "type": "textbox",
+        "label": "Trace Correlation ID",
+        "description": "Paste the X-Correlation-ID from a log or header to trace the request path."
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "${service_name} Dashboard",
+  "uid": "${service_name}-log-dashboard"
+}
