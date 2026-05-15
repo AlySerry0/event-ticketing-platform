@@ -105,6 +105,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
+            org.slf4j.MDC.put("jwtToken", ctx.getToken());
+
             var auth = new UsernamePasswordAuthenticationToken(
                     ctx.getAuthenticatedEmail(),
                     null,
@@ -115,6 +117,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
         } finally {
             org.slf4j.MDC.remove("correlationId"); // Essential for thread safety [cite: 1582]
+            org.slf4j.MDC.remove("jwtToken");
         }
     }
 
