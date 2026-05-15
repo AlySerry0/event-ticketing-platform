@@ -1,6 +1,6 @@
 package com.team7.eventticketing.contracts.wrappers;
 
-import com.team7.eventticketing.contracts.clients.BookingServiceClient;
+import com.team7.eventticketing.contracts.feign.BookingServiceClient;
 import com.team7.eventticketing.contracts.dto.BookingSummaryDTO;
 import feign.FeignException;
 import org.slf4j.Logger;
