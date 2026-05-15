@@ -51,7 +51,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             gatewayCheck.setNext(extraction).setNext(validation).setNext(userLoader).setNext(roleCheck);
 
             // Run the chain
-            AuthResult result = extraction.handle(ctx);
+            AuthResult result = gatewayCheck.handle(ctx);
 
             if (!result.isSuccess()) {
                 response.setStatus(result.getStatusCode());
