@@ -10,46 +10,39 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import com.team7.eventticketing.ticket.dto.UnusedTicketDTO;
 import com.team7.eventticketing.ticket.model.Ticket;
 import com.team7.eventticketing.ticket.model.TicketStatus;
 
 @Repository
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
-    @Query(value = """
-        SELECT 
-            t.id AS ticketId,
-            t.attendee_name AS attendeeName,
-            t.ticket_code AS ticketCode,
-            b.id AS bookingId,
-            e.name AS eventName,
-            e.event_date AS eventDate
-        FROM tickets t
-        JOIN bookings b ON t.booking_id = b.id
-        JOIN events e ON b.event_id = e.id
-        WHERE t.status = 'VALID'
-        AND e.status = 'UPCOMING'
-        """, nativeQuery = true)
-    List<Object[]> findUnusedTicketsForUpcomingEvents();
 
-    
     @Query(value = """
-        SELECT 
-            b.event_id AS eventId,
+        SELECT
+            t.event_id AS eventId,
             COUNT(*) AS totalTickets,
             SUM(CASE WHEN t.status = 'USED' THEN 1 ELSE 0 END) AS usedTickets,
             SUM(CASE WHEN t.status = 'VALID' THEN 1 ELSE 0 END) AS validTickets,
             MAX(t.issued_at) FILTER (WHERE t.status = 'USED') AS lastCheckIn
         FROM tickets t
-        JOIN bookings b ON t.booking_id = b.id
-        WHERE b.event_id = :eventId
-        GROUP BY b.event_id
-    """, nativeQuery = true)
+        WHERE t.event_id = :eventId
+        GROUP BY t.event_id
+        """, nativeQuery = true)
     List<Object[]> getEventAttendanceSummary(@Param("eventId") Long eventId);
-         
+
+    @Query(value = "SELECT COUNT(*) FROM tickets WHERE booking_id = :bookingId AND status = 'USED'", nativeQuery = true)
+    int countUsedByBookingId(@Param("bookingId") Long bookingId);
+
+    @Query(value = "SELECT COUNT(*) FROM tickets WHERE event_id = :eventId", nativeQuery = true)
+    long countByEventId(@Param("eventId") Long eventId);
+
+    @Query(value = "SELECT COUNT(*) FROM tickets WHERE event_id = :eventId AND status = 'USED'", nativeQuery = true)
+    int countUsedByEventId(@Param("eventId") Long eventId);
+
+    List<Ticket> findByStatusAndEventIdIsNotNull(TicketStatus status);
+
     @Modifying
     @Query(value = """
-        DELETE FROM tickets 
+        DELETE FROM tickets
         WHERE issued_at < :cutoff
         AND status IN ('EXPIRED', 'CANCELLED')
         """, nativeQuery = true)
@@ -57,32 +50,6 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     Optional<Ticket> findFirstByBookingIdOrderByIssuedAtDesc(Long bookingId);
 
-    @Query(value = "SELECT EXISTS(SELECT 1 FROM bookings WHERE id = :bookingId)", nativeQuery = true)
-    boolean existsBookingById(@Param("bookingId") Long bookingId);
-
-    @Query(value = "SELECT event_id FROM bookings WHERE id = :bookingId", nativeQuery = true)
-    Long findEventIdByBookingId(@Param("bookingId") Long bookingId);
-
-   
-
-    @Query(value = """
-        SELECT 
-            t.id, 
-            t.attendee_name, 
-            t.booking_id, 
-            e.name, 
-            CAST(e.details->>'venueLat' AS DOUBLE PRECISION), 
-            CAST(e.details->>'venueLon' AS DOUBLE PRECISION),
-            (SQRT(POWER(CAST(e.details->>'venueLat' AS DOUBLE PRECISION) - :lat, 2) + POWER(CAST(e.details->>'venueLon' AS DOUBLE PRECISION) - :lon, 2)) * 111) as distance
-        FROM tickets t
-        JOIN bookings b ON t.booking_id = b.id
-        JOIN events e ON b.event_id = e.id
-        WHERE t.status = 'VALID'
-        AND (SQRT(POWER(CAST(e.details->>'venueLat' AS DOUBLE PRECISION) - :lat, 2) + POWER(CAST(e.details->>'venueLon' AS DOUBLE PRECISION) - :lon, 2)) * 111) <= :radiusKm
-        ORDER BY distance ASC
-        """, nativeQuery = true)
-    List<Object[]> findNearbyTicketsNative(@Param("lat") double lat, @Param("lon") double lon, @Param("radiusKm") double radiusKm);
-    
     @Query(value = "SELECT * FROM tickets WHERE metadata ->> :key = :value", nativeQuery = true)
     List<Ticket> findByMetadataEquals(@Param("key") String key, @Param("value") String value);
 
@@ -114,4 +81,3 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
         """, nativeQuery = true)
     List<Object[]> getTicketAnalytics(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }
-

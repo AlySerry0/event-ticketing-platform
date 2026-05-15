@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ticket-postgres
+spec:
+  serviceName: ticket-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ticket-postgres
+  template:
+    metadata:
+      labels:
+        app: ticket-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: ticket-postgres-secret
+          volumeMounts:
+            - name: ticket-postgres-storage
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: ticket-postgres-storage
+          persistentVolumeClaim:
+            claimName: ticket-postgres-pvc

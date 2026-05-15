@@ -107,6 +107,12 @@ public class TicketController {
     }
 
     @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+    @GetMapping("/booking/{bookingId}/used-count")
+    public ResponseEntity<Integer> getUsedTicketCount(@PathVariable Long bookingId) {
+        return ResponseEntity.ok(ticketService.getUsedTicketCount(bookingId));
+    }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/booking/{bookingId}/latest")
     public ResponseEntity<?> getLatestTicket(@PathVariable Long bookingId) {
         try {

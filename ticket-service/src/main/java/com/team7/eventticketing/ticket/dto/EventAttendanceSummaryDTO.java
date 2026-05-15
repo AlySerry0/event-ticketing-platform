@@ -78,4 +78,13 @@ public class EventAttendanceSummaryDTO {
     public LocalDateTime getLastCheckIn() {
         return lastCheckIn;
     }
+
+    // Alias getters for EventTicketSummaryDTO Feign client deserialization compatibility
+    public long getTotalTicketsSold() {
+        return totalTickets;
+    }
+
+    public int getUsedCount() {
+        return (int) usedTickets;
+    }
 }
