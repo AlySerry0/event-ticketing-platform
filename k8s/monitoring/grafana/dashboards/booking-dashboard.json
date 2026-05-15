@@ -1,0 +1,112 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": { "list": [] },
+  "description": "Booking Service — LogQL observability panels",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+      "description": "Count of ERROR-level log lines from booking-service per minute. Spike detection — sudden rise indicates an unhandled exception or downstream failure.",
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2 } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\", level=\"ERROR\"}[1m]))",
+          "legendFormat": "errors/min",
+          "refId": "A"
+        }
+      ],
+      "title": "Error Rate — booking-service",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+      "description": "Feign call outcomes from booking-service: successful downstream responses vs FeignException catches. A rising exception count indicates a degraded upstream (event-service, user-service, or ticket-service).",
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2 } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} |= \"FeignException\"[1m]))",
+          "legendFormat": "feign-exceptions/min",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} |= \"feign\" != \"FeignException\"[1m]))",
+          "legendFormat": "feign-ok/min",
+          "refId": "B"
+        }
+      ],
+      "title": "Feign Call Outcomes — booking-service",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+      "description": "Saga state transition log lines for booking-service filtered by bookingId. Visualise the full saga path for a specific booking: COMPLETING → PAYMENT_PENDING → PAID (or PAYMENT_FAILED → CANCELLED).",
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "id": 3,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Ascending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "expr": "{app=\"eventticketing\", service=\"booking-service\"} |= \"COMPLETING\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"PAYMENT_PENDING\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"PAYMENT_FAILED\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"REFUNDED\"",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Saga State Transitions — booking-service",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["booking-service", "logql"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "label": "Loki Datasource",
+        "name": "loki_datasource",
+        "options": [],
+        "query": "loki",
+        "refresh": 1,
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Booking Service Dashboard",
+  "uid": "booking-service-dashboard",
+  "version": 1
+}
