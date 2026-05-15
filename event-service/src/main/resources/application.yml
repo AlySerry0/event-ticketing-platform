@@ -3,7 +3,7 @@ spring:
     name: event-service
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/eventticketingdb}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://event-postgres:5432/etdb-events}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver

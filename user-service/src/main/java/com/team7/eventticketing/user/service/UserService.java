@@ -1,5 +1,7 @@
 package com.team7.eventticketing.user.service;
 
+import com.team7.eventticketing.contracts.dto.BookingSummaryDTO;
+import com.team7.eventticketing.contracts.wrappers.BookingServiceClientWrapper;
 import com.team7.eventticketing.user.dto.*;
 import com.team7.eventticketing.user.model.*;
 import com.team7.eventticketing.user.observer.EntityObserver;
@@ -25,10 +27,9 @@ import java.util.*;
 
 import java.util.stream.Collectors;
 
-import com.team7.eventticketing.user.dto.UserBookingSummaryDTO;
-import com.team7.eventticketing.user.repository.BookingSummaryProjection;
-
 import com.team7.eventticketing.user.adapter.ObjectArrayDtoAdapter;
+import com.team7.eventticketing.contracts.events.UserDeactivatedEvent;
+import com.team7.eventticketing.user.messaging.publishers.UserEventPublisher;
 
 @Service
 @Transactional(readOnly = true)
@@ -36,17 +37,23 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final CacheInvalidationService cacheInvalidationService;
+    private final UserEventPublisher userEventPublisher;
     private final ObjectArrayDtoAdapter objectArrayDtoAdapter = new ObjectArrayDtoAdapter();
+    private BookingServiceClientWrapper bookingClient;
 
     private final List<EntityObserver> observers = new ArrayList<>();
 
     public UserService(UserRepository userRepository,
                        CacheInvalidationService cacheInvalidationService,
-                       AuthEventRepository authEventRepository) {
+                       AuthEventRepository authEventRepository,
+                       UserEventPublisher userEventPublisher,
+                       BookingServiceClientWrapper bookingClient) {
         this.userRepository = userRepository;
         this.cacheInvalidationService = cacheInvalidationService;
+        this.userEventPublisher = userEventPublisher;
 //        this.registerObserver(new MongoEventLogger(authEventRepository));
         this.registerObserver(new MongoEventLogger(authEventRepository, cacheInvalidationService));
+        this.bookingClient = bookingClient;
     }
 
     // -----------------------------------------------------------------------
@@ -240,6 +247,10 @@ public class UserService {
                 "role", updatedUser.getRole(),
                 "timestamp", LocalDateTime.now()
         ));
+
+        // M3 S1-EVENTS: publish user.deactivated to user.events exchange
+        userEventPublisher.publishUserDeactivated(new UserDeactivatedEvent(updatedUser.getId()));
+
         return convertToDTO(updatedUser);
     }
 
@@ -367,12 +378,23 @@ public class UserService {
         userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with ID: " + id));
 
-        List<Object[]> rows = userRepository.getUserBookingSummary(id);
-        if (rows.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "No booking summary found for user ID: " + id);
-        }
-        return objectArrayDtoAdapter.toUserBookingSummaryDTO(rows.get(0));
+//        List<Object[]> rows = userRepository.getUserBookingSummary(id);
+//
+//        if (rows.isEmpty()) {
+//            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+//                    "No booking summary found for user ID: " + id);
+//        }
+//        return objectArrayDtoAdapter.toUserBookingSummaryDTO(rows.get(0));
+        BookingSummaryDTO bookingSummary = bookingClient.getUserBookingSummary(id);
+        return UserBookingSummaryDTO.builder()
+                .userId(id)
+                .name(getUserById(id).getName()) // Get name from user-service DB, not booking-service
+                .totalBookings(bookingSummary.getTotalBookings())
+                .completedBookings(bookingSummary.getCompletedBookings())
+                .cancelledBookings(bookingSummary.getCancelledBookings())
+                .totalSpent(bookingSummary.getTotalSpent())
+                .averageBookingAmount(bookingSummary.getAverageBookingAmount())
+                .build();
     }
 
 

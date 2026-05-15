@@ -33,37 +33,47 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        // Build the GoF handler chain
-        AuthContext ctx = new AuthContext(request);
+        String correlationId = request.getHeader("X-Correlation-ID");
+        if (correlationId == null)
+            correlationId = java.util.UUID.randomUUID().toString();
+        org.slf4j.MDC.put("correlationId", correlationId);
 
-        TokenExtractionHandler extraction = new TokenExtractionHandler();
-        SignatureValidationHandler validation = new SignatureValidationHandler(jwtService);
-        UserLoaderHandler userLoader = new UserLoaderHandler(ticketRepository);
-        RoleAuthorizationHandler roleCheck = new RoleAuthorizationHandler();
+        try{
+            // Build the GoF handler chain
+            AuthContext ctx = new AuthContext(request);
 
-        extraction.setNext(validation).setNext(userLoader).setNext(roleCheck);
+            GatewayHeaderHandler gatewayCheck = new GatewayHeaderHandler();
+            TokenExtractionHandler extraction = new TokenExtractionHandler();
+            SignatureValidationHandler validation = new SignatureValidationHandler(jwtService);
+            UserLoaderHandler userLoader = new UserLoaderHandler(ticketRepository);
+            RoleAuthorizationHandler roleCheck = new RoleAuthorizationHandler();
 
-        // Run the chain
-        AuthResult result = extraction.handle(ctx);
+            gatewayCheck.setNext(extraction).setNext(validation).setNext(userLoader).setNext(roleCheck);
 
-        if (!result.isSuccess()) {
-            response.setStatus(result.getStatusCode());
-            response.setContentType("application/json");
-            response.getWriter().write(
-                    "{\"error\":\"" + result.getMessage() + "\"}"
+            // Run the chain
+            AuthResult result = gatewayCheck.handle(ctx);
+
+            if (!result.isSuccess()) {
+                response.setStatus(result.getStatusCode());
+                response.setContentType("application/json");
+                response.getWriter().write(
+                        "{\"error\":\"" + result.getMessage() + "\"}"
+                );
+                return; // Do NOT call filterChain.doFilter — short-circuit here
+            }
+
+            // All handlers passed — populate Spring Security context
+            var auth = new UsernamePasswordAuthenticationToken(
+                    ctx.getAuthenticatedEmail(),
+                    null,
+                    List.of(new SimpleGrantedAuthority("ROLE_" + ctx.getAuthenticatedRole()))
             );
-            return; // Do NOT call filterChain.doFilter — short-circuit here
+            SecurityContextHolder.getContext().setAuthentication(auth);
+
+            filterChain.doFilter(request, response);
+        } finally {
+            org.slf4j.MDC.remove("correlationId"); // Essential for thread safety [cite: 1582]
         }
-
-        // All handlers passed — populate Spring Security context
-        var auth = new UsernamePasswordAuthenticationToken(
-                ctx.getAuthenticatedEmail(),
-                null,
-                List.of(new SimpleGrantedAuthority("ROLE_" + ctx.getAuthenticatedRole()))
-        );
-        SecurityContextHolder.getContext().setAuthentication(auth);
-
-        filterChain.doFilter(request, response);
     }
 
 
