@@ -193,6 +193,7 @@ public class TicketSaleController {
         return ResponseEntity.ok(refundedSale);
     }
 
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/user/{userId}/total")
     public ResponseEntity<BigDecimal> getUserTotalCompletedSales(
             @PathVariable Long userId,
