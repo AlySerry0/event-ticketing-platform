@@ -1,11 +1,8 @@
-package com.team7.eventticketing.contracts.clients;
+package com.team7.eventticketing.contracts.feign;
 
 import com.team7.eventticketing.contracts.dto.UserBookingSummaryDTO;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @FeignClient(name = "booking-service", url = "${services.booking.url:http://booking-service:8080}")
 public interface BookingServiceClient {
