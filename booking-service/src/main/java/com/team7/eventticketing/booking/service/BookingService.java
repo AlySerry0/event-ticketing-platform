@@ -32,6 +32,11 @@ import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.Comparator;
 
+import com.team7.eventticketing.contracts.dto.BookingSummaryDTO;
+import com.team7.eventticketing.contracts.dto.EventBookingRevenueDTO;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -655,5 +660,49 @@ public class BookingService implements EntitySubject {
 		}
 
 		return result.attendanceCount();
+	}
+
+	public BookingSummaryDTO getUserBookingSummary(Long userId) {
+		Object[] row = bookingRepository.getUserBookingSummaryRaw(userId).get(0);
+		long total = ((Number) row[0]).longValue();
+		long completed = ((Number) row[1]).longValue();
+		long cancelled = ((Number) row[2]).longValue();
+		BigDecimal totalSpent = row[3] == null ? BigDecimal.ZERO : new BigDecimal(row[3].toString());
+		BigDecimal avg = total == 0 ? BigDecimal.ZERO :
+				totalSpent.divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
+		return new BookingSummaryDTO(total, completed, cancelled, totalSpent, avg);
+	}
+
+	public int getActiveBookingCountByUser(Long userId) {
+		return bookingRepository.countActiveBookingsByUserId(userId);
+	}
+
+	public long getTotalBookingCountByUser(Long userId, String status) {
+		if (status == null || status.isBlank()) {
+			return bookingRepository.countByUserId(userId);
+		}
+		return bookingRepository.countByUserIdAndStatus(userId, status.toUpperCase());
+	}
+
+	public BigDecimal getUserBookingTotal(Long userId, String startDate, String endDate) {
+		LocalDateTime start = LocalDate.parse(startDate).atStartOfDay();
+		LocalDateTime end = LocalDate.parse(endDate).atTime(LocalTime.MAX);
+		BigDecimal total = bookingRepository.sumCompletedByUserIdAndDateRange(userId, start, end);
+		return total == null ? BigDecimal.ZERO : total;
+	}
+
+	public EventBookingRevenueDTO getEventRevenue(Long eventId, String startDate, String endDate) {
+		LocalDateTime start = LocalDate.parse(startDate).atStartOfDay();
+		LocalDateTime end = LocalDate.parse(endDate).atTime(LocalTime.MAX);
+		Object[] row = bookingRepository.getEventRevenueRaw(eventId, start, end).get(0);
+		long total = ((Number) row[0]).longValue();
+		BigDecimal revenue = row[1] == null ? BigDecimal.ZERO : new BigDecimal(row[1].toString());
+		BigDecimal avg = total == 0 ? BigDecimal.ZERO :
+				revenue.divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
+		return new EventBookingRevenueDTO(total, revenue, avg);
+	}
+
+	public int getActiveBookingCountByEvent(Long eventId) {
+		return bookingRepository.countActiveBookingsByEventId(eventId);
 	}
 }
