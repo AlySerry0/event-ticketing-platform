@@ -76,35 +76,49 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        AuthContext ctx = new AuthContext(request);
-        ctx.setAllowedRoles(resolveAllowedRoles(request.getMethod(), request.getRequestURI()));
+        String correlationId = request.getHeader("X-Correlation-ID");
+        if (correlationId == null)
+            correlationId = java.util.UUID.randomUUID().toString();
+        org.slf4j.MDC.put("correlationId", correlationId);
 
-        TokenExtractionHandler    extraction = new TokenExtractionHandler();
-        SignatureValidationHandler validation = new SignatureValidationHandler(jwtService);
-        UserLoaderHandler         userLoader = new UserLoaderHandler(userRepository);
-        RoleAuthorizationHandler  roleCheck  = new RoleAuthorizationHandler();
+        try{
 
-        extraction.setNext(validation).setNext(userLoader).setNext(roleCheck);
+            AuthContext ctx = new AuthContext(request);
+            ctx.setAllowedRoles(resolveAllowedRoles(request.getMethod(), request.getRequestURI()));
 
-        AuthResult result = extraction.handle(ctx);
+            GatewayHeaderHandler gatewayCheck = new GatewayHeaderHandler();
+            TokenExtractionHandler    extraction = new TokenExtractionHandler();
+            SignatureValidationHandler validation = new SignatureValidationHandler(jwtService);
+            UserLoaderHandler         userLoader = new UserLoaderHandler(userRepository);
+            RoleAuthorizationHandler  roleCheck  = new RoleAuthorizationHandler();
 
-        if (!result.isSuccess()) {
-            response.setStatus(result.getStatusCode());
-            response.setContentType("application/json");
-            response.getWriter().write(
-                    "{\"error\":\"" + result.getMessage() + "\"}"
+            gatewayCheck.setNext(extraction).setNext(validation).setNext(userLoader).setNext(roleCheck);
+
+            AuthResult result = gatewayCheck.handle(ctx);
+
+            if (!result.isSuccess()) {
+                response.setStatus(result.getStatusCode());
+                response.setContentType("application/json");
+                response.getWriter().write(
+                        "{\"error\":\"" + result.getMessage() + "\"}"
+                );
+                return;
+            }
+
+            org.slf4j.MDC.put("jwtToken", ctx.getToken());
+
+            var auth = new UsernamePasswordAuthenticationToken(
+                    ctx.getAuthenticatedEmail(),
+                    null,
+                    List.of(new SimpleGrantedAuthority("ROLE_" + ctx.getAuthenticatedRole()))
             );
-            return;
+            SecurityContextHolder.getContext().setAuthentication(auth);
+
+            filterChain.doFilter(request, response);
+        } finally {
+            org.slf4j.MDC.remove("correlationId"); // Essential for thread safety [cite: 1582]
+            org.slf4j.MDC.remove("jwtToken");
         }
-
-        var auth = new UsernamePasswordAuthenticationToken(
-                ctx.getAuthenticatedEmail(),
-                null,
-                List.of(new SimpleGrantedAuthority("ROLE_" + ctx.getAuthenticatedRole()))
-        );
-        SecurityContextHolder.getContext().setAuthentication(auth);
-
-        filterChain.doFilter(request, response);
     }
 
     private Set<String> resolveAllowedRoles(String method, String path) {

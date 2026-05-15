@@ -24,3 +24,38 @@ spring:
           uri: http://sales-service:8080
           predicates:
             - Path=/api/sales/**
+
+      # Global CORS ? filled in by each service slice
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+
+# Service URLs (overridden per environment
+services:
+  user:
+    url: http://user-service:8080
+  event:
+    url: http://event-service:8080
+  booking:
+    url: http://booking-service:8080
+  ticket:
+    url: http://ticket-service:8080
+  sales:
+    url: http://sales-service:8080
+
+jwt:
+  secret: ${JWT_SECRET}
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true

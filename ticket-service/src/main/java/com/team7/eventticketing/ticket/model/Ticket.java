@@ -18,6 +18,9 @@ public class Ticket {
     @Column(name = "booking_id", nullable = false)
     private Long bookingId;
 
+    @Column(name = "event_id")
+    private Long eventId;
+
     @Column(name = "attendee_name", nullable = false)
     private String attendeeName;
 
@@ -31,6 +34,9 @@ public class Ticket {
 
     @Column(name = "issued_at", nullable = false)
     private LocalDateTime issuedAt;
+
+    @Column(name = "event_id")
+    private Long eventId;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
@@ -54,6 +60,9 @@ public class Ticket {
     public Long getBookingId() { return bookingId; }
     public void setBookingId(Long bookingId) { this.bookingId = bookingId; }
 
+    public Long getEventId() { return eventId; }
+    public void setEventId(Long eventId) { this.eventId = eventId; }
+
     public String getAttendeeName() { return attendeeName; }
     public void setAttendeeName(String attendeeName) { this.attendeeName = attendeeName; }
 
@@ -65,6 +74,9 @@ public class Ticket {
 
     public LocalDateTime getIssuedAt() { return issuedAt; }
     public void setIssuedAt(LocalDateTime issuedAt) { this.issuedAt = issuedAt; }
+
+    public Long getEventId() { return eventId; }
+    public void setEventId(Long eventId) { this.eventId = eventId; }
 
     public Map<String, Object> getMetadata() { return metadata; }
     public void setMetadata(Map<String, Object> metadata) { this.metadata = metadata; }
