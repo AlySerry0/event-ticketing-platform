@@ -663,7 +663,7 @@ public class BookingService implements EntitySubject {
 	}
 
 	public BookingSummaryDTO getUserBookingSummary(Long userId) {
-		Object[] row = bookingRepository.getUserBookingSummaryRaw(userId);
+		Object[] row = bookingRepository.getUserBookingSummaryRaw(userId).get(0);
 		long total = ((Number) row[0]).longValue();
 		long completed = ((Number) row[1]).longValue();
 		long cancelled = ((Number) row[2]).longValue();
@@ -694,7 +694,7 @@ public class BookingService implements EntitySubject {
 	public EventBookingRevenueDTO getEventRevenue(Long eventId, String startDate, String endDate) {
 		LocalDateTime start = LocalDate.parse(startDate).atStartOfDay();
 		LocalDateTime end = LocalDate.parse(endDate).atTime(LocalTime.MAX);
-		Object[] row = bookingRepository.getEventRevenueRaw(eventId, start, end);
+		Object[] row = bookingRepository.getEventRevenueRaw(eventId, start, end).get(0);
 		long total = ((Number) row[0]).longValue();
 		BigDecimal revenue = row[1] == null ? BigDecimal.ZERO : new BigDecimal(row[1].toString());
 		BigDecimal avg = total == 0 ? BigDecimal.ZERO :

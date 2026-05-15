@@ -95,7 +95,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total_amount ELSE 0 END), 0) \
         FROM bookings WHERE user_id = :userId
         """, nativeQuery = true)
-    Object[] getUserBookingSummaryRaw(@Param("userId") Long userId);
+    List<Object[]> getUserBookingSummaryRaw(@Param("userId") Long userId);
 
     @Query(value = "SELECT COUNT(*) FROM bookings WHERE user_id = :userId AND status IN ('PENDING','CONFIRMED','CHECKED_IN')", nativeQuery = true)
     int countActiveBookingsByUserId(@Param("userId") Long userId);
@@ -103,7 +103,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Query(value = "SELECT COUNT(*) FROM bookings WHERE user_id = :userId", nativeQuery = true)
     long countByUserId(@Param("userId") Long userId);
 
-    @Query(value = "SELECT COUNT(*) FROM bookings WHERE user_id = :userId AND status = :status", nativeQuery = true)
+    @Query(value = "SELECT COUNT(*) FROM bookings WHERE user_id = :userId AND status = CAST(:status AS bookingstatus)", nativeQuery = true)
     long countByUserIdAndStatus(@Param("userId") Long userId, @Param("status") String status);
 
     @Query(value = """
@@ -123,7 +123,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         WHERE event_id = :eventId AND status = 'COMPLETED' \
           AND booking_date >= :startDate AND booking_date <= :endDate
         """, nativeQuery = true)
-    Object[] getEventRevenueRaw(@Param("eventId") Long eventId,
+    List<Object[]> getEventRevenueRaw(@Param("eventId") Long eventId,
                                 @Param("startDate") LocalDateTime startDate,
                                 @Param("endDate") LocalDateTime endDate);
 
