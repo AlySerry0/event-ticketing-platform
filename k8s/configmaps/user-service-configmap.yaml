@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-service-configmap
+  namespace: eventticketing
+data:
+  SPRING_DATASOURCE_URL: jdbc:postgresql://user-postgres:5432/etdb-users
+  SPRING_DATA_MONGODB_URI: mongodb://root:rootpass@mongo:27017/eventticketingmongo?authSource=admin
+  SPRING_DATA_REDIS_HOST: redis
+  SPRING_DATA_REDIS_PASSWORD: redispass
+  SPRING_RABBITMQ_HOST: rabbitmq
+  SPRING_RABBITMQ_PORT: "5672"
+  FEIGN_BOOKING_SERVICE_URL: http://booking-service:8080
+  JWT_EXPIRATION_MS: "86400000"
+  TZ: Africa/Cairo

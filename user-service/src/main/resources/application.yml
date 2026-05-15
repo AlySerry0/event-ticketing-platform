@@ -2,7 +2,7 @@ spring:
   application:
     name: user-service
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/eventticketingdb}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://user-postgres:5432/etdb-users}
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
@@ -23,6 +23,19 @@ spring:
       password: ${SPRING_DATA_REDIS_PASSWORD:redispass}
   mongodb:
     uri: ${SPRING_DATA_MONGODB_URI:mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin}
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:guest}
+    password: ${SPRING_RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 3
   web:
     error:
       include-message: always
@@ -39,3 +52,24 @@ logging:
   level:
     com.team7.eventticketing.user: DEBUG
     org.springframework.security: INFO
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus,health,info"
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+feign:
+  booking-service:
+    url: ${FEIGN_BOOKING_SERVICE_URL:http://booking-service:8080}
+  event-service:
+    url: ${FEIGN_EVENT_SERVICE_URL:http://event-service:8080}
+  ticket-service:
+    url: ${FEIGN_TICKET_SERVICE_URL:http://ticket-service:8080}
+  sales-service:
+    url: ${FEIGN_SALES_SERVICE_URL:http://sales-service:8080}

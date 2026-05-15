@@ -1,5 +1,7 @@
 package com.team7.eventticketing.booking.controller;
 
+import com.team7.eventticketing.contracts.dto.BookingSummaryDTO;
+import com.team7.eventticketing.contracts.dto.EventBookingRevenueDTO;
 import com.team7.eventticketing.booking.dto.AttendanceRecordDTO;
 import com.team7.eventticketing.booking.dto.BookingAnalyticsDTO;
 import com.team7.eventticketing.booking.dto.BookingAnalyticsDashboardDTO;
@@ -9,7 +11,6 @@ import com.team7.eventticketing.booking.dto.BookingEstimateRequestDTO;
 import com.team7.eventticketing.booking.dto.BookingDetailsDTO;
 import com.team7.eventticketing.booking.dto.BookingItemDTO;
 import com.team7.eventticketing.booking.service.BookingService;
-import com.team7.eventticketing.booking.observer.MongoEventLogger;
 import com.team7.eventticketing.booking.dto.EventRecommendationDTO;
 import com.team7.eventticketing.booking.service.JwtService;
 
@@ -21,10 +22,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 
 @RestController
@@ -34,10 +33,8 @@ public class BookingController {
 	@Autowired
 	private BookingService bookingService;
 
-
-  @Autowired
-  private JwtService jwtService;
-
+	@Autowired
+	private JwtService jwtService;
 
 	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PostMapping
@@ -90,18 +87,18 @@ public class BookingController {
 		}
 	}
 
-  @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
-  @PutMapping("/{id}/cancel")
-  public ResponseEntity<Void> cancelBooking(@PathVariable Long id) {
-      try {
-          bookingService.cancelBooking(id);
-          return ResponseEntity.ok().build();
-      } catch (NoSuchElementException e) {
-          throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-      } catch (IllegalArgumentException e) {
-          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-      }
-  }
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@PutMapping("/{id}/cancel")
+	public ResponseEntity<Void> cancelBooking(@PathVariable Long id) {
+		try {
+			bookingService.cancelBooking(id);
+			return ResponseEntity.ok().build();
+		} catch (NoSuchElementException e) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+		} catch (IllegalArgumentException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+		}
+	}
 
 	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@PutMapping("/{id}/complete")
@@ -182,8 +179,7 @@ public class BookingController {
 		return ResponseEntity.ok(bookingService.filterBookingsByMetadata(key, value));
 	}
 
-
-  @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/{id}/items")
 	public ResponseEntity<List<BookingItemDTO>> getBookingItems(@PathVariable Long id) {
 		return bookingService.findById(id)
@@ -192,22 +188,22 @@ public class BookingController {
 				.orElse(ResponseEntity.notFound().build());
 	}
 
-  @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
-  @PostMapping("/{bookingId}/items")
-  public ResponseEntity<BookingDTO> addItemsToBooking(
-          @PathVariable Long bookingId,
-          @RequestBody List<BookingItemDTO> items) {
-      try {
-          BookingDTO updatedBooking = bookingService.addItemsToBooking(bookingId, items);
-          return ResponseEntity.ok(updatedBooking);
-      } catch (NoSuchElementException e) {
-          throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-      } catch (IllegalArgumentException e) {
-          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-      }
-  }
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@PostMapping("/{bookingId}/items")
+	public ResponseEntity<BookingDTO> addItemsToBooking(
+			@PathVariable Long bookingId,
+			@RequestBody List<BookingItemDTO> items) {
+		try {
+			BookingDTO updatedBooking = bookingService.addItemsToBooking(bookingId, items);
+			return ResponseEntity.ok(updatedBooking);
+		} catch (NoSuchElementException e) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+		} catch (IllegalArgumentException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+		}
+	}
 
-  @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
 	@GetMapping("/{bookingId}/details")
 	public ResponseEntity<BookingDetailsDTO> getBookingDetails(@PathVariable Long bookingId) {
 		try {
@@ -228,27 +224,68 @@ public class BookingController {
 		} catch (ResponseStatusException e) {
 			throw e;
 		} catch (Exception e) {
-			throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error recording attendance: " + e.getMessage());
+			throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+					"Error recording attendance: " + e.getMessage());
 		}
 	}
 
-  @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
-  @GetMapping("/recommendations")
-  public ResponseEntity<List<EventRecommendationDTO>> getEventRecommendations(
-          @RequestParam Long userId,
-          @RequestParam(required = false) Integer limit,
-          @RequestHeader("Authorization") String authorizationHeader) {
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@GetMapping("/recommendations")
+	public ResponseEntity<List<EventRecommendationDTO>> getEventRecommendations(
+			@RequestParam Long userId,
+			@RequestParam(required = false) Integer limit,
+			@RequestHeader("Authorization") String authorizationHeader) {
 
-      if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
-          throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing or invalid token");
-      }
+		if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing or invalid token");
+		}
 
-      String token = authorizationHeader.substring(7);
-      Long requesterId = jwtService.extractUserId(token);
-      String requesterRole = jwtService.extractRole(token);
+		String token = authorizationHeader.substring(7);
+		Long requesterId = jwtService.extractUserId(token);
+		String requesterRole = jwtService.extractRole(token);
 
-      return ResponseEntity.ok(
-              bookingService.getEventRecommendations(userId, limit, requesterId, requesterRole)
-      );
-  }
+		return ResponseEntity.ok(
+				bookingService.getEventRecommendations(userId, limit, requesterId, requesterRole));
+	}
+
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@GetMapping("/user/{userId}/summary")
+	public ResponseEntity<BookingSummaryDTO> getUserBookingSummary(@PathVariable Long userId) {
+		return ResponseEntity.ok(bookingService.getUserBookingSummary(userId));
+	}
+
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@GetMapping("/user/{userId}/active-count")
+	public ResponseEntity<Integer> getUserActiveBookingCount(@PathVariable Long userId) {
+		return ResponseEntity.ok(bookingService.getActiveBookingCountByUser(userId));
+	}
+
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@GetMapping("/user/{userId}/count")
+	public ResponseEntity<Long> getUserBookingCount(@PathVariable Long userId,
+			@RequestParam(required = false) String status) {
+		return ResponseEntity.ok(bookingService.getTotalBookingCountByUser(userId, status));
+	}
+
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@GetMapping("/user/{userId}/total")
+	public ResponseEntity<java.math.BigDecimal> getUserBookingTotal(@PathVariable Long userId,
+			@RequestParam String startDate,
+			@RequestParam String endDate) {
+		return ResponseEntity.ok(bookingService.getUserBookingTotal(userId, startDate, endDate));
+	}
+
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@GetMapping("/event/{eventId}/revenue")
+	public ResponseEntity<EventBookingRevenueDTO> getEventRevenue(@PathVariable Long eventId,
+			@RequestParam String startDate,
+			@RequestParam String endDate) {
+		return ResponseEntity.ok(bookingService.getEventRevenue(eventId, startDate, endDate));
+	}
+
+	@PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+	@GetMapping("/event/{eventId}/active-count")
+	public ResponseEntity<Integer> getEventActiveBookingCount(@PathVariable Long eventId) {
+		return ResponseEntity.ok(bookingService.getActiveBookingCountByEvent(eventId));
+	}
 }

@@ -13,5 +13,4 @@ public class SalesServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(SalesServiceApplication.class, args);
     }
-
 }

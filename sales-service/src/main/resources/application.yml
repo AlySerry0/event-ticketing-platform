@@ -1,13 +1,11 @@
 spring:
   application:
     name: sales-service
-
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/etdb-sales}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://sales-postgres:5432/etdb-sales}
+    username: postgres
+    password: postgres
     driver-class-name: org.postgresql.Driver
-
   jpa:
     hibernate:
       ddl-auto: update
@@ -15,60 +13,46 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-
   data:
     mongodb:
       uri: ${SPRING_DATA_MONGODB_URI:mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin}
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
-      port: ${SPRING_DATA_REDIS_PORT:6379}
+      port: 6379
       password: ${SPRING_DATA_REDIS_PASSWORD:redispass}
 
-  rabbitmq:
-    host: ${SPRING_RABBITMQ_HOST:localhost}
-    port: ${SPRING_RABBITMQ_PORT:5672}
-    username: ${SPRING_RABBITMQ_USERNAME:guest}
-    password: ${SPRING_RABBITMQ_PASSWORD:guest}
-    listener:
-      simple:
-        acknowledge-mode: auto
-        default-requeue-rejected: false
-        retry:
-          enabled: true
-          initial-interval: 1000
-          max-attempts: 3
-
+  mongodb:
+    uri: ${SPRING_DATA_MONGODB_URI:mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin}
   web:
     error:
       include-message: always
       include-binding-errors: always
 
 server:
-  port: ${SERVER_PORT:8080}
-
-feign:
-  user-service:
-    url: ${FEIGN_USER_SERVICE_URL:http://localhost:8081}
-  event-service:
-    url: ${FEIGN_EVENT_SERVICE_URL:http://localhost:8082}
-  booking-service:
-    url: ${FEIGN_BOOKING_SERVICE_URL:http://localhost:8083}
-  ticket-service:
-    url: ${FEIGN_TICKET_SERVICE_URL:http://localhost:8084}
+  port: 8080
 
 jwt:
   secret: ${JWT_SECRET:XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw=}
   expiration: ${JWT_EXPIRATION_MS:86400000}
 
+logging:
+  level:
+    com.team7.eventticketing.sales: DEBUG
+
+feign:
+  user-service:
+    url: http://user-service:8080
+  booking-service:
+    url: http://booking-service:8080
+  event-service:
+    url: http://event-service:8080
+
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
-  endpoint:
-    health:
-      show-details: always
-
-logging:
-  level:
-    com.team7.eventticketing.sales: DEBUG
+        include: "prometheus,health,info"
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
