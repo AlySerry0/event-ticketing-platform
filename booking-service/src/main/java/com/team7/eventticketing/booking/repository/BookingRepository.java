@@ -97,7 +97,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         """, nativeQuery = true)
     List<Object[]> getUserBookingSummaryRaw(@Param("userId") Long userId);
 
-    @Query(value = "SELECT COUNT(*) FROM bookings WHERE user_id = :userId AND status IN ('PENDING','CONFIRMED','CHECKED_IN')", nativeQuery = true)
+    @Query(value = "SELECT COUNT(*) FROM bookings WHERE user_id = :userId AND status IN ('PENDING','CONFIRMED','CHECKED_IN','COMPLETING','PAYMENT_PENDING')", nativeQuery = true)
     int countActiveBookingsByUserId(@Param("userId") Long userId);
 
     @Query(value = "SELECT COUNT(*) FROM bookings WHERE user_id = :userId", nativeQuery = true)
@@ -127,6 +127,6 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                                 @Param("startDate") LocalDateTime startDate,
                                 @Param("endDate") LocalDateTime endDate);
 
-    @Query(value = "SELECT COUNT(*) FROM bookings WHERE event_id = :eventId AND status IN ('PENDING','CONFIRMED','CHECKED_IN')", nativeQuery = true)
+    @Query(value = "SELECT COUNT(*) FROM bookings WHERE event_id = :eventId AND status IN ('PENDING','CONFIRMED','CHECKED_IN','COMPLETING','PAYMENT_PENDING')", nativeQuery = true)
     int countActiveBookingsByEventId(@Param("eventId") Long eventId);
 }
