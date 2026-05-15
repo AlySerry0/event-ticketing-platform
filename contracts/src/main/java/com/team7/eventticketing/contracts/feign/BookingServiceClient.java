@@ -1,8 +1,13 @@
 package com.team7.eventticketing.contracts.feign;
 
+import com.team7.eventticketing.contracts.dto.BookingItemDTO;
 import com.team7.eventticketing.contracts.dto.BookingSummaryDTO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
+import com.team7.eventticketing.contracts.dto.BookingDTO;
+
+import java.util.List;
+
 
 @FeignClient(name = "booking-service", url = "${feign.booking-service.url:http://booking-service:8080}")
 public interface BookingServiceClient {
@@ -37,4 +42,10 @@ public interface BookingServiceClient {
 //            @RequestHeader("Authorization") String token,
 //            @RequestHeader(value = "X-Correlation-ID", required = false)
 //            String correlationId);
+        @GetMapping("/api/bookings/{bookingId}")
+        BookingDTO getBooking(@PathVariable("bookingId") Long bookingId);
+
+
+        @GetMapping("/api/bookings/{bookingId}/items")
+        List<BookingItemDTO> getBookingItems(@PathVariable("bookingId") Long bookingId);
 }
