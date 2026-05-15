@@ -15,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.math.BigDecimal;
 
 @RestController
 @RequestMapping("/api/sales")
@@ -190,5 +191,18 @@ public class TicketSaleController {
         TicketSaleDTO refundedSale = ticketSaleService.processRefundWithWindowPolicy(id, request);
         return ResponseEntity.ok(refundedSale);
     }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+    @GetMapping("/user/{userId}/total")
+    public ResponseEntity<BigDecimal> getUserTotalCompletedSales(
+            @PathVariable Long userId,
+            @RequestParam(required = false) LocalDate startDate,
+            @RequestParam(required = false) LocalDate endDate
+    ) {
+        return ResponseEntity.ok(
+                ticketSaleService.getUserTotalCompletedSales(userId, startDate, endDate)
+        );
+    }
+
 }
 

@@ -48,6 +48,9 @@ import com.team7.eventticketing.sales.strategy.RefundStrategy;
 import com.team7.eventticketing.sales.strategy.RefundStrategySelector;
 import java.time.Duration;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
 @Service
 public class TicketSaleService {
 
@@ -675,4 +678,12 @@ public class TicketSaleService {
 
         return mongoDocumentAdapter.adapt(saleId, events);
     }
+
+    public BigDecimal getUserTotalCompletedSales(Long userId, LocalDate startDate, LocalDate endDate) {
+        LocalDateTime startDateTime = startDate != null ? startDate.atStartOfDay() : null;
+        LocalDateTime endDateTime = endDate != null ? endDate.atTime(23, 59, 59) : null;
+
+        return ticketSaleRepository.getUserTotalCompletedSales(userId, startDateTime, endDateTime);
+    }
+
 }
