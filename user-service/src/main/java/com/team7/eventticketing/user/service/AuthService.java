@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.Map;
 
 import com.team7.eventticketing.user.util.CacheInvalidationService;
+import com.team7.eventticketing.contracts.events.UserRegisteredEvent;
+import com.team7.eventticketing.user.messaging.publishers.UserEventPublisher;
 
 @Service
 public class AuthService {
@@ -28,6 +30,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final BCryptPasswordEncoder passwordEncoder;
     private final CacheInvalidationService cacheInvalidationService;
+    private final UserEventPublisher userEventPublisher;
 
     // -----------------------------------------------------------------------
     // Classical GoF Observer — subject side
@@ -52,11 +55,13 @@ public class AuthService {
                        JwtService jwtService,
                        BCryptPasswordEncoder passwordEncoder,
                        AuthEventRepository authEventRepository,
-                       CacheInvalidationService cacheInvalidationService) {
+                       CacheInvalidationService cacheInvalidationService,
+                       UserEventPublisher userEventPublisher) {
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
         this.cacheInvalidationService = cacheInvalidationService;
+        this.userEventPublisher = userEventPublisher;
 
         // Register the MongoEventLogger observer at construction time.
         // MongoEventLogger is NOT a Spring bean — we instantiate it manually
@@ -133,6 +138,11 @@ public class AuthService {
                 "role", user.getRole().name(),
                 "timestamp", LocalDateTime.now()
         ));
+
+        // M3 S1-EVENTS: publish user.registered to user.events exchange
+        userEventPublisher.publishUserRegistered(
+                new UserRegisteredEvent(user.getId(), user.getEmail(), user.getRole().name())
+        );
 
         String token = jwtService.generateToken(
                 user.getEmail(), user.getId(), user.getRole().name());

@@ -28,6 +28,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.team7.eventticketing.user.adapter.ObjectArrayDtoAdapter;
+import com.team7.eventticketing.contracts.events.UserDeactivatedEvent;
+import com.team7.eventticketing.user.messaging.publishers.UserEventPublisher;
 
 @Service
 @Transactional(readOnly = true)
@@ -35,6 +37,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final CacheInvalidationService cacheInvalidationService;
+    private final UserEventPublisher userEventPublisher;
     private final ObjectArrayDtoAdapter objectArrayDtoAdapter = new ObjectArrayDtoAdapter();
     private BookingServiceClientWrapper bookingClient;
 
@@ -43,9 +46,11 @@ public class UserService {
     public UserService(UserRepository userRepository,
                        CacheInvalidationService cacheInvalidationService,
                        AuthEventRepository authEventRepository,
+                       UserEventPublisher userEventPublisher,
                        BookingServiceClientWrapper bookingClient) {
         this.userRepository = userRepository;
         this.cacheInvalidationService = cacheInvalidationService;
+        this.userEventPublisher = userEventPublisher;
 //        this.registerObserver(new MongoEventLogger(authEventRepository));
         this.registerObserver(new MongoEventLogger(authEventRepository, cacheInvalidationService));
         this.bookingClient = bookingClient;
@@ -242,6 +247,10 @@ public class UserService {
                 "role", updatedUser.getRole(),
                 "timestamp", LocalDateTime.now()
         ));
+
+        // M3 S1-EVENTS: publish user.deactivated to user.events exchange
+        userEventPublisher.publishUserDeactivated(new UserDeactivatedEvent(updatedUser.getId()));
+
         return convertToDTO(updatedUser);
     }
 
