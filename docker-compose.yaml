@@ -357,12 +357,6 @@ services:
     depends_on:
       ticket-postgres:
         condition: service_healthy
-      cassandra:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      mongo:
-        condition: service_healthy
     restart: on-failure
 
   sales-service:
