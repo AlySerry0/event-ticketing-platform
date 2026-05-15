@@ -11,7 +11,7 @@
     {
       "id": 1,
       "title": "Error Rate — user-service (LogQL)",
-      "description": "Count of ERROR-level log lines per minute. Spike = something is broken. [cite: 1617]",
+      "description": "Count of ERROR-level log lines per minute. Spike = something is broken.",
       "type": "timeseries",
       "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
       "datasource": { "type": "loki", "uid": "loki" },
@@ -47,7 +47,7 @@
     {
       "id": 3,
       "title": "HTTP request rate (PromQL)",
-      "description": "Requests per second to each user-service endpoint. [cite: 1646]",
+      "description": "Requests per second to each user-service endpoint.",
       "type": "timeseries",
       "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -62,7 +62,7 @@
     {
       "id": 4,
       "title": "HTTP P99 latency (PromQL)",
-      "description": "99th-percentile request duration per endpoint. [cite: 1648]",
+      "description": "99th-percentile request duration per endpoint.",
       "type": "timeseries",
       "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -77,7 +77,7 @@
     {
       "id": 5,
       "title": "Booking Service Feign Errors (LogQL)",
-      "description": "Detects when event-service or booking-service is degraded. [cite: 1624]",
+      "description": "Detects when event-service or booking-service is degraded.",
       "type": "timeseries",
       "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
       "datasource": { "type": "loki", "uid": "loki" },
@@ -92,7 +92,7 @@
     {
       "id": 6,
       "title": "JVM Heap Used (PromQL)",
-      "description": "Heap usage monitor to detect memory leaks. [cite: 1650]",
+      "description": "Heap usage monitor to detect memory leaks.",
       "type": "timeseries",
       "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -107,7 +107,7 @@
     {
       "id": 7,
       "title": "HikariCP — active DB connections (PromQL)",
-      "description": "Active vs. idle JDBC connections to user-postgres. [cite: 1652]",
+      "description": "Active vs. idle JDBC connections to user-postgres.",
       "type": "timeseries",
       "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -137,7 +137,7 @@
     {
       "id": 9,
       "title": "Correlation ID Trace (LogQL — Explore)",
-      "description": "Trace a single request across the cluster. [cite: 1619]",
+      "description": "Trace a single request across the cluster.",
       "type": "logs",
       "gridPos": { "x": 0, "y": 32, "w": 24, "h": 10 },
       "datasource": { "type": "loki", "uid": "loki" },
