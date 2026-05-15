@@ -39,6 +39,7 @@ logging:
   level:
     com.team7.eventticketing.user: DEBUG
     org.springframework.security: INFO
+  config: classpath:logback-spring.xml
 
 feign:
   booking-service:

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- ── Properties ─────────────────────────────────────────────────── -->
+    <springProperty scope="context" name="appName"
+                    source="spring.application.name"
+                    defaultValue="user-service"/>
+
+    <!-- ── Console appender (human-readable in dev) ───────────────────── -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>
+                %d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{correlationId}] - %msg%n
+            </pattern>
+        </encoder>
+    </appender>
+
+    <!--
+        ── JSON appender — structured logs sent to Loki via Promtail ─────
+        Every log line is a JSON object. Loki indexes the structured fields
+        so LogQL queries like {service="user-service"} | json | level="ERROR"
+        work without parsing raw text.
+    -->
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- Static labels that Promtail forwards to Loki as stream labels -->
+            <customFields>{"service":"user-service","env":"production"}</customFields>
+
+            <!-- Include MDC keys as top-level JSON fields -->
+            <includeMdcKeyName>correlationId</includeMdcKeyName>
+            <includeMdcKeyName>userId</includeMdcKeyName>
+            <includeMdcKeyName>requestPath</includeMdcKeyName>
+
+            <!-- Mask the password field if it ever leaks into a log line -->
+            <fieldNames>
+                <timestamp>timestamp</timestamp>
+                <message>message</message>
+                <logger>logger</logger>
+                <thread>thread</thread>
+                <level>level</level>
+                <stackTrace>stackTrace</stackTrace>
+            </fieldNames>
+        </encoder>
+    </appender>
+
+    <!-- Async wrapper — prevents slow Loki pipeline from blocking request threads -->
+    <appender name="ASYNC_JSON" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="JSON"/>
+        <queueSize>1024</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <includeCallerData>false</includeCallerData>
+    </appender>
+
+    <!-- ── Logger configuration ────────────────────────────────────────── -->
+
+    <!-- Suppress noisy libraries -->
+    <logger name="org.hibernate.SQL"                          level="WARN"/>
+    <logger name="org.hibernate.type.descriptor.sql"          level="WARN"/>
+    <logger name="com.zaxxer.hikari"                          level="INFO"/>
+    <logger name="org.springframework.security"               level="WARN"/>
+    <logger name="org.springframework.web"                    level="WARN"/>
+    <logger name="com.netflix.discovery"                      level="WARN"/>
+    <logger name="io.lettuce"                                  level="WARN"/>
+
+    <!-- Application code at DEBUG in dev, INFO in prod -->
+    <logger name="com.teamXX.eventticketing.user" level="DEBUG"/>
+
+    <!-- Feign client calls — INFO so we see outbound calls without body spam -->
+    <logger name="com.teamXX.eventticketing.user.client" level="INFO"/>
+
+    <!-- ── Profile-specific routing ────────────────────────────────────── -->
+    <springProfile name="dev,default">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <springProfile name="prod,docker">
+        <root level="INFO">
+            <appender-ref ref="ASYNC_JSON"/>
+        </root>
+    </springProfile>
+
+</configuration>
