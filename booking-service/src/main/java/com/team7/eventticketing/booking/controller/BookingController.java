@@ -1,5 +1,7 @@
 package com.team7.eventticketing.booking.controller;
 
+import com.team7.eventticketing.contracts.dto.BookingSummaryDTO;
+import com.team7.eventticketing.contracts.dto.EventBookingRevenueDTO;
 import com.team7.eventticketing.booking.dto.AttendanceRecordDTO;
 import com.team7.eventticketing.booking.dto.BookingAnalyticsDTO;
 import com.team7.eventticketing.booking.dto.BookingAnalyticsDashboardDTO;
@@ -251,4 +253,39 @@ public class BookingController {
               bookingService.getEventRecommendations(userId, limit, requesterId, requesterRole)
       );
   }
+
+	@GetMapping("/user/{userId}/summary")
+	public ResponseEntity<BookingSummaryDTO> getUserBookingSummary(@PathVariable Long userId) {
+		return ResponseEntity.ok(bookingService.getUserBookingSummary(userId));
+	}
+
+	@GetMapping("/user/{userId}/active-count")
+	public ResponseEntity<Integer> getUserActiveBookingCount(@PathVariable Long userId) {
+		return ResponseEntity.ok(bookingService.getActiveBookingCountByUser(userId));
+	}
+
+	@GetMapping("/user/{userId}/count")
+	public ResponseEntity<Long> getUserBookingCount(@PathVariable Long userId,
+													@RequestParam(required = false) String status) {
+		return ResponseEntity.ok(bookingService.getTotalBookingCountByUser(userId, status));
+	}
+
+	@GetMapping("/user/{userId}/total")
+	public ResponseEntity<java.math.BigDecimal> getUserBookingTotal(@PathVariable Long userId,
+																	@RequestParam String startDate,
+																	@RequestParam String endDate) {
+		return ResponseEntity.ok(bookingService.getUserBookingTotal(userId, startDate, endDate));
+	}
+
+	@GetMapping("/event/{eventId}/revenue")
+	public ResponseEntity<EventBookingRevenueDTO> getEventRevenue(@PathVariable Long eventId,
+																  @RequestParam String startDate,
+																  @RequestParam String endDate) {
+		return ResponseEntity.ok(bookingService.getEventRevenue(eventId, startDate, endDate));
+	}
+
+	@GetMapping("/event/{eventId}/active-count")
+	public ResponseEntity<Integer> getEventActiveBookingCount(@PathVariable Long eventId) {
+		return ResponseEntity.ok(bookingService.getActiveBookingCountByEvent(eventId));
+	}
 }
