@@ -2,7 +2,7 @@ spring:
   application:
     name: booking-service
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://booking-postgres:5432/etdb-booking}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://booking-postgres:5432/etdb-bookings}
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
@@ -31,6 +31,19 @@ spring:
     error:
       include-message: always
       include-binding-errors: always
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:rabbitmq}
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 3
 
 server:
   port: 8080
@@ -38,6 +51,18 @@ server:
 jwt:
   secret: ${JWT_SECRET:XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw=}
   expiration: ${JWT_EXPIRATION_MS:86400000}
+
+feign:
+  event-service:
+    url: ${FEIGN_EVENT_SERVICE_URL:http://event-service:8080}
+  user-service:
+    url: ${FEIGN_USER_SERVICE_URL:http://user-service:8080}
+  ticket-service:
+    url: ${FEIGN_TICKET_SERVICE_URL:http://ticket-service:8080}
+  sales-service:
+    url: ${FEIGN_SALES_SERVICE_URL:http://sales-service:8080}
+  booking-service:
+    url: ${FEIGN_BOOKING_SERVICE_URL:http://booking-service:8080}
 
 logging:
   level:

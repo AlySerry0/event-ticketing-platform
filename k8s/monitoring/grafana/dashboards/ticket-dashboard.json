@@ -1,0 +1,69 @@
+{
+  "uid": "ticket-service-dashboard",
+  "title": "Ticket Service Dashboard",
+  "tags": ["ticket-service", "logql"],
+  "timezone": "browser",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "loki_datasource",
+        "type": "datasource",
+        "pluginId": "loki",
+        "label": "Loki Datasource"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Error Rate (per minute)",
+      "type": "timeseries",
+      "datasource": "${loki_datasource}",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({app=\"ticket-service\", level=\"ERROR\"}[1m]))",
+          "legendFormat": "errors/min"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Feign Call Outcomes",
+      "type": "timeseries",
+      "datasource": "${loki_datasource}",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({app=\"ticket-service\"} |= \"FeignException\" [1m]))",
+          "legendFormat": "feign-errors/min"
+        },
+        {
+          "expr": "sum(count_over_time({app=\"ticket-service\"} |= \"TICKET_ISSUED\" [1m]))",
+          "legendFormat": "tickets-issued/min"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Ticket Operations Log",
+      "type": "logs",
+      "datasource": "${loki_datasource}",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "expr": "{app=\"ticket-service\"} |= \"TICKET_ISSUED\" or {app=\"ticket-service\"} |= \"BATCH_ISSUED\" or {app=\"ticket-service\"} |= \"TICKET_CREATED\"",
+          "legendFormat": ""
+        }
+      ]
+    }
+  ]
+}

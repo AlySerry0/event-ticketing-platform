@@ -78,4 +78,12 @@ public class EventAttendanceSummaryDTO {
     public LocalDateTime getLastCheckIn() {
         return lastCheckIn;
     }
+
+    public long getTotalTicketsSold() {
+        return totalTickets;
+    }
+
+    public int getUsedCount() {
+        return (int) usedTickets;
+    }
 }
