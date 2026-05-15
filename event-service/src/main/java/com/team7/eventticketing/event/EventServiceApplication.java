@@ -6,7 +6,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 
 
 @SpringBootApplication
-@EnableFeignClients(basePackages = "com.team7.eventticketing")
+@EnableFeignClients(basePackages = "com.team7.eventticketing.contracts.feign")
 public class EventServiceApplication {
 
     public static void main(String[] args) {
