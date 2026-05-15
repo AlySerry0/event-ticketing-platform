@@ -1,0 +1,33 @@
+# ── Headless Service — used by StatefulSet for stable DNS ─────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-postgres-headless
+  namespace: eventticketing
+  labels:
+    app: user-postgres
+spec:
+  clusterIP: None          # headless — no virtual IP, DNS resolves to pod IP directly
+  selector:
+    app: user-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
+---
+# ── ClusterIP Service — used by user-service to connect ───────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-postgres        # this is the hostname in the JDBC URL
+  namespace: eventticketing
+  labels:
+    app: user-postgres
+spec:
+  selector:
+    app: user-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
+  type: ClusterIP

@@ -1,22 +1,113 @@
 services:
-  postgres:
+#  postgres:
+#    image: postgres:17
+#    container_name: eventticketing-db
+#    restart: always
+#    ports:
+#      - "5432:5432"
+#    environment:
+#      POSTGRES_USER: postgres
+#      POSTGRES_PASSWORD: postgres
+#      POSTGRES_DB: eventticketingdb
+#    volumes:
+#      - pgdata:/var/lib/postgresql
+#      - ./db/init:/docker-entrypoint-initdb.d
+#    healthcheck:
+#      test: ["CMD-SHELL", "pg_isready -U postgres -d eventticketingdb"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+
+  user-postgres:
     image: postgres:17
-    container_name: eventticketing-db
-    restart: always
+    container_name: eventticketing-user-postgres
     ports:
-      - "5432:5432"
+      - "5433:5432"   # 5433 on host to avoid conflict with the shared postgres on 5432
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: eventticketingdb
+      POSTGRES_DB: etdb-users
     volumes:
-      - pgdata:/var/lib/postgresql
-      - ./db/init:/docker-entrypoint-initdb.d
+      - user-pgdata:/var/lib/postgresql/data
+      - ./db/init/users:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d eventticketingdb"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d etdb-users" ]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  event-postgres:
+    image: postgres:17
+    container_name: eventticketing-event-postgres
+    ports:
+      - "5434:5432"   # 5434 on host to avoid conflict with the shared postgres on 5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: etdb-events
+    volumes:
+      - event-pgdata:/var/lib/postgresql/data
+      - ./db/init/events:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d etdb-events" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  booking-postgres:
+    image: postgres:17
+    container_name: eventticketing-booking-postgres
+    ports:
+      - "5435:5432"   # 5435 on host to avoid conflict with the shared postgres on 5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: etdb-bookings
+    volumes:
+      - booking-pgdata:/var/lib/postgresql/data
+      - ./db/init/bookings:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d etdb-bookings" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ticket-postgres:
+    image: postgres:17
+    container_name: eventticketing-ticket-postgres
+    ports:
+      - "5436:5432"   # 5436 on host to avoid conflict with the shared postgres on 5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: etdb-tickets
+    volumes:
+      - ticket-pgdata:/var/lib/postgresql/data
+      - ./db/init/tickets:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d etdb-tickets" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  sales-postgres:
+    image: postgres:17
+    container_name: eventticketing-sales-postgres
+    ports:
+      - "5437:5432"   # 5437 on host to avoid conflict with the shared postgres on 5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: etdb-sales
+    volumes:
+      - sales-pgdata:/var/lib/postgresql/data
+      - ./db/init/sales:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d etdb-sales" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 
   mongo:
     image: mongo:latest
@@ -181,7 +272,7 @@ services:
     ports:
       - "8081:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/eventticketingdb
+      SPRING_DATASOURCE_URL: jdbc:postgresql://user-postgres:5432/etdb-users
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_DATA_MONGODB_URI: mongodb://root:rootpass@mongo:27017/eventticketingmongo?authSource=admin
@@ -192,8 +283,10 @@ services:
       JWT_SECRET: "XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw="
       JWT_EXPIRATION_MS: "86400000"
       TZ: Africa/Cairo
+      SPRING_PROFILES_ACTIVE: docker
+      FEIGN_BOOKING_SERVICE_URL: http://booking-service:8080
     depends_on:
-      postgres:
+      user-postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -205,7 +298,7 @@ services:
     ports:
       - "8082:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/eventticketingdb
+      SPRING_DATASOURCE_URL: jdbc:postgresql://event-postgres:5432/etdb-events
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_DATA_MONGODB_URI: mongodb://root:rootpass@mongo:27017/eventticketingmongo?authSource=admin
@@ -225,7 +318,7 @@ services:
     ports:
       - "8083:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/eventticketingdb
+      SPRING_DATASOURCE_URL: jdbc:postgresql://booking-postgres:5432/etdb-bookings
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_DATA_MONGODB_URI: mongodb://root:rootpass@mongo:27017/eventticketingmongo?authSource=admin
@@ -248,7 +341,7 @@ services:
     ports:
       - "8084:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/eventticketingdb
+      SPRING_DATASOURCE_URL: jdbc:postgresql://ticket-postgres:5432/etdb-tickets
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_DATA_MONGODB_URI: mongodb://root:rootpass@mongo:27017/eventticketingmongo?authSource=admin
@@ -273,7 +366,9 @@ services:
     ports:
       - "8085:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/eventticketingdb
+      SPRING_DATASOURCE_URL: jdbc:postgresql://sales-postgres:5432/etdb-sales
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_DATA_MONGODB_URI: mongodb://root:rootpass@mongo:27017/eventticketingmongo?authSource=admin
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PASSWORD: redispass
@@ -287,9 +382,14 @@ services:
 
 
 volumes:
-  pgdata:
+#  pgdata:
   mongo-data:
   es-data:
   neo4j-data:
   cassandra-data:
   rabbitmq-data:
+  user-pgdata:
+  event-pgdata:
+  booking-pgdata:
+  ticket-pgdata:
+  sales-pgdata:

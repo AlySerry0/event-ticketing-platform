@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 
 @SpringBootApplication
-@EnableFeignClients(basePackages = "com.team7.eventticketing.contracts.clients")
+@EnableFeignClients(basePackages = "com.team7.eventticketing.contracts.feign")
 public class UserServiceApplication {
 
     public static void main(String[] args) {
