@@ -1,5 +1,6 @@
 package com.team7.eventticketing.user.service;
 
+import com.team7.eventticketing.contracts.wrappers.BookingServiceClientWrapper;
 import com.team7.eventticketing.user.dto.*;
 import com.team7.eventticketing.user.model.*;
 import com.team7.eventticketing.user.observer.EntityObserver;
@@ -7,6 +8,7 @@ import com.team7.eventticketing.user.observer.MongoEventLogger;
 import com.team7.eventticketing.user.repository.AuthEventRepository;
 import com.team7.eventticketing.user.repository.UserRepository;
 import com.team7.eventticketing.user.util.CacheInvalidationService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,7 +27,7 @@ import java.util.*;
 
 import java.util.stream.Collectors;
 
-import com.team7.eventticketing.user.dto.UserBookingSummaryDTO;
+import com.team7.eventticketing.contracts.dto.UserBookingSummaryDTO;
 import com.team7.eventticketing.user.repository.BookingSummaryProjection;
 
 import com.team7.eventticketing.user.adapter.ObjectArrayDtoAdapter;
@@ -37,16 +39,19 @@ public class UserService {
     private final UserRepository userRepository;
     private final CacheInvalidationService cacheInvalidationService;
     private final ObjectArrayDtoAdapter objectArrayDtoAdapter = new ObjectArrayDtoAdapter();
+    private BookingServiceClientWrapper bookingClient;
 
     private final List<EntityObserver> observers = new ArrayList<>();
 
     public UserService(UserRepository userRepository,
                        CacheInvalidationService cacheInvalidationService,
-                       AuthEventRepository authEventRepository) {
+                       AuthEventRepository authEventRepository,
+                       BookingServiceClientWrapper bookingClient) {
         this.userRepository = userRepository;
         this.cacheInvalidationService = cacheInvalidationService;
 //        this.registerObserver(new MongoEventLogger(authEventRepository));
         this.registerObserver(new MongoEventLogger(authEventRepository, cacheInvalidationService));
+        this.bookingClient = bookingClient;
     }
 
     // -----------------------------------------------------------------------
@@ -367,12 +372,14 @@ public class UserService {
         userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with ID: " + id));
 
-        List<Object[]> rows = userRepository.getUserBookingSummary(id);
-        if (rows.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "No booking summary found for user ID: " + id);
-        }
-        return objectArrayDtoAdapter.toUserBookingSummaryDTO(rows.get(0));
+//        List<Object[]> rows = userRepository.getUserBookingSummary(id);
+//
+//        if (rows.isEmpty()) {
+//            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+//                    "No booking summary found for user ID: " + id);
+//        }
+//        return objectArrayDtoAdapter.toUserBookingSummaryDTO(rows.get(0));
+        return bookingClient.getUserBookingSummary(id);
     }
 
 
