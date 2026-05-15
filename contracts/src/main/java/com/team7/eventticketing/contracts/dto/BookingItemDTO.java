@@ -1,6 +1,7 @@
 package com.team7.eventticketing.contracts.dto;
 
-import com.team7.eventticketing.booking.model.BookingItemStatus;
+
+import com.team7.eventticketing.contracts.enums.BookingItemStatus;
 
 import java.util.Map;
 
