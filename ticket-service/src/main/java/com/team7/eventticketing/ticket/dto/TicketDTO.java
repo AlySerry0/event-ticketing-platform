@@ -7,6 +7,7 @@ import java.util.Map;
 public class TicketDTO {
     private Long id;
     private Long bookingId;
+    private Long eventId;
     private String attendeeName;
     private String ticketCode;
     private TicketStatus status;
@@ -20,6 +21,9 @@ public class TicketDTO {
 
     public Long getBookingId() { return bookingId; }
     public void setBookingId(Long bookingId) { this.bookingId = bookingId; }
+
+    public Long getEventId() { return eventId; }
+    public void setEventId(Long eventId) { this.eventId = eventId; }
 
     public String getAttendeeName() { return attendeeName; }
     public void setAttendeeName(String attendeeName) { this.attendeeName = attendeeName; }

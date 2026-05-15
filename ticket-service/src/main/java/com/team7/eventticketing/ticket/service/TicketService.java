@@ -161,6 +161,7 @@ public class TicketService implements EntitySubject {
         TicketDTO dto = new TicketDTO();
         dto.setId(ticket.getId());
         dto.setBookingId(ticket.getBookingId());
+        dto.setEventId(ticket.getEventId());
         dto.setAttendeeName(ticket.getAttendeeName());
         dto.setTicketCode(ticket.getTicketCode());
         dto.setStatus(ticket.getStatus());
@@ -173,6 +174,7 @@ public class TicketService implements EntitySubject {
         Ticket ticket = new Ticket();
         ticket.setId(dto.getId());
         ticket.setBookingId(dto.getBookingId());
+        ticket.setEventId(dto.getEventId());
         ticket.setAttendeeName(dto.getAttendeeName());
         ticket.setTicketCode(dto.getTicketCode());
         ticket.setStatus(dto.getStatus());
@@ -195,7 +197,7 @@ public class TicketService implements EntitySubject {
     }
 
     public int getUsedTicketCount(Long bookingId) {
-        return ticketRepository.countUsedByBookingId(bookingId);
+        return ticketRepository.countUsedTicketsByBookingId(bookingId);
     }
 
     @Transactional

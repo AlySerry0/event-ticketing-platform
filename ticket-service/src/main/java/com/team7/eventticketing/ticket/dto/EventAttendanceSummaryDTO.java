@@ -79,7 +79,6 @@ public class EventAttendanceSummaryDTO {
         return lastCheckIn;
     }
 
-    // Alias getters for EventTicketSummaryDTO Feign client deserialization compatibility
     public long getTotalTicketsSold() {
         return totalTickets;
     }

@@ -26,11 +26,11 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
         FROM tickets t
         WHERE t.event_id = :eventId
         GROUP BY t.event_id
-        """, nativeQuery = true)
+    """, nativeQuery = true)
     List<Object[]> getEventAttendanceSummary(@Param("eventId") Long eventId);
 
     @Query(value = "SELECT COUNT(*) FROM tickets WHERE booking_id = :bookingId AND status = 'USED'", nativeQuery = true)
-    int countUsedByBookingId(@Param("bookingId") Long bookingId);
+    int countUsedTicketsByBookingId(@Param("bookingId") Long bookingId);
 
     @Query(value = "SELECT COUNT(*) FROM tickets WHERE event_id = :eventId", nativeQuery = true)
     long countByEventId(@Param("eventId") Long eventId);
@@ -39,7 +39,6 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     int countUsedByEventId(@Param("eventId") Long eventId);
 
     List<Ticket> findByStatusAndEventIdIsNotNull(TicketStatus status);
-
     @Modifying
     @Query(value = """
         DELETE FROM tickets
