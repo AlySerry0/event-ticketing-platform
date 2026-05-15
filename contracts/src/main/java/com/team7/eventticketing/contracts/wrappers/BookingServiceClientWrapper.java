@@ -1,7 +1,7 @@
 package com.team7.eventticketing.contracts.wrappers;
 
 import com.team7.eventticketing.contracts.feign.BookingServiceClient;
-import com.team7.eventticketing.contracts.dto.UserBookingSummaryDTO;
+import com.team7.eventticketing.contracts.dto.BookingSummaryDTO;
 import feign.FeignException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,13 +49,13 @@ public class BookingServiceClientWrapper {
      * Falls back to BookingSummaryDTO.empty() if booking-service is down or
      * returns 404 (user has no bookings).
      */
-    public UserBookingSummaryDTO getUserBookingSummary(Long userId) {
+    public BookingSummaryDTO getUserBookingSummary(Long userId) {
         try {
             return client.getUserBookingSummary(userId, token(), correlationId());
 
         } catch (FeignException.NotFound e) {
             log.debug("booking-service: no bookings found for userId={}", userId);
-            return new UserBookingSummaryDTO();
+            return new BookingSummaryDTO();
 
         } catch (FeignException.Unauthorized | FeignException.Forbidden e) {
             log.warn("booking-service auth error for userId={}: {}", userId, e.getMessage());
@@ -66,12 +66,12 @@ public class BookingServiceClientWrapper {
             log.warn("booking-service unavailable for userId={}: status={} message={}",
                      userId, e.status(), e.getMessage());
             // Degrade gracefully — return empty summary rather than 500
-            return new UserBookingSummaryDTO();
+            return new BookingSummaryDTO();
 
         } catch (Exception e) {
             log.error("Unexpected error calling booking-service for userId={}: {}",
                       userId, e.getMessage(), e);
-            return new UserBookingSummaryDTO();
+            return new BookingSummaryDTO();
         }
     }
 
