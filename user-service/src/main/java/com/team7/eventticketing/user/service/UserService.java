@@ -247,11 +247,15 @@ public class UserService {
         int activeCount;
         try {
             activeCount = bookingClient.getActiveBookingCount(id);
+        } catch (FeignException.NotFound e) {
+            log.info("booking-service GET /api/bookings/user/{}/active-count returned 404 — treating as 0 active bookings",
+                    id);
+            activeCount = 0;
         } catch (FeignException e) {
-            log.warn("booking-service unavailable while checking active bookings for user {}: {}",
-                    id, e.getMessage());
+            log.warn("Feign call to booking-service GET /api/bookings/user/{}/active-count failed: status={} reason='{}' body='{}'",
+                    id, e.status(), e.getMessage(), e.contentUTF8());
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "Booking service temporarily unavailable");
+                    "Booking service temporarily unavailable while verifying user {id=" + id + "} has no active bookings");
         }
 
         if (activeCount > 0) {
@@ -401,24 +405,19 @@ public class UserService {
         userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with ID: " + id));
 
-//        List<Object[]> rows = userRepository.getUserBookingSummary(id);
-//
-//        if (rows.isEmpty()) {
-//            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-//                    "No booking summary found for user ID: " + id);
-//        }
-//        return objectArrayDtoAdapter.toUserBookingSummaryDTO(rows.get(0));
-//        BookingSummaryDTO bookingSummary = bookingClient.getUserBookingSummary(id);
-//        return UserBookingSummaryDTO.builder()
-//                .userId(id)
-//                .name(getUserById(id).getName()) // Get name from user-service DB, not booking-service
-//                .totalBookings(bookingSummary.getTotalBookings())
-//                .completedBookings(bookingSummary.getCompletedBookings())
-//                .cancelledBookings(bookingSummary.getCancelledBookings())
-//                .totalSpent(bookingSummary.getTotalSpent())
-//                .averageBookingAmount(bookingSummary.getAverageBookingAmount())
-//                .build();
-        BookingSummaryDTO bookingSummary = bookingClient.getUserBookingSummary(id);
+        BookingSummaryDTO bookingSummary;
+        try {
+            bookingSummary = bookingClient.getUserBookingSummary(id);
+        } catch (FeignException.NotFound e) {
+            log.info("booking-service GET /api/bookings/user/{}/summary returned 404 — user has no bookings, falling back to empty summary",
+                    id);
+            bookingSummary = BookingSummaryDTO.empty();
+        } catch (FeignException e) {
+            log.warn("Feign call to booking-service GET /api/bookings/user/{}/summary failed: status={} reason='{}' body='{}'",
+                    id, e.status(), e.getMessage(), e.contentUTF8());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Booking service temporarily unavailable while fetching booking summary for user " + id);
+        }
         return UserBookingSummaryDTO.builder()
                 .userId(id)
                 .name(getUserById(id).getName()) // Get name from user-service DB, not booking-service
@@ -471,14 +470,30 @@ public class UserService {
                 .map(user -> {
                     BigDecimal total = BigDecimal.ZERO;
                     long count = 0L;
+
+                    // Per-call try-catch so one user's failure doesn't poison the whole report,
+                    // and so the log line tells us EXACTLY which call broke for which user.
                     try {
                         BigDecimal t = bookingClient.getUserBookingTotal(user.getId(), startDateStr, endDateStr);
                         if (t != null) total = t;
-                        count = bookingClient.getTotalBookingCount(user.getId(), "COMPLETED");
+                    } catch (FeignException.NotFound e) {
+                        log.debug("booking-service GET /api/bookings/user/{}/total?startDate={}&endDate={} returned 404 — user has no bookings in range",
+                                user.getId(), startDateStr, endDateStr);
                     } catch (FeignException e) {
-                        log.warn("booking-service error for user {} in top-attendees: {}",
-                                user.getId(), e.getMessage());
+                        log.warn("Feign call to booking-service GET /api/bookings/user/{}/total?startDate={}&endDate={} failed: status={} reason='{}' body='{}' — excluding this user's spend from the report",
+                                user.getId(), startDateStr, endDateStr, e.status(), e.getMessage(), e.contentUTF8());
                     }
+
+                    try {
+                        count = bookingClient.getTotalBookingCount(user.getId(), "COMPLETED");
+                    } catch (FeignException.NotFound e) {
+                        log.debug("booking-service GET /api/bookings/user/{}/count?status=COMPLETED returned 404 — user has no completed bookings",
+                                user.getId());
+                    } catch (FeignException e) {
+                        log.warn("Feign call to booking-service GET /api/bookings/user/{}/count?status=COMPLETED failed: status={} reason='{}' body='{}' — reporting bookingCount=0 for this user",
+                                user.getId(), e.status(), e.getMessage(), e.contentUTF8());
+                    }
+
                     return TopAttendeeDTO.builder()
                             .userId(user.getId())
                             .name(user.getName())
@@ -530,14 +545,19 @@ public class UserService {
         // the COMPLETED-bookings count check moves to a Feign call per candidate user.
         return userRepository.findByPreferenceKeyValue("favoriteCategory", category).stream()
                 .filter(user -> {
+                    long count;
                     try {
-                        long count = bookingClient.getTotalBookingCount(user.getId(), "COMPLETED");
-                        return count >= minBookings;
+                        count = bookingClient.getTotalBookingCount(user.getId(), "COMPLETED");
+                    } catch (FeignException.NotFound e) {
+                        log.debug("booking-service GET /api/bookings/user/{}/count?status=COMPLETED returned 404 — user has no completed bookings",
+                                user.getId());
+                        count = 0L;
                     } catch (FeignException e) {
-                        log.warn("booking-service error counting bookings for user {}: {}",
-                                user.getId(), e.getMessage());
+                        log.warn("Feign call to booking-service GET /api/bookings/user/{}/count?status=COMPLETED failed: status={} reason='{}' body='{}' — excluding user from category-with-min-bookings result",
+                                user.getId(), e.status(), e.getMessage(), e.contentUTF8());
                         return false;
                     }
+                    return count >= minBookings;
                 })
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
