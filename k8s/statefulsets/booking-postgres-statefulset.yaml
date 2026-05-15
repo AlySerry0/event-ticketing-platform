@@ -24,14 +24,17 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: booking-postgres-secret
-                  key: username
+                  key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: booking-postgres-secret
-                  key: password
+                  key: POSTGRES_PASSWORD
             - name: POSTGRES_DB
-              value: etdb-bookings
+              valueFrom:
+                secretKeyRef:
+                  name: booking-postgres-secret
+                  key: POSTGRES_DB
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
