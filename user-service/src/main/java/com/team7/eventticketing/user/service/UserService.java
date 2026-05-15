@@ -4,6 +4,11 @@ import com.team7.eventticketing.contracts.dto.BookingSummaryDTO;
 import com.team7.eventticketing.contracts.feign.BookingServiceClient;
 import com.team7.eventticketing.user.dto.*;
 import com.team7.eventticketing.user.model.*;
+import feign.FeignException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.math.BigDecimal;
 import com.team7.eventticketing.user.observer.EntityObserver;
 import com.team7.eventticketing.user.observer.MongoEventLogger;
 import com.team7.eventticketing.user.repository.AuthEventRepository;
@@ -35,6 +40,7 @@ import com.team7.eventticketing.user.messaging.publishers.UserEventPublisher;
 @Transactional(readOnly = true)
 public class UserService {
 
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
     private final UserRepository userRepository;
     private final CacheInvalidationService cacheInvalidationService;
     private final UserEventPublisher userEventPublisher;
@@ -229,9 +235,26 @@ public class UserService {
                         "User not found with ID: " + id
                 ));
 
-        boolean hasActiveBookings = userRepository.existsActiveBookingForUser(id);
+//        boolean hasActiveBookings = userRepository.existsActiveBookingForUser(id);
+//
+//        if (hasActiveBookings) {
+//            throw new ResponseStatusException(
+//                    HttpStatus.BAD_REQUEST,
+//                    "User has active bookings"
+//            );
+//        }
+        // M3 S1-F4: Feign → booking-service for active-bookings check (replaces M1 cross-service SQL)
+        int activeCount;
+        try {
+            activeCount = bookingClient.getActiveBookingCount(id);
+        } catch (FeignException e) {
+            log.warn("booking-service unavailable while checking active bookings for user {}: {}",
+                    id, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Booking service temporarily unavailable");
+        }
 
-        if (hasActiveBookings) {
+        if (activeCount > 0) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "User has active bookings"
@@ -385,15 +408,25 @@ public class UserService {
 //                    "No booking summary found for user ID: " + id);
 //        }
 //        return objectArrayDtoAdapter.toUserBookingSummaryDTO(rows.get(0));
+//        BookingSummaryDTO bookingSummary = bookingClient.getUserBookingSummary(id);
+//        return UserBookingSummaryDTO.builder()
+//                .userId(id)
+//                .name(getUserById(id).getName()) // Get name from user-service DB, not booking-service
+//                .totalBookings(bookingSummary.getTotalBookings())
+//                .completedBookings(bookingSummary.getCompletedBookings())
+//                .cancelledBookings(bookingSummary.getCancelledBookings())
+//                .totalSpent(bookingSummary.getTotalSpent())
+//                .averageBookingAmount(bookingSummary.getAverageBookingAmount())
+//                .build();
         BookingSummaryDTO bookingSummary = bookingClient.getUserBookingSummary(id);
         return UserBookingSummaryDTO.builder()
                 .userId(id)
                 .name(getUserById(id).getName()) // Get name from user-service DB, not booking-service
-                .totalBookings(bookingSummary.getTotalBookings())
-                .completedBookings(bookingSummary.getCompletedBookings())
-                .cancelledBookings(bookingSummary.getCancelledBookings())
-                .totalSpent(bookingSummary.getTotalSpent())
-                .averageBookingAmount(bookingSummary.getAverageBookingAmount())
+                .totalBookings(bookingSummary.totalBookings())
+                .completedBookings(bookingSummary.completedBookings())
+                .cancelledBookings(bookingSummary.cancelledBookings())
+                .totalSpent(bookingSummary.totalSpent() != null ? bookingSummary.totalSpent().doubleValue() : null)
+                .averageBookingAmount(bookingSummary.averageBookingAmount() != null ? bookingSummary.averageBookingAmount().doubleValue() : null)
                 .build();
     }
 
@@ -428,23 +461,34 @@ public class UserService {
                     "Start date must not be after end date");
         }
 
-        LocalDateTime startDateTime = startDate.atStartOfDay();
-        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+        // M3 S1-F6: cross-service SQL replaced by per-user Feign calls to booking-service.
+        // For each user we ask booking-service: total spent in [startDate, endDate] + lifetime COMPLETED count.
+        // Server-side date filtering keeps the response payload small.
+        final String startDateStr = startDate.toString();
+        final String endDateStr   = endDate.toString();
 
-//        List<Object[]> results = userRepository
-//                .findTopAttendeesBySpending(startDateTime, endDateTime, limit);
-//
-//        return results.stream().map(row -> new TopAttendeeDTO(
-//                ((Number) row[0]).longValue(),
-//                (String) row[1],
-//                ((Number) row[2]).doubleValue(),
-//                ((Number) row[3]).longValue()
-//        )).collect(Collectors.toList());
-        List<Object[]> results = userRepository
-                .findTopAttendeesBySpending(startDateTime, endDateTime, limit);
-
-        return results.stream()
-                .map(objectArrayDtoAdapter::toTopAttendeeDTO)
+        return userRepository.findAll().stream()
+                .map(user -> {
+                    BigDecimal total = BigDecimal.ZERO;
+                    long count = 0L;
+                    try {
+                        BigDecimal t = bookingClient.getUserBookingTotal(user.getId(), startDateStr, endDateStr);
+                        if (t != null) total = t;
+                        count = bookingClient.getTotalBookingCount(user.getId(), "COMPLETED");
+                    } catch (FeignException e) {
+                        log.warn("booking-service error for user {} in top-attendees: {}",
+                                user.getId(), e.getMessage());
+                    }
+                    return TopAttendeeDTO.builder()
+                            .userId(user.getId())
+                            .name(user.getName())
+                            .totalSpent(total.doubleValue())
+                            .bookingCount(count)
+                            .build();
+                })
+                .filter(dto -> dto.getTotalSpent() != null && dto.getTotalSpent() > 0)
+                .sorted((a, b) -> Double.compare(b.getTotalSpent(), a.getTotalSpent()))
+                .limit(limit)
                 .collect(Collectors.toList());
     }
 
@@ -482,8 +526,19 @@ public class UserService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category must not be blank");
         }
 
-        return userRepository.findUsersByFavoriteCategoryWithMinBookings(category, minBookings)
-                .stream()
+        // M3 S1-F9: JSONB lookup stays local (preferences live in user-postgres);
+        // the COMPLETED-bookings count check moves to a Feign call per candidate user.
+        return userRepository.findByPreferenceKeyValue("favoriteCategory", category).stream()
+                .filter(user -> {
+                    try {
+                        long count = bookingClient.getTotalBookingCount(user.getId(), "COMPLETED");
+                        return count >= minBookings;
+                    } catch (FeignException e) {
+                        log.warn("booking-service error counting bookings for user {}: {}",
+                                user.getId(), e.getMessage());
+                        return false;
+                    }
+                })
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
