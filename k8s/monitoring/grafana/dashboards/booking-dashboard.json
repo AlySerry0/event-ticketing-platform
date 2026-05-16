@@ -83,11 +83,59 @@
       ],
       "title": "Saga State Transitions — booking-service",
       "type": "logs"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${prometheus_datasource}" },
+      "description": "HTTP request rate for booking-service.",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "id": 4,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${prometheus_datasource}" },
+          "expr": "sum(rate(http_server_requests_seconds_count{application=\"booking-service\"}[1m]))",
+          "legendFormat": "requests/sec",
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP Request Rate — booking-service",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${prometheus_datasource}" },
+      "description": "JVM heap memory usage for booking-service.",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+      "id": 5,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${prometheus_datasource}" },
+          "expr": "jvm_memory_used_bytes{application=\"booking-service\", area=\"heap\"}",
+          "legendFormat": "heap used",
+          "refId": "A"
+        }
+      ],
+      "title": "JVM Heap Usage — booking-service",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${prometheus_datasource}" },
+      "description": "Active database connections for booking-service.",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+      "id": 6,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${prometheus_datasource}" },
+          "expr": "hikaricp_connections_active{application=\"booking-service\"}",
+          "legendFormat": "active connections",
+          "refId": "A"
+        }
+      ],
+      "title": "Active DB Connections — booking-service",
+      "type": "timeseries"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["booking-service", "logql"],
+  "tags": ["booking-service", "logql", "promql"],
   "templating": {
     "list": [
       {
@@ -98,6 +146,17 @@
         "name": "loki_datasource",
         "options": [],
         "query": "loki",
+        "refresh": 1,
+        "type": "datasource"
+      },
+      {
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "label": "Prometheus Datasource",
+        "name": "prometheus_datasource",
+        "options": [],
+        "query": "prometheus",
         "refresh": 1,
         "type": "datasource"
       }
