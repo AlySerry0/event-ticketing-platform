@@ -45,7 +45,7 @@ public class JwtGatewayFilter implements GlobalFilter {
             Claims claims = Jwts.parser()
                     .verifyWith(Keys.hmacShaKeyFor(Base64.getDecoder().decode(secret)))
                     .build()
-                    .parseClaimsJws(token)
+                    .parseSignedClaims(token)
                     .getPayload();
 
             String userId = claims.get("uid", String.class);
