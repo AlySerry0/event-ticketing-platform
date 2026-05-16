@@ -1,21 +1,21 @@
 package com.team7.eventticketing.booking.security;
 
-import com.team7.eventticketing.booking.repository.BookingRepository;
-import com.team7.eventticketing.booking.security.AuthContext;
-import com.team7.eventticketing.booking.security.AuthHandler;
-import com.team7.eventticketing.booking.security.AuthResult;
+import com.team7.eventticketing.contracts.feign.UserServiceClient;
+import feign.FeignException;
 
 public class UserLoaderHandler extends AuthHandler {
 
-    private final BookingRepository bookingRepository;
+    private final UserServiceClient userServiceClient;
 
-    public UserLoaderHandler(BookingRepository repo) {
-        this.bookingRepository = repo;
+    public UserLoaderHandler(UserServiceClient userServiceClient) {
+        this.userServiceClient = userServiceClient;
     }
 
     @Override
     public AuthResult handle(AuthContext context) {
-        if (!bookingRepository.userExistsByEmail(context.getAuthenticatedEmail())) {
+        try {
+            userServiceClient.getUser(context.getAuthenticatedUserId());
+        } catch (FeignException.NotFound e) {
             return AuthResult.unauthorized("User no longer exists");
         }
         return passToNext(context);
