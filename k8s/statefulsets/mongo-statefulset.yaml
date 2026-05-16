@@ -18,7 +18,7 @@ metadata:
   labels:
     app: mongodb
 spec:
-  serviceName: mongodb     # Must match the headless Service name below
+  serviceName: mongodb
   replicas: 1
   selector:
     matchLabels:
@@ -37,15 +37,9 @@ spec:
 
           env:
             - name: MONGO_INITDB_ROOT_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: mongodb-secret
-                  key: MONGO_ROOT_USERNAME
+              value: root
             - name: MONGO_INITDB_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mongodb-secret
-                  key: MONGO_ROOT_PASSWORD
+              value: rootpass
 
           volumeMounts:
             - name: data
@@ -59,29 +53,17 @@ spec:
               memory: "512Mi"
               cpu: "300m"
 
-          # MongoDB doesn't have a built-in HTTP health endpoint.
-          # We use mongosh (included in mongo:6) to check connectivity.
           readinessProbe:
             exec:
               command:
                 - mongosh
                 - "--eval"
                 - "db.adminCommand('ping')"
-            initialDelaySeconds: 20
-            periodSeconds: 10
-            failureThreshold: 3
-
-          livenessProbe:
-            exec:
-              command:
-                - mongosh
-                - "--eval"
-                - "db.adminCommand('ping')"
             initialDelaySeconds: 30
-            periodSeconds: 30
-            failureThreshold: 3
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 5
 
-  # PVC template — K8s creates one PVC per replica automatically
   volumeClaimTemplates:
     - metadata:
         name: data
@@ -91,4 +73,3 @@ spec:
         resources:
           requests:
             storage: 2Gi
-        # storageClassName: standard   # Minikube provides "standard" by default; omit to use default SC
