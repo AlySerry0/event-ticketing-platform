@@ -42,14 +42,14 @@
     },
     {
       "id": 3,
-      "title": "Booking Service Feign Errors (LogQL)",
-      "description": "Warning logs from BookingServiceClientWrapper — booking-service unavailability.",
+      "title": "Downstream Feign Warnings (LogQL)",
+      "description": "WARN logs from any class making Feign calls — indicates downstream service unavailability.",
       "type": "timeseries",
       "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "count_over_time({service=\"user-service\"} | json | logger=\"com.teamXX.eventticketing.user.client.BookingServiceClientWrapper\" | level=\"WARN\" [1m])",
+          "expr": "count_over_time({service=\"user-service\"} | json | level=\"WARN\" | message=~\".*(booking-service|FeignException|unavailable|feign).*\" [1m])",
           "legendFormat": "feign-warn/min",
           "refId": "A"
         }
