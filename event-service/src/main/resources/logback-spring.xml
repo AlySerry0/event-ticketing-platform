@@ -5,21 +5,26 @@
         </http>
         <format>
             <label>
-                <pattern>app=eventticketing, service=${spring.application.name}</pattern>
+                <pattern>app="eventticketing",service="${spring.application.name}"</pattern>
             </label>
             <message>
                 <pattern>
                     {
                     "timestamp": "%d{ISO8601}",
                     "level": "%level",
+                    "service": "${spring.application.name}",
+                    "thread": "%thread",
                     "correlationId": "%X{correlationId:-}",
                     "eventId": "%X{eventId:-}",
+                    "bookingId": "%X{bookingId:-}",
+                    "routingKey": "%X{routingKey:-}",
                     "message": "%msg"
                     }
                 </pattern>
             </message>
         </format>
     </appender>
+
     <root level="INFO">
         <appender-ref ref="LOKI" />
     </root>
