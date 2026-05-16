@@ -56,7 +56,6 @@ public class BookingEventConsumer {
         this.ticketSaleService = ticketSaleService;
     }
 
-    // Deficit 1 fix: single @RabbitListener with routing key dispatch
     @Transactional
     @RabbitListener(queues = PaymentEventConfig.PAYMENT_SAGA_QUEUE)
     public void handleBookingEvent(
@@ -108,10 +107,27 @@ public class BookingEventConsumer {
                 );
     }
 
-    // Deficit 6 fix: UserDTO result is used to set payment method from user profile
     private void createPendingSaleAndPublishPaymentInitiated(BookingCompletedEvent event) {
-        UserDTO user = userServiceClient.getUser(event.userId());
-        BookingDTO booking = bookingServiceClient.getBooking(event.bookingId());
+        UserDTO user = null;
+        try {
+            user = userServiceClient.getUser(event.userId());
+        } catch (feign.FeignException.NotFound e) {
+            log.warn("User not found for userId={}, proceeding with default payment method", event.userId());
+        } catch (feign.FeignException e) {
+            log.warn("user-service unavailable for userId={}, proceeding with default payment method: {}",
+                    event.userId(), e.getMessage());
+        }
+
+        BookingDTO booking;
+        try {
+            booking = bookingServiceClient.getBooking(event.bookingId());
+        } catch (feign.FeignException.NotFound e) {
+            log.error("Booking not found for bookingId={}, cannot create TicketSale", event.bookingId());
+            throw new RuntimeException("Booking not found for bookingId=" + event.bookingId());
+        } catch (feign.FeignException e) {
+            log.error("booking-service unavailable for bookingId={}: {}", event.bookingId(), e.getMessage());
+            throw new RuntimeException("Booking service temporarily unavailable for bookingId=" + event.bookingId());
+        }
 
         PaymentMethod paymentMethod = PaymentMethod.CREDIT_CARD;
         if (user != null && user.preferences() != null) {
@@ -120,11 +136,8 @@ public class BookingEventConsumer {
                 try {
                     paymentMethod = PaymentMethod.valueOf(pref.toString().toUpperCase());
                 } catch (IllegalArgumentException e) {
-                    log.warn(
-                            "Unknown preferredPaymentMethod '{}' for userId={}, defaulting to CREDIT_CARD",
-                            pref,
-                            event.userId()
-                    );
+                    log.warn("Unknown preferredPaymentMethod '{}' for userId={}, defaulting to CREDIT_CARD",
+                            pref, event.userId());
                 }
             }
         }
@@ -155,15 +168,10 @@ public class BookingEventConsumer {
                 savedSale.getAmount()
         );
 
-        log.info(
-                "Created PENDING TicketSale saleId={} for bookingId={} and published payment.initiated",
-                savedSale.getId(),
-                savedSale.getBookingId()
-        );
+        log.info("Created PENDING TicketSale saleId={} for bookingId={} and published payment.initiated",
+                savedSale.getId(), savedSale.getBookingId());
     }
 
-    // Deficit 4 fix: PENDING sales now enter the refund path alongside COMPLETED
-    // Deficit 5 fix: delegates to processRefundWithWindowPolicy (S5-F12) if eventDate is reachable
     private void processRefundIfEligible(TicketSale sale, BookingCancelledEvent event) {
         if (sale.getStatus() == TicketSaleStatus.REFUNDED) {
             log.info(
@@ -204,8 +212,6 @@ public class BookingEventConsumer {
 
         } catch (ResponseStatusException rse) {
             if (rse.getStatusCode().value() == 404) {
-                // eventDate not reachable — spec says apply S5-F12 "if eventDate is reachable"
-                // fall back to direct refund
                 log.warn(
                         "eventDate not reachable for saleId={}, falling back to direct refund: {}",
                         sale.getId(),
@@ -226,7 +232,6 @@ public class BookingEventConsumer {
                         sale.getAmount()
                 );
             } else {
-                // Permanent business rejection (e.g. refund window expired) — ACK the message
                 log.warn(
                         "Refund denied for saleId={}, bookingId={}: {}",
                         sale.getId(),
@@ -235,7 +240,6 @@ public class BookingEventConsumer {
                 );
             }
         } catch (RuntimeException e) {
-            // Transient error — rethrow so message is nacked and retried/DLQ'd
             log.error(
                     "Unexpected error processing refund for saleId={}, bookingId={}: {}",
                     sale.getId(),

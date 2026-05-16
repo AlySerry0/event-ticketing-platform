@@ -16,6 +16,8 @@ import com.team7.eventticketing.sales.repository.TicketSaleRepository;
 import com.team7.eventticketing.sales.adapter.MongoDocumentAdapter;
 import com.team7.eventticketing.sales.dto.SaleAuditTrailDTO;
 import com.team7.eventticketing.sales.repository.PaymentAuditEventRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
@@ -94,6 +96,7 @@ public class TicketSaleService {
     private UserServiceClient userServiceClient;
 
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
+    private static final Logger log = LoggerFactory.getLogger(TicketSaleService.class);
 
     @PostConstruct
     public void initObservers() {
@@ -337,8 +340,11 @@ public class TicketSaleService {
 
         try {
             booking = bookingServiceClient.getBooking(bookingId);
-        } catch (Exception e) {
+        } catch (feign.FeignException.NotFound e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
+        } catch (feign.FeignException e) {
+            log.warn("booking-service unavailable for bookingId={}: {}", bookingId, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Booking service temporarily unavailable");
         }
 
         if (booking.status() == null ||
@@ -448,9 +454,12 @@ public class TicketSaleService {
     )
     public UserSaleSummaryDTO getUserSaleSummary(Long userId) {
         try {
-            UserDTO user = userServiceClient.getUser(userId);
-        } catch (Exception e) {
+            userServiceClient.getUser(userId);
+        } catch (feign.FeignException.NotFound e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+        } catch (feign.FeignException e) {
+            log.warn("user-service unavailable for userId={}: {}", userId, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "User service temporarily unavailable");
         }
         List<Object[]> rows = ticketSaleRepository.getUserSalesSummaryByMethod(
                 userId,
@@ -512,10 +521,11 @@ public class TicketSaleService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Ticket sale not found"));
 
-        if (ticketSale.getStatus() != TicketSaleStatus.COMPLETED) {
+        if (ticketSale.getStatus() != TicketSaleStatus.COMPLETED
+                && ticketSale.getStatus() != TicketSaleStatus.PENDING) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Only COMPLETED ticket sales can be refunded"
+                    "Only PENDING or COMPLETED ticket sales can be refunded"
             );
         }
 
@@ -523,8 +533,11 @@ public class TicketSaleService {
 
         try {
             booking = bookingServiceClient.getBooking(ticketSale.getBookingId());
-        } catch (Exception e) {
+        } catch (feign.FeignException.NotFound e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
+        } catch (feign.FeignException e) {
+            log.warn("booking-service unavailable for bookingId={}: {}", ticketSale.getBookingId(), e.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Booking service temporarily unavailable");
         }
 
         if (booking.eventId() == null) {
@@ -538,8 +551,11 @@ public class TicketSaleService {
 
         try {
             event = eventServiceClient.getEvent(booking.eventId());
-        } catch (Exception e) {
+        } catch (feign.FeignException.NotFound e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found");
+        } catch (feign.FeignException e) {
+            log.warn("event-service unavailable for eventId={}: {}", booking.eventId(), e.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Event service temporarily unavailable");
         }
 
         LocalDateTime eventDate = event.eventDate();
@@ -699,7 +715,19 @@ public class TicketSaleService {
         Map<String, TierAccumulator> tierMap = new HashMap<>();
 
         for (TicketSale sale : completedSales) {
-            List<BookingItemDTO> items = bookingServiceClient.getBookingItems(sale.getBookingId());
+            List<BookingItemDTO> items;
+            try {
+                items = bookingServiceClient.getBookingItems(sale.getBookingId());
+            } catch (feign.FeignException.NotFound e) {
+                log.warn("No booking items found for bookingId={}, skipping", sale.getBookingId());
+                continue;
+            } catch (feign.FeignException e) {
+                log.warn("booking-service unavailable for bookingId={}: {}", sale.getBookingId(), e.getMessage());
+                throw new ResponseStatusException(
+                        HttpStatus.SERVICE_UNAVAILABLE,
+                        "Booking service temporarily unavailable while loading booking items"
+                );
+            }
 
             for (BookingItemDTO item : items) {
                 String tier = "UNSPECIFIED";
