@@ -4,7 +4,7 @@ import com.team7.eventticketing.contracts.events.PaymentCompletedEvent;
 import com.team7.eventticketing.contracts.events.PaymentFailedEvent;
 import com.team7.eventticketing.contracts.events.PaymentInitiatedEvent;
 import com.team7.eventticketing.contracts.events.PaymentRefundedEvent;
-import com.team7.eventticketing.sales.config.RabbitMQConfig;
+import com.team7.eventticketing.sales.config.PaymentEventConfig;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
@@ -32,8 +32,8 @@ public class PaymentEventPublisher {
         );
 
         rabbitTemplate.convertAndSend(
-                RabbitMQConfig.PAYMENT_EXCHANGE,
-                RabbitMQConfig.PAYMENT_INITIATED_ROUTING_KEY,
+                PaymentEventConfig.PAYMENT_EXCHANGE,
+                PaymentEventConfig.PAYMENT_INITIATED_ROUTING_KEY,
                 event
         );
     }
@@ -51,8 +51,8 @@ public class PaymentEventPublisher {
         );
 
         rabbitTemplate.convertAndSend(
-                RabbitMQConfig.PAYMENT_EXCHANGE,
-                RabbitMQConfig.PAYMENT_COMPLETED_ROUTING_KEY,
+                PaymentEventConfig.PAYMENT_EXCHANGE,
+                PaymentEventConfig.PAYMENT_COMPLETED_ROUTING_KEY,
                 event
         );
     }
@@ -70,8 +70,8 @@ public class PaymentEventPublisher {
         );
 
         rabbitTemplate.convertAndSend(
-                RabbitMQConfig.PAYMENT_EXCHANGE,
-                RabbitMQConfig.PAYMENT_FAILED_ROUTING_KEY,
+                PaymentEventConfig.PAYMENT_EXCHANGE,
+                PaymentEventConfig.PAYMENT_FAILED_ROUTING_KEY,
                 event
         );
     }
@@ -89,8 +89,8 @@ public class PaymentEventPublisher {
         );
 
         rabbitTemplate.convertAndSend(
-                RabbitMQConfig.PAYMENT_EXCHANGE,
-                RabbitMQConfig.PAYMENT_REFUNDED_ROUTING_KEY,
+                PaymentEventConfig.PAYMENT_EXCHANGE,
+                PaymentEventConfig.PAYMENT_REFUNDED_ROUTING_KEY,
                 event
         );
     }

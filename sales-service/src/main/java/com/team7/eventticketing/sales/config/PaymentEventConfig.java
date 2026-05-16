@@ -5,7 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-public class RabbitMQConfig {
+public class PaymentEventConfig {
 
     public static final String PAYMENT_EXCHANGE = "payment.events";
     public static final String BOOKING_EXCHANGE = "booking.events";

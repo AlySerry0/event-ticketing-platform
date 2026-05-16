@@ -6,6 +6,19 @@ spring:
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:guest}
+    password: ${SPRING_RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 3
   jpa:
     hibernate:
       ddl-auto: update
@@ -23,22 +36,36 @@ spring:
 
   mongodb:
     uri: ${SPRING_DATA_MONGODB_URI:mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin}
-
-  rabbitmq:
-    host: ${SPRING_RABBITMQ_HOST:localhost}
-    port: ${SPRING_RABBITMQ_PORT:5672}
-    username: ${SPRING_RABBITMQ_USERNAME:guest}
-    password: ${SPRING_RABBITMQ_PASSWORD:guest}
-    listener:
-      simple:
-        acknowledge-mode: auto
-        default-requeue-rejected: false
-        retry:
-          enabled: true
-          initial-interval: 1000
-          max-attempts: 3
-
   web:
     error:
       include-message: always
       include-binding-errors: always
+
+server:
+  port: 8080
+
+jwt:
+  secret: ${JWT_SECRET:XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw=}
+  expiration: ${JWT_EXPIRATION_MS:86400000}
+
+logging:
+  level:
+    com.team7.eventticketing.sales: DEBUG
+
+feign:
+  user-service:
+    url: http://user-service:8080
+  booking-service:
+    url: http://booking-service:8080
+  event-service:
+    url: http://event-service:8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus,health,info"
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
