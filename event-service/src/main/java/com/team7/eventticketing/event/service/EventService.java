@@ -1,11 +1,14 @@
 package com.team7.eventticketing.event.service;
 
+import com.team7.eventticketing.contracts.dto.AvgCapacityDTO;
+import com.team7.eventticketing.contracts.dto.VenueCoordsDTO;
 import com.team7.eventticketing.event.adapter.ElasticsearchHitAdapter;
 import com.team7.eventticketing.event.adapter.ObjectArrayDtoAdapter;
 import com.team7.eventticketing.event.dto.*;
 import com.team7.eventticketing.event.elasticsearch.EventSearchDocument;
 import com.team7.eventticketing.event.model.Event;
 import com.team7.eventticketing.event.model.EventCategory;
+import com.team7.eventticketing.event.model.EventSession;
 import com.team7.eventticketing.event.model.EventStatus;
 import com.team7.eventticketing.event.observer.EntityObserver;
 import com.team7.eventticketing.event.observer.MongoEventLogger;
@@ -744,6 +747,36 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
         return searchHits.getSearchHits().stream()
                 .map(elasticsearchHitAdapter::adapt)
                 .collect(Collectors.toList());
+    }
+
+    public AvgCapacityDTO calculateAvgCapacity(Long id) {
+        Event event = eventRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Event not found with id: " + id));
+
+        double avg = event.getEventSessions().stream()
+                .mapToDouble(EventSession::getCapacity)
+                .average()
+                .orElse(0.0);
+
+        return new AvgCapacityDTO(avg);
+    }
+
+    public VenueCoordsDTO getVenueCoords(Long id) {
+        Event event = eventRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Event not found with id: " + id));
+
+        // Logic to extract from Event.details JSONB
+        Map<String, Object> details = event.getDetails();
+        if (details == null || !details.containsKey("venueLat") || !details.containsKey("venueLon")) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Venue coordinates not found in event details for event id: " + id);
+        }
+        Double lat = (Double) details.get("venueLat");
+        Double lon = (Double) details.get("venueLon");
+
+        return new VenueCoordsDTO(lat, lon);
     }
 
     // -----------------------------------------------------------------------
