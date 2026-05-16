@@ -65,9 +65,6 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     boolean existsByTicketCode(String ticketCode);
 
-    @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE email = :email", nativeQuery = true)
-    boolean userExistsByEmail(String email);
-
     @Query(value = """
         SELECT
             COUNT(*) AS totalIssued,
