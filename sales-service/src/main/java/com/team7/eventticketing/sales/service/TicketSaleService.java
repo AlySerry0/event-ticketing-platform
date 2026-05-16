@@ -40,7 +40,9 @@ import com.team7.eventticketing.sales.observer.MongoEventLogger;
 import com.team7.eventticketing.sales.util.CacheInvalidationService;
 import jakarta.annotation.PostConstruct;
 import com.team7.eventticketing.contracts.dto.BookingDTO;
+import com.team7.eventticketing.contracts.dto.EventDTO;
 import com.team7.eventticketing.contracts.feign.BookingServiceClient;
+import com.team7.eventticketing.contracts.feign.EventServiceClient;
 import java.util.ArrayList;
 
 import com.team7.eventticketing.sales.dto.RefundRequestDTO;
@@ -83,6 +85,8 @@ public class TicketSaleService {
     private BookingServiceClient bookingServiceClient;
     @Autowired
     private PaymentEventPublisher paymentEventPublisher;
+    @Autowired
+    private EventServiceClient eventServiceClient;
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
 
     @PostConstruct
@@ -510,7 +514,30 @@ public class TicketSaleService {
             );
         }
 
-        LocalDateTime eventDate = ticketSaleRepository.findEventDateBySaleId(saleId);
+        BookingDTO booking;
+
+        try {
+            booking = bookingServiceClient.getBooking(ticketSale.getBookingId());
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
+        }
+
+        if (booking.eventId() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "booking has no associated event"
+            );
+        }
+
+        EventDTO event;
+
+        try {
+            event = eventServiceClient.getEvent(booking.eventId());
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found");
+        }
+
+        LocalDateTime eventDate = event.eventDate();
 
         if (eventDate == null) {
             throw new ResponseStatusException(
