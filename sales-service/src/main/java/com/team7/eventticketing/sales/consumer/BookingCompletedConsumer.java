@@ -1,5 +1,7 @@
 package com.team7.eventticketing.sales.consumer;
 
+import com.team7.eventticketing.contracts.dto.BookingDTO;
+import com.team7.eventticketing.contracts.feign.BookingServiceClient;
 import com.team7.eventticketing.contracts.events.BookingCompletedEvent;
 import com.team7.eventticketing.sales.config.RabbitMQConfig;
 import com.team7.eventticketing.sales.model.PaymentMethod;
@@ -24,13 +26,16 @@ public class BookingCompletedConsumer {
 
     private final TicketSaleRepository ticketSaleRepository;
     private final PaymentEventPublisher paymentEventPublisher;
+    private final BookingServiceClient bookingServiceClient;
 
     public BookingCompletedConsumer(
             TicketSaleRepository ticketSaleRepository,
-            PaymentEventPublisher paymentEventPublisher
+            PaymentEventPublisher paymentEventPublisher,
+            BookingServiceClient bookingServiceClient
     ) {
         this.ticketSaleRepository = ticketSaleRepository;
         this.paymentEventPublisher = paymentEventPublisher;
+        this.bookingServiceClient = bookingServiceClient;
     }
 
     @Transactional
@@ -50,12 +55,11 @@ public class BookingCompletedConsumer {
     }
 
     private void createPendingSaleAndPublishPaymentInitiated(BookingCompletedEvent event) {
+        BookingDTO booking = bookingServiceClient.getBooking(event.bookingId());
         TicketSale sale = new TicketSale();
         sale.setBookingId(event.bookingId());
         sale.setUserId(event.userId());
-
-        sale.setAmount(0.0);
-
+        sale.setAmount(booking.totalAmount() != null ? booking.totalAmount().doubleValue() : 0.0);
         sale.setMethod(PaymentMethod.CREDIT_CARD);
         sale.setStatus(TicketSaleStatus.PENDING);
         sale.setCreatedAt(LocalDateTime.now());
