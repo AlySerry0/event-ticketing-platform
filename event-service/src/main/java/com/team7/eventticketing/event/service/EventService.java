@@ -768,8 +768,13 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
                         HttpStatus.NOT_FOUND, "Event not found with id: " + id));
 
         // Logic to extract from Event.details JSONB
-        Double lat = (Double) event.getDetails().get("venueLat");
-        Double lon = (Double) event.getDetails().get("venueLon");
+        Map<String, Object> details = event.getDetails();
+        if (details == null || !details.containsKey("venueLat") || !details.containsKey("venueLon")) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Venue coordinates not found in event details for event id: " + id);
+        }
+        Double lat = (Double) details.get("venueLat");
+        Double lon = (Double) details.get("venueLon");
 
         return new VenueCoordsDTO(lat, lon);
     }
