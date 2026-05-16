@@ -41,8 +41,10 @@ import com.team7.eventticketing.sales.util.CacheInvalidationService;
 import jakarta.annotation.PostConstruct;
 import com.team7.eventticketing.contracts.dto.BookingDTO;
 import com.team7.eventticketing.contracts.dto.EventDTO;
+import com.team7.eventticketing.contracts.dto.UserDTO;
 import com.team7.eventticketing.contracts.feign.BookingServiceClient;
 import com.team7.eventticketing.contracts.feign.EventServiceClient;
+import com.team7.eventticketing.contracts.feign.UserServiceClient;
 import java.util.ArrayList;
 
 import com.team7.eventticketing.sales.dto.RefundRequestDTO;
@@ -87,6 +89,9 @@ public class TicketSaleService {
     private PaymentEventPublisher paymentEventPublisher;
     @Autowired
     private EventServiceClient eventServiceClient;
+    @Autowired
+    private UserServiceClient userServiceClient;
+
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
 
     @PostConstruct
@@ -441,12 +446,11 @@ public class TicketSaleService {
             key = "#userId"
     )
     public UserSaleSummaryDTO getUserSaleSummary(Long userId) {
-       boolean userExists = ticketSaleRepository.userExists(userId);
-
-        if (!userExists) {
+        try {
+            UserDTO user = userServiceClient.getUser(userId);
+        } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
         }
-
         List<Object[]> rows = ticketSaleRepository.getUserSalesSummaryByMethod(
                 userId,
                 TicketSaleStatus.COMPLETED
