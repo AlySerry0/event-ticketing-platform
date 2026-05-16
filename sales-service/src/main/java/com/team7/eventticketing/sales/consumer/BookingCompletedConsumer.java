@@ -2,6 +2,7 @@ package com.team7.eventticketing.sales.consumer;
 
 import com.team7.eventticketing.contracts.dto.BookingDTO;
 import com.team7.eventticketing.contracts.feign.BookingServiceClient;
+import com.team7.eventticketing.contracts.feign.UserServiceClient;
 import com.team7.eventticketing.contracts.events.BookingCompletedEvent;
 import com.team7.eventticketing.sales.config.RabbitMQConfig;
 import com.team7.eventticketing.sales.model.PaymentMethod;
@@ -27,15 +28,18 @@ public class BookingCompletedConsumer {
     private final TicketSaleRepository ticketSaleRepository;
     private final PaymentEventPublisher paymentEventPublisher;
     private final BookingServiceClient bookingServiceClient;
+    private final UserServiceClient userServiceClient;
 
     public BookingCompletedConsumer(
             TicketSaleRepository ticketSaleRepository,
             PaymentEventPublisher paymentEventPublisher,
-            BookingServiceClient bookingServiceClient
+            BookingServiceClient bookingServiceClient,
+            UserServiceClient userServiceClient
     ) {
         this.ticketSaleRepository = ticketSaleRepository;
         this.paymentEventPublisher = paymentEventPublisher;
         this.bookingServiceClient = bookingServiceClient;
+        this.userServiceClient = userServiceClient;
     }
 
     @Transactional
@@ -55,7 +59,9 @@ public class BookingCompletedConsumer {
     }
 
     private void createPendingSaleAndPublishPaymentInitiated(BookingCompletedEvent event) {
+        userServiceClient.getUser(event.userId());
         BookingDTO booking = bookingServiceClient.getBooking(event.bookingId());
+
         TicketSale sale = new TicketSale();
         sale.setBookingId(event.bookingId());
         sale.setUserId(event.userId());
