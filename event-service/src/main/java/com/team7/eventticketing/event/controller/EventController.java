@@ -335,6 +335,7 @@ public class EventController {
     }
 
     @GetMapping("/search/full-text")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventDTO>> searchEventsFullText(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) String category,
@@ -352,11 +353,13 @@ public class EventController {
     }
 
     @GetMapping("/{id}/sessions/avg-capacity")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<AvgCapacityDTO> getAvgCapacity(@PathVariable Long id) {
         return ResponseEntity.ok(eventService.calculateAvgCapacity(id));
     }
 
     @GetMapping("/{id}/venue-coords")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<VenueCoordsDTO> getVenueCoords(@PathVariable Long id) {
         return ResponseEntity.ok(eventService.getVenueCoords(id));
     }
