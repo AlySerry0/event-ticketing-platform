@@ -39,7 +39,8 @@ import com.team7.eventticketing.sales.observer.EntityObserver;
 import com.team7.eventticketing.sales.observer.MongoEventLogger;
 import com.team7.eventticketing.sales.util.CacheInvalidationService;
 import jakarta.annotation.PostConstruct;
-
+import com.team7.eventticketing.contracts.dto.BookingDTO;
+import com.team7.eventticketing.contracts.feign.BookingServiceClient;
 import java.util.ArrayList;
 
 import com.team7.eventticketing.sales.dto.RefundRequestDTO;
@@ -78,6 +79,8 @@ public class TicketSaleService {
     private EventFactory eventFactory;
     @Autowired
     private RefundStrategySelector refundStrategySelector;
+    @Autowired
+    private BookingServiceClient bookingServiceClient;
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
 
     @PostConstruct
@@ -318,14 +321,24 @@ public class TicketSaleService {
 
     @Transactional
     public TicketSale processTicketSale(Long bookingId, String methodStr, String cardLastFour, boolean simulateFailure) {
-        boolean doesExist = ticketSaleRepository.bookingExists(bookingId);
-        if (!doesExist) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
+        BookingDTO booking;
+
+        try {
+            booking = bookingServiceClient.getBooking(bookingId);
+        } catch (Exception e) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Booking not found"
+            );
         }
 
-        String bookingStatus = ticketSaleRepository.getBookingStatus(bookingId);
-        if (!"COMPLETED".equalsIgnoreCase(bookingStatus)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking must be COMPLETED");
+        if (booking.status() == null ||
+                !"COMPLETED".equalsIgnoreCase(booking.status().name())) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Booking must be COMPLETED"
+            );
         }
 
         TicketSale ticketSale = ticketSaleRepository.findByBookingId(bookingId)
