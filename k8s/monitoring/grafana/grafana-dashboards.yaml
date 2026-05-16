@@ -274,7 +274,185 @@ data:
       "version": 1
     }
   event-dashboard.json: |
-    {"title": "Event Dashboard", "panels": [], "schemaVersion": 39}
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "title": "Event Service Request Rate (PromQL)",
+          "description": "Requests per second to event-service endpoints.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (uri) (rate(http_server_requests_seconds_count{job=\"event-service\"}[5m]))",
+              "legendFormat": "{{uri}}"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Event Service 5xx Error Rate (PromQL)",
+          "description": "Tracks internal server errors in event-service.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 12,
+            "y": 0,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(rate(http_server_requests_seconds_count{job=\"event-service\",status=~\"5..\"}[5m]))",
+              "legendFormat": "5xx/min"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Event Service P95 Latency (PromQL)",
+          "description": "95th percentile latency for event-service requests.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 8,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job=\"event-service\"}[5m])) by (le))",
+              "legendFormat": "p95 latency"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "RabbitMQ Routing Keys (LogQL)",
+          "description": "Tracks published/consumed RabbitMQ routing keys.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 12,
+            "y": 8,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "sum by (routingKey) (count_over_time({service=\"event-service\"} | json | routingKey != \"\" [5m]))",
+              "legendFormat": "{{routingKey}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Session Verification Events (LogQL)",
+          "description": "Tracks S2-F8 verification activity.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 16,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "count_over_time({service=\"event-service\"} |= \"SESSION_VERIFIED\" [5m])",
+              "legendFormat": "session-verifications",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Correlation ID Trace (LogQL)",
+          "description": "Trace one request across event-service logs.",
+          "type": "logs",
+          "gridPos": {
+            "x": 0,
+            "y": 24,
+            "w": 24,
+            "h": 10
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "{service=\"event-service\"} | json | correlationId=\"$correlationId\"",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "wrapLogMessage": true
+          }
+        }
+      ],
+      "refresh": "10s",
+      "schemaVersion": 39,
+      "tags": [
+        "eventticketing",
+        "event-service",
+        "m3"
+      ],
+      "templating": {
+        "list": [
+          {
+            "name": "correlationId",
+            "type": "textbox",
+            "label": "Correlation ID",
+            "description": "Paste a correlationId to trace a request"
+          }
+        ]
+      },
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "timezone": "browser",
+      "title": "Event Service — M3 Integrated Dashboard",
+      "uid": "event-service-integrated",
+      "version": 1
+    }
   booking-dashboard.json: |
     {
       "__inputs": [],
