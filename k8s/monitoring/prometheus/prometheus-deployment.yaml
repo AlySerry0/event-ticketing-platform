@@ -16,6 +16,9 @@ spec:
       containers:
         - name: prometheus
           image: prom/prometheus:v2.51.2
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
           ports:
             - containerPort: 9090
           volumeMounts:
@@ -24,6 +27,12 @@ spec:
               subPath: prometheus.yml
             - name: prometheus-storage
               mountPath: /prometheus
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 9090
+            initialDelaySeconds: 30
+            periodSeconds: 10
       volumes:
         - name: prometheus-config
           configMap:

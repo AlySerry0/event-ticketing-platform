@@ -10,7 +10,7 @@
   "links": [],
   "panels": [
     {
-      "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+      "datasource": { "type": "loki", "uid": "loki" },
       "description": "Count of ERROR-level log lines from booking-service per minute. Spike detection — sudden rise indicates an unhandled exception or downstream failure.",
       "fieldConfig": {
         "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2 } },
@@ -21,7 +21,7 @@
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "datasource": { "type": "loki", "uid": "loki" },
           "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\", level=\"ERROR\"}[1m]))",
           "legendFormat": "errors/min",
           "refId": "A"
@@ -31,7 +31,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+      "datasource": { "type": "loki", "uid": "loki" },
       "description": "Feign call outcomes from booking-service: successful downstream responses vs FeignException catches. A rising exception count indicates a degraded upstream (event-service, user-service, or ticket-service).",
       "fieldConfig": {
         "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2 } },
@@ -42,13 +42,13 @@
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "datasource": { "type": "loki", "uid": "loki" },
           "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} |= \"FeignException\"[1m]))",
           "legendFormat": "feign-exceptions/min",
           "refId": "A"
         },
         {
-          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "datasource": { "type": "loki", "uid": "loki" },
           "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} |= \"feign\" != \"FeignException\"[1m]))",
           "legendFormat": "feign-ok/min",
           "refId": "B"
@@ -58,7 +58,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+      "datasource": { "type": "loki", "uid": "loki" },
       "description": "Saga state transition log lines for booking-service filtered by bookingId. Visualise the full saga path for a specific booking: COMPLETING → PAYMENT_PENDING → PAID (or PAYMENT_FAILED → CANCELLED).",
       "fieldConfig": { "defaults": {}, "overrides": [] },
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
@@ -75,7 +75,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "datasource": { "type": "loki", "uid": "loki" },
           "expr": "{app=\"eventticketing\", service=\"booking-service\"} |= \"COMPLETING\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"PAYMENT_PENDING\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"PAYMENT_FAILED\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"REFUNDED\"",
           "legendFormat": "",
           "refId": "A"
@@ -85,14 +85,14 @@
       "type": "logs"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${prometheus_datasource}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "description": "HTTP request rate for booking-service.",
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
       "id": 4,
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${prometheus_datasource}" },
-          "expr": "sum(rate(http_server_requests_seconds_count{application=\"booking-service\"}[1m]))",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"booking-service\"}[1m]))",
           "legendFormat": "requests/sec",
           "refId": "A"
         }
@@ -101,14 +101,14 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${prometheus_datasource}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "description": "JVM heap memory usage for booking-service.",
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
       "id": 5,
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${prometheus_datasource}" },
-          "expr": "jvm_memory_used_bytes{application=\"booking-service\", area=\"heap\"}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "jvm_memory_used_bytes{job=\"booking-service\", area=\"heap\"}",
           "legendFormat": "heap used",
           "refId": "A"
         }
@@ -117,14 +117,14 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${prometheus_datasource}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "description": "Active database connections for booking-service.",
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
       "id": 6,
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${prometheus_datasource}" },
-          "expr": "hikaricp_connections_active{application=\"booking-service\"}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "hikaricp_connections_active{job=\"booking-service\"}",
           "legendFormat": "active connections",
           "refId": "A"
         }
@@ -136,32 +136,7 @@
   "refresh": "30s",
   "schemaVersion": 39,
   "tags": ["booking-service", "logql", "promql"],
-  "templating": {
-    "list": [
-      {
-        "current": {},
-        "hide": 0,
-        "includeAll": false,
-        "label": "Loki Datasource",
-        "name": "loki_datasource",
-        "options": [],
-        "query": "loki",
-        "refresh": 1,
-        "type": "datasource"
-      },
-      {
-        "current": {},
-        "hide": 0,
-        "includeAll": false,
-        "label": "Prometheus Datasource",
-        "name": "prometheus_datasource",
-        "options": [],
-        "query": "prometheus",
-        "refresh": 1,
-        "type": "datasource"
-      }
-    ]
-  },
+  "templating": { "list": [] },
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",

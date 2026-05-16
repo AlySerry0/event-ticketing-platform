@@ -24,7 +24,10 @@ spec:
               name: bolt
           env:
             - name: NEO4J_AUTH
-              value: neo4j/password
+              valueFrom:
+                secretKeyRef:
+                  name: neo4j-secret
+                  key: NEO4J_AUTH
           volumeMounts:
             - name: neo4j-storage
               mountPath: /data
