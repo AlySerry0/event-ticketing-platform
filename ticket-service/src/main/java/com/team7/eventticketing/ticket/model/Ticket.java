@@ -18,9 +18,6 @@ public class Ticket {
     @Column(name = "booking_id", nullable = false)
     private Long bookingId;
 
-    @Column(name = "event_id")
-    private Long eventId;
-
     @Column(name = "attendee_name", nullable = false)
     private String attendeeName;
 
@@ -74,9 +71,6 @@ public class Ticket {
 
     public LocalDateTime getIssuedAt() { return issuedAt; }
     public void setIssuedAt(LocalDateTime issuedAt) { this.issuedAt = issuedAt; }
-
-    public Long getEventId() { return eventId; }
-    public void setEventId(Long eventId) { this.eventId = eventId; }
 
     public Map<String, Object> getMetadata() { return metadata; }
     public void setMetadata(Map<String, Object> metadata) { this.metadata = metadata; }
