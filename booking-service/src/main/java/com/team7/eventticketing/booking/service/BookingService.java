@@ -283,6 +283,7 @@ public class BookingService implements EntitySubject {
 		// --- REFACTORED (S3-F4): Saga State & Removed Direct SQL Insert ---
 		booking.setStatus(BookingStatus.COMPLETING); // Changed from COMPLETED
 		Booking savedBooking = bookingRepository.saveAndFlush(booking);
+		log.info("Booking {} transitioning to COMPLETING", savedBooking.getId());
 
 		// Publish event to trigger the Payment Saga in sales-service
 		bookingEventPublisher.publishBookingCompleted(

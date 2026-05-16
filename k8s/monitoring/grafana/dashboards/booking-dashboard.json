@@ -76,13 +76,112 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "${loki_datasource}" },
-          "expr": "{app=\"eventticketing\", service=\"booking-service\"} |= \"COMPLETING\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"PAYMENT_PENDING\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"PAYMENT_FAILED\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"REFUNDED\"",
+          "expr": "{app=\"eventticketing\", service=\"booking-service\"} |= \"COMPLETING\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"PAYMENT_PENDING\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"PAID\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"PAYMENT_FAILED\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"CANCELLED\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"REFUNDED\"",
           "legendFormat": "",
           "refId": "A"
         }
       ],
       "title": "Saga State Transitions — booking-service",
       "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+      "description": "Trends for bookings transitioning into various Saga states. Helps monitor the flow of distributed transactions.",
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2 } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "id": 4,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} |= \"transitioning to COMPLETING\"[1m]))",
+          "legendFormat": "completing",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} |= \"transitioning\" |= \"PAYMENT_PENDING\"[1m]))",
+          "legendFormat": "payment-pending",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} |= \"transitioning\" |= \"PAID\"[1m]))",
+          "legendFormat": "paid",
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} |= \"transitioning\" |= \"PAYMENT_FAILED\"[1m]))",
+          "legendFormat": "payment-failed",
+          "refId": "D"
+        }
+      ],
+      "title": "Saga State Trends — booking-service",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+      "description": "RabbitMQ message throughput for the booking saga queue. Visualises the volume of incoming payment events.",
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2 } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} |= \"Consuming payment.initiated\"[1m]))",
+          "legendFormat": "payment.initiated",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} |= \"Consuming payment.completed\"[1m]))",
+          "legendFormat": "payment.completed",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} |= \"Consuming payment.failed\"[1m]))",
+          "legendFormat": "payment.failed",
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} |= \"Consuming payment.refunded\"[1m]))",
+          "legendFormat": "payment.refunded",
+          "refId": "D"
+        }
+      ],
+      "title": "RabbitMQ Saga Throughput — booking-service",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+      "description": "Failures during saga event processing in PaymentEventConsumer.",
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2 } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "id": 6,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} |= \"Saga processing failure\"[1m]))",
+          "legendFormat": "saga-failures",
+          "refId": "A"
+        }
+      ],
+      "title": "Saga Processing Errors — booking-service",
+      "type": "timeseries"
     }
   ],
   "refresh": "30s",
@@ -108,5 +207,5 @@
   "timezone": "browser",
   "title": "Booking Service Dashboard",
   "uid": "booking-service-dashboard",
-  "version": 1
+  "version": 3
 }

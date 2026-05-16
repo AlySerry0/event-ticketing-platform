@@ -32,55 +32,59 @@ public class PaymentEventConsumer {
 	@RabbitListener(queues = BookingEventConfig.SAGA_QUEUE)
 	@Transactional
 	public void handlePaymentEvents(Object payload, @Header(AmqpHeaders.RECEIVED_ROUTING_KEY) String routingKey) {
-		// In a real scenario, you'd extract the bookingId from the specific payload type.
-		// For this skeleton, let's assume we extracted it into a variable called `bookingId`.
-		Long bookingId = extractBookingId(payload);
-
 		try {
-			MDC.put("bookingId", String.valueOf(bookingId));
-			MDC.put("routingKey", routingKey);
-			log.info("Consuming {} for {}={}", routingKey, "bookingId", bookingId);
+			// In a real scenario, you'd extract the bookingId from the specific payload type.
+			// For this skeleton, let's assume we extracted it into a variable called `bookingId`.
+			Long bookingId = extractBookingId(payload);
 
-			Booking booking = bookingRepository.findById(bookingId).orElseThrow();
+			try {
+				MDC.put("bookingId", String.valueOf(bookingId));
+				MDC.put("routingKey", routingKey);
+				log.info("Consuming {} for {}={}", routingKey, "bookingId", bookingId);
 
-			// 1. PAYMENT INITIATED
-			if (routingKey.equals("payment.initiated") && booking.getStatus() == BookingStatus.COMPLETING) {
-				log.info("Booking {} transitioning {} -> {}", bookingId, booking.getStatus(), BookingStatus.PAYMENT_PENDING);
-				booking.setStatus(BookingStatus.PAYMENT_PENDING);
+				Booking booking = bookingRepository.findById(bookingId).orElseThrow();
+
+				// 1. PAYMENT INITIATED
+				if (routingKey.equals("payment.initiated") && booking.getStatus() == BookingStatus.COMPLETING) {
+					log.info("Booking {} transitioning {} -> {}", bookingId, booking.getStatus(), BookingStatus.PAYMENT_PENDING);
+					booking.setStatus(BookingStatus.PAYMENT_PENDING);
+				}
+
+				// 2. PAYMENT COMPLETED
+				else if (routingKey.equals("payment.completed") && booking.getStatus() == BookingStatus.PAYMENT_PENDING) {
+					log.info("Booking {} transitioning {} -> {}", bookingId, booking.getStatus(), BookingStatus.PAID);
+					booking.setStatus(BookingStatus.PAID);
+				}
+
+				// 3. PAYMENT FAILED (The Compensation Trigger)
+				else if (routingKey.equals("payment.failed") && booking.getStatus() == BookingStatus.PAYMENT_PENDING) {
+					log.info("Booking {} transitioning {} -> {}", bookingId, booking.getStatus(), BookingStatus.PAYMENT_FAILED);
+					booking.setStatus(BookingStatus.PAYMENT_FAILED);
+
+					// Trigger the compensation cascade!
+					bookingEventPublisher.publishBookingCancelled(
+							new BookingCancelledEvent(booking.getId(), booking.getUserId(), booking.getEventId(), "payment_failed", LocalDateTime.now())
+					);
+				}
+
+				// 4. PAYMENT REFUNDED
+				else if (routingKey.equals("payment.refunded") && (booking.getStatus() == BookingStatus.PAID || booking.getStatus() == BookingStatus.PAYMENT_FAILED)) {
+					log.info("Booking {} transitioning {} -> {}", bookingId, booking.getStatus(), BookingStatus.REFUNDED);
+					booking.setStatus(BookingStatus.REFUNDED);
+				}
+
+				bookingRepository.save(booking);
+				log.info("Processed {} for {}={}", routingKey, "bookingId", bookingId);
+
+			} finally {
+				MDC.remove("bookingId");
+				MDC.remove("routingKey");
 			}
-
-			// 2. PAYMENT COMPLETED
-			else if (routingKey.equals("payment.completed") && booking.getStatus() == BookingStatus.PAYMENT_PENDING) {
-				log.info("Booking {} transitioning {} -> {}", bookingId, booking.getStatus(), BookingStatus.PAID);
-				booking.setStatus(BookingStatus.PAID);
-			}
-
-			// 3. PAYMENT FAILED (The Compensation Trigger)
-			else if (routingKey.equals("payment.failed") && booking.getStatus() == BookingStatus.PAYMENT_PENDING) {
-				log.info("Booking {} transitioning {} -> {}", bookingId, booking.getStatus(), BookingStatus.PAYMENT_FAILED);
-				booking.setStatus(BookingStatus.PAYMENT_FAILED);
-
-				// Trigger the compensation cascade!
-				bookingEventPublisher.publishBookingCancelled(
-						new BookingCancelledEvent(booking.getId(), booking.getUserId(), booking.getEventId(), "payment_failed", LocalDateTime.now())
-				);
-			}
-
-			// 4. PAYMENT REFUNDED
-			else if (routingKey.equals("payment.refunded") && (booking.getStatus() == BookingStatus.PAID || booking.getStatus() == BookingStatus.PAYMENT_FAILED)) {
-				log.info("Booking {} transitioning {} -> {}", bookingId, booking.getStatus(), BookingStatus.REFUNDED);
-				booking.setStatus(BookingStatus.REFUNDED);
-			}
-
-			bookingRepository.save(booking);
-			log.info("Processed {} for {}={}", routingKey, "bookingId", bookingId);
-
-		} finally {
-			MDC.remove("bookingId");
-			MDC.remove("routingKey");
+		} catch (Exception e) {
+			log.error("Saga processing failure for routingKey={}: {}", routingKey, e.getMessage(), e);
+			throw e; // Re-throw to ensure RabbitMQ retry/DLQ if configured
 		}
 	}
-
 	private Long extractBookingId(Object payload) {
 		return switch (payload) {
 			case PaymentInitiatedEvent e -> e.bookingId();
