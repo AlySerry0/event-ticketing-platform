@@ -27,11 +27,11 @@ public class TicketEventPublisher {
         MDC.put("bookingId", String.valueOf(event.bookingId()));
 
         try {
-            log.info("Published {} for ticketId={}", TicketEventConfig.ROUTING_KEY_TICKET_ISSUED, event.ticketId());
             rabbitTemplate.convertAndSend(
                     TicketEventConfig.TICKET_EVENTS_EXCHANGE,
                     TicketEventConfig.ROUTING_KEY_TICKET_ISSUED,
                     event);
+            log.info("Published {} for ticketId={}", TicketEventConfig.ROUTING_KEY_TICKET_ISSUED, event.ticketId());
         } finally {
             MDC.remove("routingKey");
             MDC.remove("ticketId");
@@ -45,11 +45,11 @@ public class TicketEventPublisher {
         MDC.put("bookingId", String.valueOf(event.bookingId()));
 
         try {
-            log.info("Published {} for ticketId={}", TicketEventConfig.ROUTING_KEY_TICKET_STATUS_CHANGED, event.ticketId());
             rabbitTemplate.convertAndSend(
                     TicketEventConfig.TICKET_EVENTS_EXCHANGE,
                     TicketEventConfig.ROUTING_KEY_TICKET_STATUS_CHANGED,
                     event);
+            log.info("Published {} for ticketId={}", TicketEventConfig.ROUTING_KEY_TICKET_STATUS_CHANGED, event.ticketId());
         } finally {
             MDC.remove("routingKey");
             MDC.remove("ticketId");
@@ -63,11 +63,11 @@ public class TicketEventPublisher {
         MDC.put("bookingId", String.valueOf(event.bookingId()));
 
         try {
-            log.info("Published {} for ticketId={}", TicketEventConfig.ROUTING_KEY_TICKET_CANCELLED, event.ticketId());
             rabbitTemplate.convertAndSend(
                     TicketEventConfig.TICKET_EVENTS_EXCHANGE,
                     TicketEventConfig.ROUTING_KEY_TICKET_CANCELLED,
                     event);
+            log.info("Published {} for ticketId={}", TicketEventConfig.ROUTING_KEY_TICKET_CANCELLED, event.ticketId());
         } finally {
             MDC.remove("routingKey");
             MDC.remove("ticketId");

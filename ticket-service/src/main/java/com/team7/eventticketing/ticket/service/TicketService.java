@@ -604,6 +604,10 @@ public class TicketService implements EntitySubject {
     public void auditTicketsForCompletedBooking(Long bookingId) {
         List<Ticket> tickets = ticketRepository.findByBookingId(bookingId);
         for (Ticket ticket : tickets) {
+            if (ticket.getStatus() != TicketStatus.USED) {
+                log.debug("auditTickets: ticketId={} status={} — skipping (not USED)", ticket.getId(), ticket.getStatus());
+                continue;
+            }
             ticketEventPublisher.publishTicketStatusChanged(new TicketStatusChangedEvent(
                     ticket.getId(),
                     ticket.getBookingId(),
@@ -611,6 +615,7 @@ public class TicketService implements EntitySubject {
             log.debug("auditTickets: published ticket.status-changed (audit) for ticketId={}", ticket.getId());
         }
     }
+
 
 
     @Transactional
@@ -628,11 +633,6 @@ public class TicketService implements EntitySubject {
 
             ticketEventPublisher.publishTicketCancelled(
                     new TicketCancelledEvent(ticket.getId(), ticket.getBookingId()));
-
-            ticketEventPublisher.publishTicketStatusChanged(new TicketStatusChangedEvent(
-                    ticket.getId(),
-                    ticket.getBookingId(),
-                    TicketStatus.CANCELLED.name()));
 
             log.info("cancelTickets: ticketId={} cancelled (was {})", ticket.getId(), previousStatus);
         }

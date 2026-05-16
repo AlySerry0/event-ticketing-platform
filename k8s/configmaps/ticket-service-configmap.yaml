@@ -6,8 +6,8 @@ metadata:
 data:
   SPRING_DATASOURCE_URL: jdbc:postgresql://ticket-postgres:5432/etdb-tickets
 
-  SPRING_DATA_MONGODB_URI: mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin
-  SPRING_CASSANDRA_CONTACT_POINTS: localhost
+  SPRING_DATA_MONGODB_URI: mongodb://root:rootpass@mongo:27017/eventticketingmongo?authSource=admin
+  SPRING_CASSANDRA_CONTACT_POINTS: cassandra
   SPRING_CASSANDRA_PORT: "9042"
   SPRING_CASSANDRA_LOCAL_DATACENTER: datacenter1
   SPRING_CASSANDRA_KEYSPACE_NAME: eventticketingks
