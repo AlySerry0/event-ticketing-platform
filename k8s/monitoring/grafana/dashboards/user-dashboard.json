@@ -1,8 +1,12 @@
 {
-  "title": "User Service — Logs & Metrics",
-  "uid": "user-service-dashboard",
-  "timezone": "browser",
-  "schemaVersion": 38,
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
   "panels": [
     {
       "id": 1,
@@ -46,6 +50,36 @@
       "description": "WARN logs from any class making Feign calls — indicates downstream service unavailability.",
       "type": "timeseries",
       "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (uri) (rate(http_server_requests_seconds_count{job=\"user-service\"}[5m]))",
+          "legendFormat": "{{uri}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "HTTP P99 latency (PromQL)",
+      "description": "99th-percentile request duration per endpoint.",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.99, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job=\"user-service\"}[5m])))",
+          "legendFormat": "p99 {{uri}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Booking Service Feign Errors (LogQL)",
+      "description": "Detects when event-service or booking-service is degraded.",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
@@ -56,11 +90,41 @@
       ]
     },
     {
-      "id": 4,
-      "title": "Request Log Volume by Path (LogQL)",
-      "description": "Breaks down log volume by HTTP path — identifies hot endpoints.",
+      "id": 6,
+      "title": "JVM Heap Used (PromQL)",
+      "description": "Heap usage monitor to detect memory leaks.",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(jvm_memory_used_bytes{job=\"user-service\", area=\"heap\"})",
+          "legendFormat": "heap used"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "HikariCP — active DB connections (PromQL)",
+      "description": "Active vs. idle JDBC connections to user-postgres.",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "hikaricp_connections_active{job=\"user-service\"}",
+          "legendFormat": "active"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Request Log Volume by Path (LogQL)",
+      "description": "Identifies high-traffic paths via logs.",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 24, "w": 12, "h": 8 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
@@ -71,11 +135,11 @@
       ]
     },
     {
-      "id": 5,
+      "id": 9,
       "title": "Correlation ID Trace (LogQL — Explore)",
-      "description": "Filter all logs for a specific request. Use the Explore panel — paste a correlationId to trace the full request across services.",
+      "description": "Trace a single request across the cluster.",
       "type": "logs",
-      "gridPos": { "x": 0, "y": 16, "w": 24, "h": 10 },
+      "gridPos": { "x": 0, "y": 32, "w": 24, "h": 10 },
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
@@ -90,6 +154,9 @@
       }
     }
   ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["eventticketing", "user-service", "m3"],
   "templating": {
     "list": [
       {
@@ -101,5 +168,8 @@
     ]
   },
   "time": { "from": "now-1h", "to": "now" },
-  "refresh": "30s"
+  "timezone": "browser",
+  "title": "User Service — M3 Integrated Dashboard",
+  "uid": "user-service-integrated",
+  "version": 1
 }

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: event-service-configmap
+  namespace: eventticketing
+data:
+  SPRING_DATASOURCE_URL: jdbc:postgresql://event-postgres:5432/etdb-events
+  SPRING_RABBITMQ_HOST: rabbitmq
+  SPRING_DATA_REDIS_HOST: redis
+  SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+  SPRING_DATA_MONGODB_URI: mongodb://root:rootpass@mongo:27017/eventticketingmongo?authSource=admin
+
+  FEIGN_BOOKING_SERVICE_URL: http://booking-service:8080
+  FEIGN_USER_SERVICE_URL: http://user-service:8080
+  FEIGN_TICKET_SERVICE_URL: http://ticket-service:8080

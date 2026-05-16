@@ -28,6 +28,19 @@ spring:
     schema-action: CREATE_IF_NOT_EXISTS
   mongodb:
     uri: ${SPRING_DATA_MONGODB_URI:mongodb://root:rootpass@localhost:27017/eventticketingmongo?authSource=admin}
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:rabbitmq}
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 3
   web:
     error:
       include-message: always
@@ -39,6 +52,21 @@ server:
 jwt:
   secret: ${JWT_SECRET:XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw=}
   expiration: ${JWT_EXPIRATION_MS:86400000}
+
+feign:
+  booking-service:
+    url: ${FEIGN_BOOKING_SERVICE_URL:http://booking-service:8080}
+  event-service:
+    url: ${FEIGN_EVENT_SERVICE_URL:http://event-service:8080}
+  user-service:
+    url: ${FEIGN_USER_SERVICE_URL:http://user-service:8080}
+  ticket-service:
+    url: ${FEIGN_TICKET_SERVICE_URL:http://ticket-service:8080}
+  sales-service:
+    url: ${FEIGN_SALES_SERVICE_URL:http://sales-service:8080}
+
+loki:
+  url: ${LOKI_URL:http://loki:3100}
 
 logging:
   level:

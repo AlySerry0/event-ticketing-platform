@@ -11,6 +11,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import java.math.BigDecimal;
+
 @Repository
 public interface TicketSaleRepository extends JpaRepository<TicketSale, Long> {
     @Query(value = "SELECT COUNT(*) > 0 FROM bookings WHERE id = :bookingId", nativeQuery = true)
@@ -116,4 +118,20 @@ public interface TicketSaleRepository extends JpaRepository<TicketSale, Long> {
     WHERE ts.id = :saleId
     """, nativeQuery = true)
     LocalDateTime findEventDateBySaleId(@Param("saleId") Long saleId);
+
+    @Query("""
+    SELECT COALESCE(SUM(t.amount), 0)
+    FROM TicketSale t
+    WHERE t.userId = :userId
+      AND t.status = com.team7.eventticketing.sales.model.TicketSaleStatus.COMPLETED
+      AND (:startDate IS NULL OR t.createdAt >= :startDate)
+      AND (:endDate IS NULL OR t.createdAt <= :endDate)
+""")
+    BigDecimal getUserTotalCompletedSales(
+            @Param("userId") Long userId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate
+    );
+
+
 }

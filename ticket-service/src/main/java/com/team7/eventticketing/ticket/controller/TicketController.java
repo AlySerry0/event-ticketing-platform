@@ -1,4 +1,5 @@
 package com.team7.eventticketing.ticket.controller;
+
 import com.team7.eventticketing.ticket.dto.*;
 
 import com.team7.eventticketing.ticket.service.TicketService;
@@ -6,7 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import com.team7.eventticketing.ticket.dto.TicketScanDTO;
 
@@ -79,9 +79,7 @@ public class TicketController {
                         Map.of(
                                 "status", 404,
                                 "error", "Not Found",
-                                "message", "No tickets found for eventId " + eventId
-                        )
-                );
+                                "message", "No tickets found for eventId " + eventId));
             }
             throw ex;
         }
@@ -104,6 +102,12 @@ public class TicketController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(e.getMessage());
         }
+    }
+
+    @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
+    @GetMapping("/booking/{bookingId}/used-count")
+    public ResponseEntity<Integer> getUsedTicketCount(@PathVariable Long bookingId) {
+        return ResponseEntity.ok(ticketService.getUsedTicketCount(bookingId));
     }
 
     @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
@@ -133,6 +137,7 @@ public class TicketController {
                     org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
         }
     }
+
     @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/metadata/search")
     public ResponseEntity<?> filterTicketsByMetadata(
@@ -147,6 +152,7 @@ public class TicketController {
             return ResponseEntity.status(500).body(e.getMessage());
         }
     }
+
     @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @PostMapping("/batch")
     public ResponseEntity<?> issueBatchTickets(@RequestBody BatchTicketRequestDTO batchRequest) {
@@ -159,6 +165,7 @@ public class TicketController {
             return ResponseEntity.status(500).body(e.getMessage());
         }
     }
+
     @PreAuthorize("hasAnyRole('ATTENDEE', 'ADMIN')")
     @GetMapping("/history")
     public ResponseEntity<List<TicketDTO>> getTicketsInDateRange(
@@ -172,8 +179,7 @@ public class TicketController {
     @GetMapping("/analytics")
     public TicketAnalyticsDTO getAnalytics(
             @RequestParam LocalDate startDate,
-            @RequestParam LocalDate endDate
-    ) {
+            @RequestParam LocalDate endDate) {
         return ticketService.getAnalytics(startDate, endDate);
     }
 
@@ -193,5 +199,3 @@ public class TicketController {
         return ResponseEntity.status(201).build();
     }
 }
-
-
