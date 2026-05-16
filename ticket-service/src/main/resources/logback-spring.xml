@@ -9,14 +9,28 @@
 
     <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
         <http>
-            <url>${lokiUrl}/loki/api/v1/push</url>
+            <url>http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push</url>
         </http>
         <format>
             <label>
-                <pattern>app=ticket-service,host=${HOSTNAME:-local},level=%level</pattern>
+                <pattern>app=eventticketing,service=${spring.application.name:-ticket-service},level=%level,env=k8s</pattern>
             </label>
             <message>
-                <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} [%X{correlationId}] - %msg%n</pattern>
+                <pattern>
+                    {
+                    "timestamp": "%d{ISO8601}",
+                    "level": "%level",
+                    "service": "${spring.application.name:-ticket-service}",
+                    "thread": "%thread",
+                    "logger": "%logger{36}",
+                    "correlationId": "%X{correlationId:-}",
+                    "eventId": "%X{eventId:-}",
+                    "bookingId": "%X{bookingId:-}",
+                    "ticketId": "%X{ticketId:-}",
+                    "routingKey": "%X{routingKey:-}",
+                    "message": "%msg"
+                    }
+                </pattern>
             </message>
         </format>
     </appender>

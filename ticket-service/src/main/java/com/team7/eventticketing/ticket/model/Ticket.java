@@ -18,9 +18,6 @@ public class Ticket {
     @Column(name = "booking_id", nullable = false)
     private Long bookingId;
 
-    @Column(name = "event_id")
-    private Long eventId;
-
     @Column(name = "attendee_name", nullable = false)
     private String attendeeName;
 

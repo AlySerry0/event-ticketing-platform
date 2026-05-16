@@ -65,6 +65,16 @@ feign:
   sales-service:
     url: ${FEIGN_SALES_SERVICE_URL:http://sales-service:8080}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus,health,info"
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
 loki:
   url: ${LOKI_URL:http://loki:3100}
 
