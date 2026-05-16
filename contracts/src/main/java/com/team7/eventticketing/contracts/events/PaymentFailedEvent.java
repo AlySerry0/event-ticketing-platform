@@ -1,4 +1,10 @@
 package com.team7.eventticketing.contracts.events;
 
-public class PaymentFailedEvent {
+import java.time.LocalDateTime;
+
+public record PaymentFailedEvent(
+		Long bookingId,
+		String reason,
+		LocalDateTime occurredAt
+) {
 }

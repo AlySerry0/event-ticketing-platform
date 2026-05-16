@@ -1,4 +1,9 @@
 package com.team7.eventticketing.contracts.events;
 
-public class PaymentRefundedEvent {
+import java.time.LocalDateTime;
+
+public record PaymentRefundedEvent(
+		Long bookingId,
+		LocalDateTime occurredAt
+) {
 }
