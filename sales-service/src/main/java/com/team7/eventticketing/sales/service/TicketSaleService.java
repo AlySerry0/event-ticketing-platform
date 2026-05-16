@@ -81,6 +81,8 @@ public class TicketSaleService {
     private RefundStrategySelector refundStrategySelector;
     @Autowired
     private BookingServiceClient bookingServiceClient;
+    @Autowired
+    private PaymentEventPublisher paymentEventPublisher;
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
 
     @PostConstruct
@@ -326,18 +328,14 @@ public class TicketSaleService {
         try {
             booking = bookingServiceClient.getBooking(bookingId);
         } catch (Exception e) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "Booking not found"
-            );
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
         }
 
         if (booking.status() == null ||
-                !"COMPLETED".equalsIgnoreCase(booking.status().name())) {
-
+                !"PAYMENT_PENDING".equalsIgnoreCase(booking.status().name())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Booking must be COMPLETED"
+                    "Booking is not awaiting payment. Status: " + booking.status()
             );
         }
 
@@ -406,6 +404,12 @@ public class TicketSaleService {
             TicketSale failedSale = ticketSaleRepository.saveAndFlush(pendingSale);
             entitySubject.notifyObservers("FAILED", buildAuditPayload(failedSale));
 
+            paymentEventPublisher.publishPaymentFailed(
+                    failedSale.getId(),
+                    failedSale.getBookingId(),
+                    "Simulated payment failure"
+            );
+
             invalidateAfterTicketSaleWrite(failedSale);
             return failedSale;
         }
@@ -417,6 +421,13 @@ public class TicketSaleService {
 
         TicketSale completedSale = ticketSaleRepository.saveAndFlush(pendingSale);
         entitySubject.notifyObservers("COMPLETED", buildAuditPayload(completedSale));
+
+        paymentEventPublisher.publishPaymentCompleted(
+                completedSale.getId(),
+                completedSale.getBookingId(),
+                completedSale.getAmount()
+        );
+
         invalidateAfterTicketSaleWrite(completedSale);
         return completedSale;
     }
