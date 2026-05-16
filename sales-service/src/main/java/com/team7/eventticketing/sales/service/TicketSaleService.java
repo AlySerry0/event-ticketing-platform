@@ -42,6 +42,7 @@ import jakarta.annotation.PostConstruct;
 import com.team7.eventticketing.contracts.dto.BookingDTO;
 import com.team7.eventticketing.contracts.dto.EventDTO;
 import com.team7.eventticketing.contracts.dto.UserDTO;
+import com.team7.eventticketing.contracts.dto.BookingItemDTO;
 import com.team7.eventticketing.contracts.feign.BookingServiceClient;
 import com.team7.eventticketing.contracts.feign.EventServiceClient;
 import com.team7.eventticketing.contracts.feign.UserServiceClient;
@@ -690,12 +691,52 @@ public class TicketSaleService {
     )
     public List<TierRevenueDTO> getTierRevenue(LocalDate startDate, LocalDate endDate) {
         LocalDateTime startDateTime = startDate.atStartOfDay();
-        LocalDateTime endDateTime   = endDate.atTime(LocalTime.of(23, 59, 59, 999_000_000));
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.of(23, 59, 59, 999_000_000));
 
-        List<Object[]> rows = ticketSaleRepository.findTierRevenue(startDateTime, endDateTime);
+        List<TicketSale> completedSales =
+                ticketSaleRepository.findCompletedSalesBetween(startDateTime, endDateTime);
 
-        return rows.stream()
-                .map(objectArrayDtoAdapter::toTierRevenueDTO)
+        Map<String, TierAccumulator> tierMap = new HashMap<>();
+
+        for (TicketSale sale : completedSales) {
+            List<BookingItemDTO> items = bookingServiceClient.getBookingItems(sale.getBookingId());
+
+            for (BookingItemDTO item : items) {
+                String tier = "UNSPECIFIED";
+
+                if (item.metadata() != null && item.metadata().get("ticketTier") != null) {
+                    tier = item.metadata().get("ticketTier").toString();
+                }
+
+                int quantity = item.quantity() != null ? item.quantity() : 0;
+                double unitPrice = item.unitPrice() != null ? item.unitPrice() : 0.0;
+                double revenue = quantity * unitPrice;
+
+                TierAccumulator accumulator =
+                        tierMap.computeIfAbsent(tier, key -> new TierAccumulator());
+
+                accumulator.totalRevenue += revenue;
+                accumulator.ticketsSold += quantity;
+                accumulator.saleIds.add(sale.getId());
+            }
+        }
+
+        return tierMap.entrySet().stream()
+                .map(entry -> {
+                    String tier = entry.getKey();
+                    TierAccumulator acc = entry.getValue();
+
+                    long saleCount = acc.saleIds.size();
+                    double average = saleCount > 0 ? acc.totalRevenue / saleCount : 0.0;
+
+                    return TierRevenueDTO.builder()
+                            .tier(tier)
+                            .totalRevenue(acc.totalRevenue)
+                            .saleCount(saleCount)
+                            .ticketsSold(acc.ticketsSold)
+                            .averageRevenuePerSale(average)
+                            .build();
+                })
                 .toList();
     }
 
@@ -739,6 +780,11 @@ public class TicketSaleService {
         LocalDateTime endDateTime = endDate != null ? endDate.atTime(23, 59, 59) : null;
 
         return ticketSaleRepository.getUserTotalCompletedSales(userId, startDateTime, endDateTime);
+    }
+    private static class TierAccumulator {
+        double totalRevenue = 0.0;
+        long ticketsSold = 0L;
+        java.util.Set<Long> saleIds = new java.util.HashSet<>();
     }
 
 }

@@ -132,6 +132,15 @@ public interface TicketSaleRepository extends JpaRepository<TicketSale, Long> {
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate
     );
+    @Query("""
+    SELECT t FROM TicketSale t
+    WHERE t.status = com.team7.eventticketing.sales.model.TicketSaleStatus.COMPLETED
+    AND t.createdAt BETWEEN :startDateTime AND :endDateTime
+""")
+    List<TicketSale> findCompletedSalesBetween(
+            @Param("startDateTime") LocalDateTime startDateTime,
+            @Param("endDateTime") LocalDateTime endDateTime
+    );
 
 
 }
