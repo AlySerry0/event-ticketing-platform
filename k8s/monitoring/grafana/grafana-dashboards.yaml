@@ -15,9 +15,908 @@ data:
         editable: true
         options:
           path: /etc/grafana/provisioning/dashboards
-  # Placeholders for the JSON files to be embedded by each slice owner [cite: 1692]
-  user-dashboard.json: '{"title": "User Service Dashboard"}'
-  event-dashboard.json: '{"title": "Event Service Dashboard"}'
-  booking-dashboard.json: '{"title": "Booking Service Dashboard"}'
-  ticket-dashboard.json: '{"title": "Ticket Service Dashboard"}'
-  sales-dashboard.json: '{"title": "Sales Service Dashboard"}'
+  user-dashboard.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "title": "Error Rate \u2014 user-service (LogQL)",
+          "description": "Count of ERROR-level log lines per minute. Spike = something is broken.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "sum(rate({service=\"user-service\"} | json | level=\"ERROR\" [1m]))",
+              "legendFormat": "errors/min",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "red"
+              },
+              "unit": "short"
+            }
+          }
+        },
+        {
+          "id": 2,
+          "title": "Authentication Events (LogQL)",
+          "description": "REGISTERED and LOGGED_IN events over time \u2014 monitors auth traffic.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 12,
+            "y": 0,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "sum by(action) (count_over_time({service=\"user-service\"} | json | message=~\".*REGISTERED.*|.*LOGGED_IN.*\" [5m]))",
+              "legendFormat": "{{action}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "HTTP request rate (PromQL)",
+          "description": "Requests per second to each user-service endpoint.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 8,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (uri) (rate(http_server_requests_seconds_count{job=\"user-service\"}[5m]))",
+              "legendFormat": "{{uri}}"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "HTTP P99 latency (PromQL)",
+          "description": "99th-percentile request duration per endpoint.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 12,
+            "y": 8,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "histogram_quantile(0.99, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job=\"user-service\"}[5m])))",
+              "legendFormat": "p99 {{uri}}"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Booking Service Feign Errors (LogQL)",
+          "description": "Detects when event-service or booking-service is degraded.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 16,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "count_over_time({service=\"user-service\"} | json | logger=~ \".*Client.*\" | level=\"WARN\" [1m])",
+              "legendFormat": "feign-warn/min",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "JVM Heap Used (PromQL)",
+          "description": "Heap usage monitor to detect memory leaks.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 12,
+            "y": 16,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(jvm_memory_used_bytes{job=\"user-service\", area=\"heap\"})",
+              "legendFormat": "heap used"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "HikariCP \u2014 active DB connections (PromQL)",
+          "description": "Active vs. idle JDBC connections to user-postgres.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 24,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "hikaricp_connections_active{job=\"user-service\"}",
+              "legendFormat": "active"
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "title": "Request Log Volume by Path (LogQL)",
+          "description": "Identifies high-traffic paths via logs.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 12,
+            "y": 24,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "sum by(requestPath) (count_over_time({service=\"user-service\"} | json | requestPath != \"\" [5m]))",
+              "legendFormat": "{{requestPath}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "title": "Correlation ID Trace (LogQL \u2014 Explore)",
+          "description": "Trace a single request across the cluster.",
+          "type": "logs",
+          "gridPos": {
+            "x": 0,
+            "y": 32,
+            "w": 24,
+            "h": 10
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "{service=\"user-service\"} | json | correlationId=\"$correlationId\"",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "wrapLogMessage": true
+          }
+        }
+      ],
+      "refresh": "10s",
+      "schemaVersion": 39,
+      "tags": [
+        "eventticketing",
+        "user-service",
+        "m3"
+      ],
+      "templating": {
+        "list": [
+          {
+            "name": "correlationId",
+            "type": "textbox",
+            "label": "Correlation ID",
+            "description": "Paste a correlationId to trace a specific request"
+          }
+        ]
+      },
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "timezone": "browser",
+      "title": "User Service \u2014 M3 Integrated Dashboard",
+      "uid": "user-service-integrated",
+      "version": 1
+    }
+  event-dashboard.json: |
+    {"title": "Event Dashboard", "panels": [], "schemaVersion": 39}
+  booking-dashboard.json: |
+    {
+      "__inputs": [],
+      "__requires": [],
+      "annotations": {
+        "list": []
+      },
+      "description": "Booking Service \u2014 LogQL observability panels",
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "description": "Count of ERROR-level log lines from booking-service per minute. Spike detection \u2014 sudden rise indicates an unhandled exception or downstream failure.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "lineWidth": 2
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 0
+          },
+          "id": 1,
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${loki_datasource}"
+              },
+              "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\", level=\"ERROR\"}[1m]))",
+              "legendFormat": "errors/min",
+              "refId": "A"
+            }
+          ],
+          "title": "Error Rate \u2014 booking-service",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "description": "Feign call outcomes from booking-service: successful downstream responses vs FeignException catches. A rising exception count indicates a degraded upstream (event-service, user-service, or ticket-service).",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "lineWidth": 2
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 0
+          },
+          "id": 2,
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${loki_datasource}"
+              },
+              "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} |= \"FeignException\"[1m]))",
+              "legendFormat": "feign-exceptions/min",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${loki_datasource}"
+              },
+              "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} |= \"feign\" != \"FeignException\"[1m]))",
+              "legendFormat": "feign-ok/min",
+              "refId": "B"
+            }
+          ],
+          "title": "Feign Call Outcomes \u2014 booking-service",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "description": "Saga state transition log lines for booking-service filtered by bookingId. Visualise the full saga path for a specific booking: COMPLETING \u2192 PAYMENT_PENDING \u2192 PAID (or PAYMENT_FAILED \u2192 CANCELLED).",
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 8
+          },
+          "id": 3,
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": false,
+            "showCommonLabels": false,
+            "showLabels": false,
+            "showTime": true,
+            "sortOrder": "Ascending",
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${loki_datasource}"
+              },
+              "expr": "{app=\"eventticketing\", service=\"booking-service\"} |= \"COMPLETING\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"PAYMENT_PENDING\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"PAYMENT_FAILED\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"REFUNDED\"",
+              "legendFormat": "",
+              "refId": "A"
+            }
+          ],
+          "title": "Saga State Transitions \u2014 booking-service",
+          "type": "logs"
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": [
+        "booking-service",
+        "logql"
+      ],
+      "templating": {
+        "list": [
+          {
+            "current": {},
+            "hide": 0,
+            "includeAll": false,
+            "label": "Loki Datasource",
+            "name": "loki_datasource",
+            "options": [],
+            "query": "loki",
+            "refresh": 1,
+            "type": "datasource"
+          }
+        ]
+      },
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Booking Service Dashboard",
+      "uid": "booking-service-dashboard",
+      "version": 1
+    }
+  ticket-dashboard.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "title": "Error Rate \u2014 ticket-service (LogQL)",
+          "description": "Count of ERROR-level log lines per minute. A spike means something is broken in ticket-service.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "sum(rate({service=\"ticket-service\"} | json | level=\"ERROR\" [1m]))",
+              "legendFormat": "errors/min",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "red"
+              },
+              "unit": "short"
+            }
+          }
+        },
+        {
+          "id": 2,
+          "title": "Feign Call Outcomes \u2014 ticket-service (LogQL)",
+          "description": "Detects when booking-service or event-service is degraded \u2014 rising FeignException count means a downstream is failing.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 12,
+            "y": 0,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "count_over_time({service=\"ticket-service\"} | json | logger=~\".*Client.*\" | level=\"WARN\" [1m])",
+              "legendFormat": "feign-warn/min",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "HTTP Request Rate \u2014 ticket-service (PromQL)",
+          "description": "Requests per second to each ticket-service endpoint. Identifies high-traffic endpoints under load.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 8,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (uri) (rate(http_server_requests_seconds_count{job=\"ticket-service\"}[5m]))",
+              "legendFormat": "{{uri}}"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "HTTP P99 Latency \u2014 ticket-service (PromQL)",
+          "description": "99th-percentile request duration per endpoint. High P99 on scan history means Cassandra is slow.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 12,
+            "y": 8,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "histogram_quantile(0.99, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job=\"ticket-service\"}[5m])))",
+              "legendFormat": "p99 {{uri}}"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "RabbitMQ Event Audit \u2014 ticket-service (LogQL)",
+          "description": "Tracks ticket events published and consumed \u2014 ticket.issued published, booking.placed and booking.cancelled consumed.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 16,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "sum by (routingKey) (count_over_time({service=\"ticket-service\"} | json | routingKey != \"\" [5m]))",
+              "legendFormat": "{{routingKey}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "JVM Heap Used \u2014 ticket-service (PromQL)",
+          "description": "Heap memory usage over time. Rising heap after Cassandra scan events indicates a memory pressure issue.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 12,
+            "y": 16,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(jvm_memory_used_bytes{job=\"ticket-service\", area=\"heap\"})",
+              "legendFormat": "heap used"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Correlation ID Trace \u2014 ticket-service (LogQL)",
+          "description": "Trace a single request across all ticket-service log lines by correlationId.",
+          "type": "logs",
+          "gridPos": {
+            "x": 0,
+            "y": 24,
+            "w": 24,
+            "h": 10
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "{service=\"ticket-service\"} | json | correlationId=\"$correlationId\"",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "wrapLogMessage": true
+          }
+        }
+      ],
+      "refresh": "10s",
+      "schemaVersion": 39,
+      "tags": [
+        "eventticketing",
+        "ticket-service",
+        "m3"
+      ],
+      "templating": {
+        "list": [
+          {
+            "name": "correlationId",
+            "type": "textbox",
+            "label": "Correlation ID",
+            "description": "Paste a correlationId to trace a specific request"
+          }
+        ]
+      },
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "timezone": "browser",
+      "title": "Ticket Service \u2014 M3 Integrated Dashboard",
+      "uid": "ticket-service-integrated",
+      "version": 1
+    }
+  sales-dashboard.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "title": "Error Rate \u2014 sales-service (LogQL)",
+          "description": "Count of ERROR-level log lines per minute.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "sum(rate({service=\"sales-service\"} | json | level=\"ERROR\" [1m]))",
+              "legendFormat": "errors/min",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Payment Events Audit (LogQL)",
+          "description": "Tracks payment-related messages/events in sales-service logs.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 12,
+            "y": 0,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "sum by(routingKey) (count_over_time({service=\"sales-service\"} | json | routingKey != \"\" [5m]))",
+              "legendFormat": "{{routingKey}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "HTTP request rate (PromQL)",
+          "description": "Requests per second to each sales-service endpoint.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 8,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (uri) (rate(http_server_requests_seconds_count{job=\"sales-service\"}[5m]))",
+              "legendFormat": "{{uri}}"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "HTTP P99 latency (PromQL)",
+          "description": "99th-percentile request duration per sales endpoint.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 12,
+            "y": 8,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "histogram_quantile(0.99, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job=\"sales-service\"}[5m])))",
+              "legendFormat": "p99 {{uri}}"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Feign Errors \u2014 sales-service (LogQL)",
+          "description": "Warn-level Feign/client failures from sales-service.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 16,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "count_over_time({service=\"sales-service\"} | json | logger=~\".*Client.*\" | level=\"WARN\" [1m])",
+              "legendFormat": "feign-warn/min",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "JVM Heap Used (PromQL)",
+          "description": "Heap usage monitor for sales-service.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 12,
+            "y": 16,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(jvm_memory_used_bytes{job=\"sales-service\", area=\"heap\"})",
+              "legendFormat": "heap used"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "HikariCP \u2014 active DB connections (PromQL)",
+          "description": "Active JDBC connections to sales-postgres.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 24,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "hikaricp_connections_active{job=\"sales-service\"}",
+              "legendFormat": "active"
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "title": "Slow Sales Operations (LogQL)",
+          "description": "Warn logs for slow sales operations like tier analytics/refunds.",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 12,
+            "y": 24,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "count_over_time({service=\"sales-service\"} | json | level=\"WARN\" | message=~\".*Slow.*\" [5m])",
+              "legendFormat": "slow-ops",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "title": "Correlation ID Trace (LogQL \u2014 Explore)",
+          "description": "Trace one sales request by correlationId.",
+          "type": "logs",
+          "gridPos": {
+            "x": 0,
+            "y": 32,
+            "w": 24,
+            "h": 10
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "expr": "{service=\"sales-service\"} | json | correlationId=\"$correlationId\"",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "wrapLogMessage": true
+          }
+        }
+      ],
+      "refresh": "10s",
+      "schemaVersion": 39,
+      "tags": [
+        "eventticketing",
+        "sales-service",
+        "m3"
+      ],
+      "templating": {
+        "list": [
+          {
+            "name": "correlationId",
+            "type": "textbox",
+            "label": "Correlation ID",
+            "description": "Paste a correlationId to trace a specific request"
+          }
+        ]
+      },
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "timezone": "browser",
+      "title": "Sales Service \u2014 M3 Integrated Dashboard",
+      "uid": "sales-service-integrated",
+      "version": 1
+    }
