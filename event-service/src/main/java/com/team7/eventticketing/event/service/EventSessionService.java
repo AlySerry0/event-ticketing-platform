@@ -18,6 +18,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,6 +32,7 @@ import java.util.Map;
 @Service
 @Transactional(readOnly = true)
 public class EventSessionService {
+    private static final Logger log = LoggerFactory.getLogger(EventSessionService.class);
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
 
     private final EventSessionRepository eventSessionRepository;
@@ -290,60 +294,83 @@ public class EventSessionService {
      */
     @Transactional
     public EventDTO verifyEventSession(Long eventId, Long sessionId, VerifyEventSessionDTO request) {
-        ensureEventExists(eventId);
+        try {
+            MDC.put("eventId", eventId.toString());
 
-        EventSession session = eventSessionRepository.findById(sessionId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Event session not found with id: " + sessionId));
+            log.info("Received S2-F8 verify session request for eventId={} sessionId={}", eventId, sessionId);
 
-        if (!session.getEvent().getId().equals(eventId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Session does not belong to event with id: " + eventId);
+            ensureEventExists(eventId);
+
+            EventSession session = eventSessionRepository.findById(sessionId)
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND,
+                            "Event session not found with id: " + sessionId));
+
+            if (!session.getEvent().getId().equals(eventId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Session does not belong to event with id: " + eventId);
+            }
+
+            if (request == null || request.getVerifiedBy() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "verifiedBy is required");
+            }
+
+            if (!session.getStartTime().isAfter(LocalDateTime.now())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Cannot verify a session that already happened");
+            }
+
+            Long verifiedBy = request.getVerifiedBy();
+
+            if (!eventSessionRepository.isAdminUser(verifiedBy)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "Verifier must be an admin user");
+            }
+
+            session.setVerified(true);
+
+            Map<String, Object> metadata = session.getMetadata() != null
+                    ? new HashMap<>(session.getMetadata())
+                    : new HashMap<>();
+
+            metadata.put("verifiedAt", LocalDateTime.now().toString());
+            metadata.put("verifiedBy", verifiedBy);
+            session.setMetadata(metadata);
+
+            eventSessionRepository.save(session);
+
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("eventId", eventId);
+            payload.put("sessionId", sessionId);
+            payload.put("verifiedBy", verifiedBy);
+
+            notifyObservers("SESSION_VERIFIED", payload);
+
+            invalidateSessionCaches(sessionId);
+
+            log.info("Processed S2-F8 session verification for eventId={} sessionId={} verifiedBy={}",
+                    eventId, sessionId, verifiedBy);
+
+            return eventService.convertToDTO(eventRepository.findById(eventId)
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND,
+                            "Event not found with id: " + eventId)));
+
+        } catch (ResponseStatusException e) {
+            log.warn("Failed S2-F8 session verification for eventId={} sessionId={}: {}",
+                    eventId, sessionId, e.getReason());
+            throw e;
+
+        } catch (Exception e) {
+            log.error("Unexpected error during S2-F8 session verification for eventId={} sessionId={}: {}",
+                    eventId, sessionId, e.getMessage());
+            throw e;
+
+        } finally {
+            MDC.remove("eventId");
         }
-
-        if (request == null || request.getVerifiedBy() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "verifiedBy is required");
-        }
-
-        if (!session.getStartTime().isAfter(LocalDateTime.now())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Cannot verify a session that already happened");
-        }
-
-        Long verifiedBy = request.getVerifiedBy();
-
-        if (!eventSessionRepository.isAdminUser(verifiedBy)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "Verifier must be an admin user");
-        }
-
-        session.setVerified(true);
-
-        Map<String, Object> metadata = session.getMetadata() != null
-                ? new HashMap<>(session.getMetadata())
-                : new HashMap<>();
-        metadata.put("verifiedAt", LocalDateTime.now().toString());
-        metadata.put("verifiedBy", verifiedBy);
-        session.setMetadata(metadata);
-
-        eventSessionRepository.save(session);
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("eventId", eventId);
-        payload.put("sessionId", sessionId);
-        payload.put("verifiedBy", verifiedBy);
-        notifyObservers("SESSION_VERIFIED", payload);
-
-        // S2-F8 is a write — invalidate session detail + S2-F9
-        invalidateSessionCaches(sessionId);
-
-        return eventService.convertToDTO(eventRepository.findById(eventId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Event not found with id: " + eventId)));
     }
-
     /**
      * Unverify — also a write, same invalidation rules as verify
      */

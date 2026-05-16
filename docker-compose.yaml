@@ -308,7 +308,7 @@ services:
       JWT_EXPIRATION_MS: "86400000"
       TZ: Africa/Cairo
     depends_on:
-      postgres:
+      event-postgres:
         condition: service_healthy
     restart: on-failure
   booking-service:
@@ -330,7 +330,7 @@ services:
       JWT_EXPIRATION_MS: "86400000"
       TZ: Africa/Cairo
     depends_on:
-      postgres:
+      booking-postgres:
         condition: service_healthy
     restart: on-failure
 
@@ -355,7 +355,7 @@ services:
       JWT_EXPIRATION_MS: "86400000"
       TZ: Africa/Cairo
     depends_on:
-      postgres:
+      ticket-postgres:
         condition: service_healthy
     restart: on-failure
 
@@ -375,7 +375,7 @@ services:
       JWT_EXPIRATION_MS: "86400000"
       TZ: Africa/Cairo
     depends_on:
-      postgres:
+      sales-postgres:
         condition: service_healthy
     restart: on-failure
 

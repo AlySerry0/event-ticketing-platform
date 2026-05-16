@@ -1,56 +1,72 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: booking-postgres
+  name: sales-postgres
   namespace: eventticketing
+  labels:
+    app: sales-postgres
+    service: sales-service
 spec:
-  serviceName: booking-postgres
+  serviceName: sales-postgres-headless
   replicas: 1
   selector:
     matchLabels:
-      app: booking-postgres
+      app: sales-postgres
   template:
     metadata:
       labels:
-        app: booking-postgres
+        app: sales-postgres
+        service: sales-service
     spec:
       containers:
         - name: postgres
           image: postgres:17
           ports:
             - containerPort: 5432
+              name: postgres
           env:
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: booking-postgres-secret
+                  name: sales-postgres-secret
                   key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: booking-postgres-secret
+                  name: sales-postgres-secret
                   key: POSTGRES_PASSWORD
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
-                  name: booking-postgres-secret
+                  name: sales-postgres-secret
                   key: POSTGRES_DB
-          volumeMounts:
-            - name: data
-              mountPath: /var/lib/postgresql/data
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", "postgres", "-d", "etdb-bookings"]
+              command: ["pg_isready", "-U", "postgres", "-d", "etdb-sales"]
             initialDelaySeconds: 10
             periodSeconds: 5
+            failureThreshold: 6
           livenessProbe:
             exec:
-              command: ["pg_isready", "-U", "postgres", "-d", "etdb-bookings"]
+              command: ["pg_isready", "-U", "postgres", "-d", "etdb-sales"]
             initialDelaySeconds: 30
             periodSeconds: 10
+            failureThreshold: 3
+          volumeMounts:
+            - name: sales-postgres-data
+              mountPath: /var/lib/postgresql/data
   volumeClaimTemplates:
     - metadata:
-        name: data
+        name: sales-postgres-data
       spec:
         accessModes: ["ReadWriteOnce"]
         resources:

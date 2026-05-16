@@ -10,5 +10,4 @@ public record EventDTO(
         String category,
         String status,
         Double rating
-) {
-}
+) {}

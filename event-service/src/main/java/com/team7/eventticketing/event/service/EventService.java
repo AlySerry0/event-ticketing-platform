@@ -24,7 +24,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-
+import com.team7.eventticketing.contracts.events.EventRatedEvent;
+import com.team7.eventticketing.contracts.events.EventStatusChangedEvent;
+import com.team7.eventticketing.event.messaging.publisher.EventPublisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -35,6 +40,7 @@ import java.util.stream.Collectors;
 @Service
 @Transactional(readOnly = true)
 public class EventService {
+    private static final Logger log = LoggerFactory.getLogger(EventService.class);
 
     // -----------------------------------------------------------------------
     // Observer registry (classical GoF — not Spring ApplicationEventPublisher)
@@ -43,6 +49,7 @@ public class EventService {
     private final  EventIndexService eventIndexService;  // needed to trigger re-indexing on updates
     private final ElasticsearchOperations elasticsearchOperations;
     private final ElasticsearchHitAdapter elasticsearchHitAdapter;
+    private final EventPublisher eventPublisher;
 //    @Autowired
 //    private EventService self;
 
@@ -75,7 +82,7 @@ public class EventService {
      * as the single observer for this service.
      */
     public EventService(EventRepository eventRepository, MongoEventLogger mongoEventLogger, EventIndexService eventIndexService, ElasticsearchOperations elasticsearchOperations, ElasticsearchHitAdapter elasticsearchHitAdapter,
-CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheService) {
+CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheService, EventPublisher eventPublisher) {
         this.eventRepository = eventRepository;
         this.eventIndexService = eventIndexService;
         this.elasticsearchOperations = elasticsearchOperations;
@@ -83,6 +90,8 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
         this.register(mongoEventLogger);
         this.cacheInvalidationService = cacheInvalidationService;
         this.eventCacheService = eventCacheService;
+        this.eventPublisher = eventPublisher;
+
     }
 
     // -----------------------------------------------------------------------
@@ -426,6 +435,15 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
         extra.put("oldStatus", oldStatus);
         extra.put("newStatus", newStatus.name());
         notifyObservers("STATUS_CHANGED", buildPayload(eventId, extra));
+        eventPublisher.publishStatusChanged(
+                new EventStatusChangedEvent(
+                        event.getId(),
+                        event.getName(),
+                        oldStatus,
+                        newStatus.name(),
+                        LocalDateTime.now()
+                )
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -509,6 +527,16 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
         extra.put("rating", rating);
         extra.put("newAverageRating", newAvg);
         notifyObservers("RATED", buildPayload(eventId, extra));
+        eventPublisher.publishRated(
+                new EventRatedEvent(
+                        event.getId(),
+                        bookingId,
+                        rating,
+                        newAvg,
+                        event.getTotalRatings(),
+                        LocalDateTime.now()
+                )
+        );
     }
 
     @Transactional
@@ -555,9 +583,30 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
     // -----------------------------------------------------------------------
 
     public EventDashboardDTO getEventDashboard(Long eventId) {
-        EventDashboardDTO result = eventCacheService.getEventDashboardCached(eventId);
-        notifyObservers("DASHBOARD_VIEWED", buildPayload(eventId, Collections.emptyMap()));
-        return result;
+        long start = System.currentTimeMillis();
+
+        try {
+            MDC.put("eventId", eventId.toString());
+
+            log.info("Received S2-F12 dashboard request for eventId={}", eventId);
+
+            EventDashboardDTO result = eventCacheService.getEventDashboardCached(eventId);
+
+            notifyObservers("DASHBOARD_VIEWED", buildPayload(eventId, Collections.emptyMap()));
+
+            long elapsed = System.currentTimeMillis() - start;
+
+            if (elapsed > 1000) {
+                log.warn("Slow S2-F12 dashboard took {}ms for eventId={}", elapsed, eventId);
+            }
+
+            log.info("Returning S2-F12 dashboard for eventId={}", eventId);
+
+            return result;
+
+        } finally {
+            MDC.remove("eventId");
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -762,5 +811,18 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Invalid event status: " + status);
         }
+    }
+
+    public void invalidateRevenueCacheForEvent(Long eventId) {
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F3::" + eventId + "_*");
+    }
+
+    public void invalidateDashboardCacheForEvent(Long eventId) {
+        cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::" + eventId + "::*");
+    }
+
+    public void invalidateBookingDependentCaches(Long eventId) {
+        invalidateRevenueCacheForEvent(eventId);
+        invalidateDashboardCacheForEvent(eventId);
     }
 }
