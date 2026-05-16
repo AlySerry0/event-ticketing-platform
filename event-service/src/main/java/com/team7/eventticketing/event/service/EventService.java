@@ -1,5 +1,7 @@
 package com.team7.eventticketing.event.service;
 
+import com.team7.eventticketing.contracts.dto.AvgCapacityDTO;
+import com.team7.eventticketing.contracts.dto.VenueCoordsDTO;
 import com.team7.eventticketing.event.adapter.ElasticsearchHitAdapter;
 import com.team7.eventticketing.event.adapter.ObjectArrayDtoAdapter;
 import com.team7.eventticketing.event.dto.*;
