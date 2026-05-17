@@ -478,7 +478,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "loki", "uid": "loki" },
-              "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\", level=\"ERROR\"}[1m]))",
+              "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} | json | level=\"ERROR\" [1m]))",
               "legendFormat": "errors/min",
               "refId": "A"
             }
@@ -505,7 +505,7 @@ data:
             },
             {
               "datasource": { "type": "loki", "uid": "loki" },
-              "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} |= \"feign\" != \"FeignException\"[1m]))",
+              "expr": "sum(count_over_time({app=\"eventticketing\", service=\"booking-service\"} |= \"feign\" |!= \"FeignException\" [1m]))",
               "legendFormat": "feign-ok/min",
               "refId": "B"
             }
@@ -532,7 +532,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "loki", "uid": "loki" },
-              "expr": "{app=\"eventticketing\", service=\"booking-service\"} |= \"COMPLETING\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"PAYMENT_PENDING\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"PAYMENT_FAILED\" or {app=\"eventticketing\", service=\"booking-service\"} |= \"REFUNDED\"",
+              "expr": "{app=\"eventticketing\", service=\"booking-service\"} |~ \"COMPLETING|PAYMENT_PENDING|PAID|PAYMENT_FAILED|CANCELLED|REFUNDED\"",
               "legendFormat": "",
               "refId": "A"
             }
