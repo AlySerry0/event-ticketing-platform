@@ -253,6 +253,47 @@ public class SagaIntegrationTests {
         assertThat(booking.get("status").asText()).isEqualTo(expectedStatus);
     }
 
+    private Long waitUntilPendingSaleExistsForBooking(String token, Long bookingId, int maxAttempts) throws InterruptedException {
+        for (int i = 0; i < maxAttempts; i++) {
+            ResponseEntity<String> res = restTemplate.exchange(
+                    SALES_SVC + "/api/sales/search?status=PENDING",
+                    HttpMethod.GET,
+                    new HttpEntity<>(authHeader(token)),
+                    String.class
+            );
+            if (res.getStatusCode().is2xxSuccessful()) {
+                JsonNode list = parse(res.getBody());
+                if (list != null && list.isArray()) {
+                    for (JsonNode sale : list) {
+                        if (bookingId.equals(sale.get("bookingId").asLong())) {
+                            return sale.get("id").asLong();
+                        }
+                    }
+                }
+            }
+            Thread.sleep(1000);
+        }
+        // final assertion to produce a clear failure message
+        ResponseEntity<String> res = restTemplate.exchange(
+                SALES_SVC + "/api/sales/search?status=PENDING",
+                HttpMethod.GET,
+                new HttpEntity<>(authHeader(token)),
+                String.class
+        );
+        JsonNode list = parse(res.getBody());
+        assertThat(list).isNotNull();
+        assertThat(list.isArray()).isTrue();
+        boolean found = false;
+        for (JsonNode sale : list) {
+            if (bookingId.equals(sale.get("bookingId").asLong())) {
+                found = true;
+                break;
+            }
+        }
+        assertThat(found).as("Expected a PENDING TicketSale for bookingId=" + bookingId).isTrue();
+        return -1L;
+    }
+
     private void waitUntilSaleStatus(String token, Long saleId, String expectedStatus, int maxAttempts) throws InterruptedException {
         for (int i = 0; i < maxAttempts; i++) {
             ResponseEntity<String> res = restTemplate.exchange(
@@ -295,6 +336,7 @@ public class SagaIntegrationTests {
         assertThat(completeRes.getStatusCode().is2xxSuccessful()).isTrue();
 
         waitUntilBookingStatus(token, bookingId, "PAYMENT_PENDING", 15);
+        waitUntilPendingSaleExistsForBooking(token, bookingId, 5);
 
         ResponseEntity<String> paymentRes = processPayment(token, bookingId, false);
         assertThat(paymentRes.getStatusCode().is2xxSuccessful() || paymentRes.getStatusCode() == HttpStatus.CREATED).isTrue();
