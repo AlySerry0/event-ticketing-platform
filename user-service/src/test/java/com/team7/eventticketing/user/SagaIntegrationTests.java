@@ -253,6 +253,34 @@ public class SagaIntegrationTests {
         assertThat(booking.get("status").asText()).isEqualTo(expectedStatus);
     }
 
+    private void waitUntilSaleStatus(String token, Long saleId, String expectedStatus, int maxAttempts) throws InterruptedException {
+        for (int i = 0; i < maxAttempts; i++) {
+            ResponseEntity<String> res = restTemplate.exchange(
+                    SALES_SVC + "/api/sales/" + saleId,
+                    HttpMethod.GET,
+                    new HttpEntity<>(authHeader(token)),
+                    String.class
+            );
+            if (res.getStatusCode().is2xxSuccessful()) {
+                JsonNode node = parse(res.getBody());
+                if (node != null && expectedStatus.equals(node.get("status").asText())) {
+                    return;
+                }
+            }
+            Thread.sleep(1000);
+        }
+
+        ResponseEntity<String> res = restTemplate.exchange(
+                SALES_SVC + "/api/sales/" + saleId,
+                HttpMethod.GET,
+                new HttpEntity<>(authHeader(token)),
+                String.class
+        );
+        JsonNode node = parse(res.getBody());
+        assertThat(node).isNotNull();
+        assertThat(node.get("status").asText()).isEqualTo(expectedStatus);
+    }
+
     @Test
     @Order(1)
     void scenarioA_successPath_endsAtPaid() throws Exception {
@@ -291,8 +319,10 @@ public class SagaIntegrationTests {
 
         ResponseEntity<String> paymentRes = processPayment(token, bookingId, true);
         assertThat(paymentRes.getStatusCode().is2xxSuccessful() || paymentRes.getStatusCode() == HttpStatus.CREATED).isTrue();
+        Long saleId = parse(paymentRes.getBody()).get("id").asLong();
 
         waitUntilBookingStatus(token, bookingId, "REFUNDED", 20);
+        waitUntilSaleStatus(token, saleId, "REFUNDED", 10);
     }
 
     @Test
@@ -301,7 +331,9 @@ public class SagaIntegrationTests {
         String token = registerAndLogin();
         Long userId = extractUserId(token);
 
-        Long eventId = createEvent(token, "UPCOMING", "C");
+        // Event must be COMPLETED/ONGOING so the event-status pre-check passes;
+        // the 400 must come from ticket-count pre-check (0 USED tickets), not the event check.
+        Long eventId = createEvent(token, "COMPLETED", "C");
         Long bookingId = createBooking(token, userId, eventId, "CHECKED_IN");
 
         ResponseEntity<String> completeRes = completeBooking(token, bookingId);

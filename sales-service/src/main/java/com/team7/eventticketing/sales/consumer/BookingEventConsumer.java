@@ -176,16 +176,12 @@ public class BookingEventConsumer {
 
         // Payment never succeeded — no window policy check needed; directly mark REFUNDED
         if (sale.getStatus() == TicketSaleStatus.FAILED) {
-            Map<String, Object> details = new HashMap<>(
-                    sale.getTransactionDetails() != null ? sale.getTransactionDetails() : new HashMap<>());
-            details.put("refundReason", event.reason());
-            details.put("refundTriggeredBy", "booking.cancelled");
-            sale.setStatus(TicketSaleStatus.REFUNDED);
-            sale.setTransactionDetails(details);
-            ticketSaleRepository.saveAndFlush(sale);
-            paymentEventPublisher.publishPaymentRefunded(sale.getId(), sale.getBookingId(), sale.getAmount());
+            TicketSale refunded = ticketSaleService.directRefundFailedSale(
+                    sale.getId(), event.reason() != null ? event.reason() : "booking.cancelled");
+            paymentEventPublisher.publishPaymentRefunded(
+                    refunded.getId(), refunded.getBookingId(), refunded.getAmount());
             log.info("Directly refunded FAILED TicketSale saleId={} for bookingId={}",
-                    sale.getId(), sale.getBookingId());
+                    refunded.getId(), refunded.getBookingId());
             return;
         }
 
