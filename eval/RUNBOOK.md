@@ -78,7 +78,12 @@ kubectl apply -f k8s/statefulsets/
 # 7. Application Deployments
 kubectl apply -f k8s/deployments/
 
-# 8. API Gateway (last — depends on all upstream services being registered)
+# 8. Monitoring stack (Loki, Prometheus, Grafana — deploys into the monitoring namespace)
+kubectl apply -f k8s/monitoring/loki/
+kubectl apply -f k8s/monitoring/prometheus/
+kubectl apply -f k8s/monitoring/grafana/
+
+# 9. API Gateway (last — depends on all upstream services being registered)
 kubectl apply -f k8s/api-gateway/
 ```
 
