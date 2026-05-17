@@ -1,7 +1,7 @@
 package com.team7.eventticketing.ticket.security;
 
-import com.team7.eventticketing.ticket.repository.TicketRepository;
 import com.team7.eventticketing.ticket.service.JwtService;
+import com.team7.eventticketing.contracts.feign.UserServiceClient;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,12 +19,12 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final TicketRepository ticketRepository;
+    private final UserServiceClient userServiceClient;
 
     public JwtAuthenticationFilter(JwtService jwtService,
-                                   TicketRepository ticketRepository) {
+                                   UserServiceClient userServiceClient) {
         this.jwtService = jwtService;
-        this.ticketRepository = ticketRepository;
+        this.userServiceClient = userServiceClient;
     }
 
     @Override
@@ -45,7 +45,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             GatewayHeaderHandler gatewayCheck = new GatewayHeaderHandler();
             TokenExtractionHandler extraction = new TokenExtractionHandler();
             SignatureValidationHandler validation = new SignatureValidationHandler(jwtService);
-            UserLoaderHandler userLoader = new UserLoaderHandler(ticketRepository);
+            UserLoaderHandler userLoader = new UserLoaderHandler(userServiceClient);
             RoleAuthorizationHandler roleCheck = new RoleAuthorizationHandler();
 
             gatewayCheck.setNext(extraction).setNext(validation).setNext(userLoader).setNext(roleCheck);

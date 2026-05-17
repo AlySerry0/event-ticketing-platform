@@ -1,5 +1,7 @@
 package com.team7.eventticketing.event.controller;
 
+import com.team7.eventticketing.contracts.dto.AvgCapacityDTO;
+import com.team7.eventticketing.contracts.dto.VenueCoordsDTO;
 import com.team7.eventticketing.event.dto.*;
 import com.team7.eventticketing.event.service.EventIndexService;
 import com.team7.eventticketing.event.service.EventService;
@@ -333,6 +335,7 @@ public class EventController {
     }
 
     @GetMapping("/search/full-text")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
     public ResponseEntity<List<EventDTO>> searchEventsFullText(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) String category,
@@ -347,5 +350,17 @@ public class EventController {
                 query, category, venue, status, startDate, endDate, minRating, maxRating);
 
         return ResponseEntity.ok(results);
+    }
+
+    @GetMapping("/{id}/sessions/avg-capacity")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
+    public ResponseEntity<AvgCapacityDTO> getAvgCapacity(@PathVariable Long id) {
+        return ResponseEntity.ok(eventService.calculateAvgCapacity(id));
+    }
+
+    @GetMapping("/{id}/venue-coords")
+    @PreAuthorize("hasRole('ATTENDEE') or hasRole('ADMIN')")
+    public ResponseEntity<VenueCoordsDTO> getVenueCoords(@PathVariable Long id) {
+        return ResponseEntity.ok(eventService.getVenueCoords(id));
     }
 }

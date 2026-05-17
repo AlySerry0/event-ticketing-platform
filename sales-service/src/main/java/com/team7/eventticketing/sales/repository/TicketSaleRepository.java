@@ -15,11 +15,6 @@ import java.math.BigDecimal;
 
 @Repository
 public interface TicketSaleRepository extends JpaRepository<TicketSale, Long> {
-    @Query(value = "SELECT COUNT(*) > 0 FROM bookings WHERE id = :bookingId", nativeQuery = true)
-    boolean bookingExists(@Param("bookingId") Long bookingId);
-
-    @Query(value = "SELECT status FROM bookings WHERE id = :bookingId", nativeQuery = true)
-    String getBookingStatus(@Param("bookingId") Long bookingId);
 
     Optional<TicketSale> findByBookingId(Long bookingId);
 
@@ -75,8 +70,6 @@ public interface TicketSaleRepository extends JpaRepository<TicketSale, Long> {
     Long getRefundCount(@Param("start") LocalDateTime start,
                         @Param("end") LocalDateTime end);
 
-    @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE id = :userId", nativeQuery = true)
-    boolean userExists(@Param("userId") Long userId);
 
     @Query("""
         SELECT ts.method, COUNT(ts), COALESCE(SUM(ts.amount), 0)
@@ -88,36 +81,6 @@ public interface TicketSaleRepository extends JpaRepository<TicketSale, Long> {
                                                @Param("status") TicketSaleStatus status);
 
     boolean existsByBookingIdAndStatus(Long bookingId, TicketSaleStatus status);
-
-    @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE email = :email", nativeQuery = true)
-    boolean userExistsByEmail(String email);
-
-    @Query(value = """
-        SELECT
-            COALESCE(bi.metadata->>'ticketTier', 'UNSPECIFIED') AS tier,
-            SUM(bi.unit_price * bi.quantity)                    AS totalRevenue,
-            COUNT(DISTINCT ts.id)                               AS saleCount,
-            SUM(bi.quantity)                                    AS ticketsSold
-        FROM ticket_sales ts
-        JOIN bookings      b  ON b.id  = ts.booking_id
-        JOIN booking_items bi ON bi.booking_id = b.id
-        WHERE ts.created_at BETWEEN :startDateTime AND :endDateTime
-          AND ts.status = 'COMPLETED'
-        GROUP BY COALESCE(bi.metadata->>'ticketTier', 'UNSPECIFIED')
-        """, nativeQuery = true)
-    List<Object[]> findTierRevenue(
-            @Param("startDateTime") LocalDateTime startDateTime,
-            @Param("endDateTime")   LocalDateTime endDateTime
-    );
-
-    @Query(value = """
-    SELECT e.event_date
-    FROM ticket_sales ts
-    JOIN bookings b ON b.id = ts.booking_id
-    LEFT JOIN events e ON e.id = b.event_id
-    WHERE ts.id = :saleId
-    """, nativeQuery = true)
-    LocalDateTime findEventDateBySaleId(@Param("saleId") Long saleId);
 
     @Query("""
     SELECT COALESCE(SUM(t.amount), 0)
@@ -131,6 +94,15 @@ public interface TicketSaleRepository extends JpaRepository<TicketSale, Long> {
             @Param("userId") Long userId,
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate
+    );
+    @Query("""
+    SELECT t FROM TicketSale t
+    WHERE t.status = com.team7.eventticketing.sales.model.TicketSaleStatus.COMPLETED
+    AND t.createdAt BETWEEN :startDateTime AND :endDateTime
+""")
+    List<TicketSale> findCompletedSalesBetween(
+            @Param("startDateTime") LocalDateTime startDateTime,
+            @Param("endDateTime") LocalDateTime endDateTime
     );
 
 

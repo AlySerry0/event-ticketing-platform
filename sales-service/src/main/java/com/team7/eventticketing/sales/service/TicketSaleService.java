@@ -16,6 +16,8 @@ import com.team7.eventticketing.sales.repository.TicketSaleRepository;
 import com.team7.eventticketing.sales.adapter.MongoDocumentAdapter;
 import com.team7.eventticketing.sales.dto.SaleAuditTrailDTO;
 import com.team7.eventticketing.sales.repository.PaymentAuditEventRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
@@ -39,7 +41,13 @@ import com.team7.eventticketing.sales.observer.EntityObserver;
 import com.team7.eventticketing.sales.observer.MongoEventLogger;
 import com.team7.eventticketing.sales.util.CacheInvalidationService;
 import jakarta.annotation.PostConstruct;
-
+import com.team7.eventticketing.contracts.dto.BookingDTO;
+import com.team7.eventticketing.contracts.dto.EventDTO;
+import com.team7.eventticketing.contracts.dto.UserDTO;
+import com.team7.eventticketing.contracts.dto.BookingItemDTO;
+import com.team7.eventticketing.contracts.feign.BookingServiceClient;
+import com.team7.eventticketing.contracts.feign.EventServiceClient;
+import com.team7.eventticketing.contracts.feign.UserServiceClient;
 import java.util.ArrayList;
 
 import com.team7.eventticketing.sales.dto.RefundRequestDTO;
@@ -78,7 +86,17 @@ public class TicketSaleService {
     private EventFactory eventFactory;
     @Autowired
     private RefundStrategySelector refundStrategySelector;
+    @Autowired
+    private BookingServiceClient bookingServiceClient;
+    @Autowired
+    private PaymentEventPublisher paymentEventPublisher;
+    @Autowired
+    private EventServiceClient eventServiceClient;
+    @Autowired
+    private UserServiceClient userServiceClient;
+
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
+    private static final Logger log = LoggerFactory.getLogger(TicketSaleService.class);
 
     @PostConstruct
     public void initObservers() {
@@ -318,14 +336,23 @@ public class TicketSaleService {
 
     @Transactional
     public TicketSale processTicketSale(Long bookingId, String methodStr, String cardLastFour, boolean simulateFailure) {
-        boolean doesExist = ticketSaleRepository.bookingExists(bookingId);
-        if (!doesExist) {
+        BookingDTO booking;
+
+        try {
+            booking = bookingServiceClient.getBooking(bookingId);
+        } catch (feign.FeignException.NotFound e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
+        } catch (feign.FeignException e) {
+            log.warn("booking-service unavailable for bookingId={}: {}", bookingId, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Booking service temporarily unavailable");
         }
 
-        String bookingStatus = ticketSaleRepository.getBookingStatus(bookingId);
-        if (!"COMPLETED".equalsIgnoreCase(bookingStatus)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking must be COMPLETED");
+        if (booking.status() == null ||
+                !"PAYMENT_PENDING".equalsIgnoreCase(booking.status().name())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Booking is not awaiting payment. Status: " + booking.status()
+            );
         }
 
         TicketSale ticketSale = ticketSaleRepository.findByBookingId(bookingId)
@@ -393,6 +420,12 @@ public class TicketSaleService {
             TicketSale failedSale = ticketSaleRepository.saveAndFlush(pendingSale);
             entitySubject.notifyObservers("FAILED", buildAuditPayload(failedSale));
 
+            paymentEventPublisher.publishPaymentFailed(
+                    failedSale.getId(),
+                    failedSale.getBookingId(),
+                    "Simulated payment failure"
+            );
+
             invalidateAfterTicketSaleWrite(failedSale);
             return failedSale;
         }
@@ -404,6 +437,13 @@ public class TicketSaleService {
 
         TicketSale completedSale = ticketSaleRepository.saveAndFlush(pendingSale);
         entitySubject.notifyObservers("COMPLETED", buildAuditPayload(completedSale));
+
+        paymentEventPublisher.publishPaymentCompleted(
+                completedSale.getId(),
+                completedSale.getBookingId(),
+                completedSale.getAmount()
+        );
+
         invalidateAfterTicketSaleWrite(completedSale);
         return completedSale;
     }
@@ -413,12 +453,14 @@ public class TicketSaleService {
             key = "#userId"
     )
     public UserSaleSummaryDTO getUserSaleSummary(Long userId) {
-       boolean userExists = ticketSaleRepository.userExists(userId);
-
-        if (!userExists) {
+        try {
+            userServiceClient.getUser(userId);
+        } catch (feign.FeignException.NotFound e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+        } catch (feign.FeignException e) {
+            log.warn("user-service unavailable for userId={}: {}", userId, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "User service temporarily unavailable");
         }
-
         List<Object[]> rows = ticketSaleRepository.getUserSalesSummaryByMethod(
                 userId,
                 TicketSaleStatus.COMPLETED
@@ -479,14 +521,44 @@ public class TicketSaleService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Ticket sale not found"));
 
-        if (ticketSale.getStatus() != TicketSaleStatus.COMPLETED) {
+        if (ticketSale.getStatus() != TicketSaleStatus.COMPLETED
+                && ticketSale.getStatus() != TicketSaleStatus.PENDING) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Only COMPLETED ticket sales can be refunded"
+                    "Only PENDING or COMPLETED ticket sales can be refunded"
             );
         }
 
-        LocalDateTime eventDate = ticketSaleRepository.findEventDateBySaleId(saleId);
+        BookingDTO booking;
+
+        try {
+            booking = bookingServiceClient.getBooking(ticketSale.getBookingId());
+        } catch (feign.FeignException.NotFound e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
+        } catch (feign.FeignException e) {
+            log.warn("booking-service unavailable for bookingId={}: {}", ticketSale.getBookingId(), e.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Booking service temporarily unavailable");
+        }
+
+        if (booking.eventId() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "booking has no associated event"
+            );
+        }
+
+        EventDTO event;
+
+        try {
+            event = eventServiceClient.getEvent(booking.eventId());
+        } catch (feign.FeignException.NotFound e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found");
+        } catch (feign.FeignException e) {
+            log.warn("event-service unavailable for eventId={}: {}", booking.eventId(), e.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Event service temporarily unavailable");
+        }
+
+        LocalDateTime eventDate = event.eventDate();
 
         if (eventDate == null) {
             throw new ResponseStatusException(
@@ -635,12 +707,64 @@ public class TicketSaleService {
     )
     public List<TierRevenueDTO> getTierRevenue(LocalDate startDate, LocalDate endDate) {
         LocalDateTime startDateTime = startDate.atStartOfDay();
-        LocalDateTime endDateTime   = endDate.atTime(LocalTime.of(23, 59, 59, 999_000_000));
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.of(23, 59, 59, 999_000_000));
 
-        List<Object[]> rows = ticketSaleRepository.findTierRevenue(startDateTime, endDateTime);
+        List<TicketSale> completedSales =
+                ticketSaleRepository.findCompletedSalesBetween(startDateTime, endDateTime);
 
-        return rows.stream()
-                .map(objectArrayDtoAdapter::toTierRevenueDTO)
+        Map<String, TierAccumulator> tierMap = new HashMap<>();
+
+        for (TicketSale sale : completedSales) {
+            List<BookingItemDTO> items;
+            try {
+                items = bookingServiceClient.getBookingItems(sale.getBookingId());
+            } catch (feign.FeignException.NotFound e) {
+                log.warn("No booking items found for bookingId={}, skipping", sale.getBookingId());
+                continue;
+            } catch (feign.FeignException e) {
+                log.warn("booking-service unavailable for bookingId={}: {}", sale.getBookingId(), e.getMessage());
+                throw new ResponseStatusException(
+                        HttpStatus.SERVICE_UNAVAILABLE,
+                        "Booking service temporarily unavailable while loading booking items"
+                );
+            }
+
+            for (BookingItemDTO item : items) {
+                String tier = "UNSPECIFIED";
+
+                if (item.metadata() != null && item.metadata().get("ticketTier") != null) {
+                    tier = item.metadata().get("ticketTier").toString();
+                }
+
+                int quantity = item.quantity() != null ? item.quantity() : 0;
+                double unitPrice = item.unitPrice() != null ? item.unitPrice() : 0.0;
+                double revenue = quantity * unitPrice;
+
+                TierAccumulator accumulator =
+                        tierMap.computeIfAbsent(tier, key -> new TierAccumulator());
+
+                accumulator.totalRevenue += revenue;
+                accumulator.ticketsSold += quantity;
+                accumulator.saleIds.add(sale.getId());
+            }
+        }
+
+        return tierMap.entrySet().stream()
+                .map(entry -> {
+                    String tier = entry.getKey();
+                    TierAccumulator acc = entry.getValue();
+
+                    long saleCount = acc.saleIds.size();
+                    double average = saleCount > 0 ? acc.totalRevenue / saleCount : 0.0;
+
+                    return TierRevenueDTO.builder()
+                            .tier(tier)
+                            .totalRevenue(acc.totalRevenue)
+                            .saleCount(saleCount)
+                            .ticketsSold(acc.ticketsSold)
+                            .averageRevenuePerSale(average)
+                            .build();
+                })
                 .toList();
     }
 
@@ -684,6 +808,11 @@ public class TicketSaleService {
         LocalDateTime endDateTime = endDate != null ? endDate.atTime(23, 59, 59) : null;
 
         return ticketSaleRepository.getUserTotalCompletedSales(userId, startDateTime, endDateTime);
+    }
+    private static class TierAccumulator {
+        double totalRevenue = 0.0;
+        long ticketsSold = 0L;
+        java.util.Set<Long> saleIds = new java.util.HashSet<>();
     }
 
 }

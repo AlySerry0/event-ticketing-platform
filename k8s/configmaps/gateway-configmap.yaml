@@ -1,0 +1,23 @@
+# ==============================================================================
+# k8s/configmaps/gateway-configmap.yaml
+# ==============================================================================
+# Non-sensitive configuration for the API Gateway.
+# Sensitive values (JWT secret) are in Secrets, not here.
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-configmap
+  namespace: eventticketing
+data:
+  # Spring Cloud Gateway log level (INFO keeps logs clean; use DEBUG to trace routing issues)
+  LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_GATEWAY: "INFO"
+
+  # Gateway's own log level
+  LOGGING_LEVEL_COM_TEAM7_EVENTTICKETING_GATEWAY: "INFO"
+
+  # Spring application name (redundant with application.yml but explicit for container env)
+  SPRING_APPLICATION_NAME: "api-gateway"
+
+  # Actuator exposure (mirrors application.yml — env var overrides yml if present)
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,metrics"

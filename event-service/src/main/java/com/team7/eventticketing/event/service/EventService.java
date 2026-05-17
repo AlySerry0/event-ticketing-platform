@@ -1,11 +1,14 @@
 package com.team7.eventticketing.event.service;
 
+import com.team7.eventticketing.contracts.dto.AvgCapacityDTO;
+import com.team7.eventticketing.contracts.dto.VenueCoordsDTO;
 import com.team7.eventticketing.event.adapter.ElasticsearchHitAdapter;
 import com.team7.eventticketing.event.adapter.ObjectArrayDtoAdapter;
 import com.team7.eventticketing.event.dto.*;
 import com.team7.eventticketing.event.elasticsearch.EventSearchDocument;
 import com.team7.eventticketing.event.model.Event;
 import com.team7.eventticketing.event.model.EventCategory;
+import com.team7.eventticketing.event.model.EventSession;
 import com.team7.eventticketing.event.model.EventStatus;
 import com.team7.eventticketing.event.observer.EntityObserver;
 import com.team7.eventticketing.event.observer.MongoEventLogger;
@@ -35,6 +38,10 @@ import java.time.LocalTime;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
+import com.team7.eventticketing.contracts.dto.BookingDTO;
+import com.team7.eventticketing.contracts.dto.EventBookingRevenueDTO;
+import com.team7.eventticketing.contracts.feign.BookingServiceClient;
+import feign.FeignException;
 
 @Service
 @Transactional(readOnly = true)
@@ -49,6 +56,7 @@ public class EventService {
     private final ElasticsearchOperations elasticsearchOperations;
     private final ElasticsearchHitAdapter elasticsearchHitAdapter;
     private final EventPublisher eventPublisher;
+    private final BookingServiceClient bookingServiceClient;
 //    @Autowired
 //    private EventService self;
 
@@ -80,8 +88,15 @@ public class EventService {
      * Constructor — MongoEventLogger is injected by Spring and registered
      * as the single observer for this service.
      */
-    public EventService(EventRepository eventRepository, MongoEventLogger mongoEventLogger, EventIndexService eventIndexService, ElasticsearchOperations elasticsearchOperations, ElasticsearchHitAdapter elasticsearchHitAdapter,
-CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheService, EventPublisher eventPublisher) {
+    public EventService(EventRepository eventRepository,
+                        MongoEventLogger mongoEventLogger,
+                        EventIndexService eventIndexService,
+                        ElasticsearchOperations elasticsearchOperations,
+                        ElasticsearchHitAdapter elasticsearchHitAdapter,
+                        CacheInvalidationService cacheInvalidationService,
+                        EventCacheService eventCacheService,
+                        EventPublisher eventPublisher,
+                        BookingServiceClient bookingServiceClient) {
         this.eventRepository = eventRepository;
         this.eventIndexService = eventIndexService;
         this.elasticsearchOperations = elasticsearchOperations;
@@ -90,7 +105,7 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
         this.cacheInvalidationService = cacheInvalidationService;
         this.eventCacheService = eventCacheService;
         this.eventPublisher = eventPublisher;
-
+        this.bookingServiceClient = bookingServiceClient;
     }
 
     // -----------------------------------------------------------------------
@@ -380,29 +395,48 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Start date and end date are required");
         }
+
         if (startDate.isAfter(endDate)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Start date must be before or equal to end date");
         }
 
-        LocalDateTime rangeStart = startDate.atStartOfDay();
-        LocalDateTime rangeEnd = endDate.atTime(LocalTime.MAX);
+        try {
+            log.info("Calling booking-service.getEventRevenue for eventId={} startDate={} endDate={}",
+                    eventId, startDate, endDate);
 
-        Object rawResult = eventRepository.findEventRevenueSummary(eventId, rangeStart, rangeEnd);
+            EventBookingRevenueDTO revenue = bookingServiceClient.getEventRevenue(
+                    eventId,
+                    startDate.toString(),
+                    endDate.toString()
+            );
 
-        Object[] row;
-        if (rawResult == null) {
-            row = new Object[]{0L, 0.0, 0.0};
-        } else if (rawResult instanceof Object[] arr) {
-            row = (arr.length > 0 && arr[0] instanceof Object[]) ? (Object[]) arr[0] : arr;
-        } else {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Unexpected revenue query result format");
+            log.info("booking-service.getEventRevenue returned successfully for eventId={}", eventId);
+
+            return EventRevenueDTO.builder()
+                    .eventId(event.getId())
+                    .name(event.getName())
+                    .totalBookings(revenue.totalBookings())
+                    .totalRevenue(revenue.totalRevenue() == null ? 0.0 : revenue.totalRevenue().doubleValue())
+                    .averageBookingAmount(revenue.averageBookingAmount() == null ? 0.0 : revenue.averageBookingAmount().doubleValue())
+                    .build();
+
+        } catch (FeignException.NotFound e) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Booking revenue not found for event id: " + eventId
+            );
+
+        } catch (FeignException e) {
+            log.warn("booking-service unavailable while getting revenue for event {}: {}",
+                    eventId, e.getMessage());
+
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Booking service temporarily unavailable"
+            );
         }
-
-        return objectArrayDtoAdapter.toEventRevenueDTO(row, event.getId(), event.getName());
     }
-
     // -----------------------------------------------------------------------
     // S2-F4 — Status update (write — invalidate)
     // -----------------------------------------------------------------------
@@ -416,7 +450,26 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
         EventStatus newStatus = parseEventStatus(status);
 
         if (newStatus == EventStatus.CANCELLED) {
-            long activeBookings = eventRepository.countActiveBookingsForEvent(eventId);
+            int activeBookings;
+
+            try {
+                log.info("Calling booking-service.getEventActiveBookingCount for eventId={}", eventId);
+
+                activeBookings = bookingServiceClient.getEventActiveBookingCount(eventId);
+
+                log.info("booking-service.getEventActiveBookingCount returned {} for eventId={}",
+                        activeBookings, eventId);
+
+            } catch (FeignException e) {
+                log.warn("booking-service unavailable while checking active bookings for event {}: {}",
+                        eventId, e.getMessage());
+
+                throw new ResponseStatusException(
+                        HttpStatus.SERVICE_UNAVAILABLE,
+                        "Booking service temporarily unavailable"
+                );
+            }
+
             if (activeBookings > 0) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Cannot cancel event because it has active bookings");
@@ -499,13 +552,43 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
                     "Rating must be between 1 and 5");
         }
 
-        if (eventRepository.countBookingById(bookingId) == 0) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Booking not found with id: " + bookingId);
+        BookingDTO booking;
+
+        try {
+            log.info("Calling booking-service.getBooking for bookingId={}", bookingId);
+
+            booking = bookingServiceClient.getBooking(bookingId);
+
+            log.info("booking-service.getBooking returned successfully for bookingId={}", bookingId);
+
+        } catch (FeignException.NotFound e) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Booking not found with id: " + bookingId
+            );
+
+        } catch (FeignException e) {
+            log.warn("booking-service unavailable while validating booking {}: {}",
+                    bookingId, e.getMessage());
+
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Booking service temporarily unavailable"
+            );
         }
-        if (eventRepository.countCompletedBookingForEvent(bookingId, eventId) == 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Booking must belong to this event and be COMPLETED");
+
+        if (!eventId.equals(booking.eventId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Booking must belong to this event"
+            );
+        }
+
+        if (booking.status() == null || !"COMPLETED".equalsIgnoreCase(booking.status().name())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Booking must be COMPLETED"
+            );
         }
 
         int currentTotal = event.getTotalRatings() == null ? 0 : event.getTotalRatings();
@@ -744,6 +827,36 @@ CacheInvalidationService cacheInvalidationService, EventCacheService eventCacheS
         return searchHits.getSearchHits().stream()
                 .map(elasticsearchHitAdapter::adapt)
                 .collect(Collectors.toList());
+    }
+
+    public AvgCapacityDTO calculateAvgCapacity(Long id) {
+        Event event = eventRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Event not found with id: " + id));
+
+        double avg = event.getEventSessions().stream()
+                .mapToDouble(EventSession::getCapacity)
+                .average()
+                .orElse(0.0);
+
+        return new AvgCapacityDTO(avg);
+    }
+
+    public VenueCoordsDTO getVenueCoords(Long id) {
+        Event event = eventRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Event not found with id: " + id));
+
+        // Logic to extract from Event.details JSONB
+        Map<String, Object> details = event.getDetails();
+        if (details == null || !details.containsKey("venueLat") || !details.containsKey("venueLon")) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Venue coordinates not found in event details for event id: " + id);
+        }
+        Double lat = (Double) details.get("venueLat");
+        Double lon = (Double) details.get("venueLon");
+
+        return new VenueCoordsDTO(lat, lon);
     }
 
     // -----------------------------------------------------------------------

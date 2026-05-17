@@ -55,15 +55,7 @@ server:
 jwt:
   secret: ${JWT_SECRET:XTAA/1w8x3EU1gymE8NZpczBPdPcPeT3UpsSA2I+Utw=}
   expiration: ${JWT_EXPIRATION_MS:86400000}
-
-feign:
-  booking-service:
-    url: ${FEIGN_BOOKING_SERVICE_URL:http://localhost:8083}
-  user-service:
-    url: ${FEIGN_USER_SERVICE_URL:http://localhost:8081}
-  ticket-service:
-    url: ${FEIGN_TICKET_SERVICE_URL:http://localhost:8084}
-
+  
 management:
   endpoints:
     web:
@@ -77,3 +69,13 @@ management:
 logging:
   level:
     com.team7.eventticketing.event: DEBUG
+
+feign:
+  user-service:
+    url: ${FEIGN_USER_SERVICE_URL:http://user-service:8080}
+  booking-service:
+    url: ${FEIGN_BOOKING_SERVICE_URL:http://booking-service:8080}
+  ticket-service:
+    url: ${FEIGN_TICKET_SERVICE_URL:http://ticket-service:8080}
+  sales-service:
+    url: ${FEIGN_SALES_SERVICE_URL:http://sales-service:8080}

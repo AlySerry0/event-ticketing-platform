@@ -1,0 +1,86 @@
+# ==============================================================================
+# k8s/api-gateway/gateway-deployment.yaml
+# ==============================================================================
+# Deploy with:
+#   kubectl apply -f k8s/api-gateway/gateway-deployment.yaml
+#
+# Minikube local image workflow (no registry needed):
+#   eval $(minikube docker-env)          # point Docker CLI at Minikube daemon
+#   cd api-gateway && mvn clean package -DskipTests
+#   docker build -t api-gateway:latest .
+#   # imagePullPolicy: Never tells K8s to use the local image, not pull from registry
+# ==============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: eventticketing
+  labels:
+    app: api-gateway
+    version: "1.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+        version: "1.0"
+      annotations:
+        # Prometheus scrape annotations — if your team uses annotation-based discovery
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: api-gateway
+          # For Minikube: build locally with eval $(minikube docker-env) then use Never
+          image: api-gateway:latest
+          imagePullPolicy: Never      # Change to IfNotPresent or Always for a real registry
+
+          ports:
+            - containerPort: 8080
+              name: http
+
+          env:
+            # JWT secret — injected from the jwt-secret Secret object
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: jwt-secret
+                  key: jwt-secret
+
+          # Pull remaining env vars from the gateway ConfigMap
+          envFrom:
+            - configMapRef:
+                name: gateway-configmap
+
+          # ── Health probes ─────────────────────────────────────────────
+          # Spring Boot Actuator /actuator/health endpoint
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30   # gateway starts fast, but give Spring time
+            periodSeconds: 10
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 3
+
+          # ── Resource limits ───────────────────────────────────────────
+          # Sized for Minikube (single-node). Adjust for production.
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
