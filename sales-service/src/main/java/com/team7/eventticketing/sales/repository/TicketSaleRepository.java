@@ -87,8 +87,8 @@ public interface TicketSaleRepository extends JpaRepository<TicketSale, Long> {
     FROM TicketSale t
     WHERE t.userId = :userId
       AND t.status = com.team7.eventticketing.sales.model.TicketSaleStatus.COMPLETED
-      AND (:startDate IS NULL OR t.createdAt >= :startDate)
-      AND (:endDate IS NULL OR t.createdAt <= :endDate)
+      AND t.createdAt >= :startDate
+      AND t.createdAt <= :endDate
 """)
     BigDecimal getUserTotalCompletedSales(
             @Param("userId") Long userId,

@@ -48,7 +48,7 @@ public class JwtGatewayFilter implements GlobalFilter {
                     .parseSignedClaims(token)
                     .getPayload();
 
-            String userId = claims.get("uid", String.class);
+            String userId = String.valueOf(claims.get("uid"));
             String role   = claims.get("role", String.class);
 
             ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()

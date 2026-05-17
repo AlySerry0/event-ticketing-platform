@@ -23,6 +23,10 @@ public class FeignCorrelationConfig {
                 HttpServletRequest request = attrs.getRequest();
                 String auth = request.getHeader("Authorization");
                 if (auth != null) template.header("Authorization", auth);
+                String userId = request.getHeader("X-User-Id");
+                if (userId != null) template.header("X-User-Id", userId);
+                String role = request.getHeader("X-User-Role");
+                if (role != null) template.header("X-User-Role", role);
             }
         };
     }

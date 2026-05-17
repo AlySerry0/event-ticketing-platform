@@ -110,12 +110,9 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     long countActiveBookingsForEvent(@Param("eventId") Long eventId);
 
     @Query(value = """
-    SELECT e.id, e.name, e.rating,
-           COUNT(b.id) as total_bookings
+    SELECT e.id, e.name, e.rating, 0 AS total_bookings
     FROM events e
-    LEFT JOIN bookings b ON b.event_id = e.id
-        AND b.status = 'COMPLETED'
-    GROUP BY e.id
+    WHERE e.rating IS NOT NULL
     ORDER BY e.rating DESC
     LIMIT :limit
     """, nativeQuery = true)
