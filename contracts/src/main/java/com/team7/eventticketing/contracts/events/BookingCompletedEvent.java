@@ -7,7 +7,7 @@ public record BookingCompletedEvent(
         Long bookingId,
         Long userId,
         Long eventId,
-        LocalDateTime occurredAt,
-        BigDecimal totalAmount
+        BigDecimal totalAmount,
+        LocalDateTime occurredAt
 ) {
 }

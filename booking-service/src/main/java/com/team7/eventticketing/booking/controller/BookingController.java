@@ -288,4 +288,5 @@ public class BookingController {
 	public ResponseEntity<Integer> getEventActiveBookingCount(@PathVariable Long eventId) {
 		return ResponseEntity.ok(bookingService.getActiveBookingCountByEvent(eventId));
 	}
+
 }
