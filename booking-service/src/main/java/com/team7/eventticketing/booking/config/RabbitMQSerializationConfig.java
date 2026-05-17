@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
 @Configuration
-public class RabbitMQConfig {
+public class RabbitMQSerializationConfig {
 
     @Bean
     @Primary
