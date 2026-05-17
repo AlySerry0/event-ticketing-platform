@@ -5,6 +5,7 @@
 1. [Environment Setup (Docker Desktop Kubernetes)](#1-environment-setup)
 2. [End-to-End Flow (Saga Happy Path)](#2-end-to-end-flow-saga-happy-path)
 3. [Running the Saga Integration Tests (§8.6)](#3-running-the-saga-integration-tests)
+4. [Monitoring (Grafana / Prometheus / Loki)](#step-7--verify-monitoring-stack)
 
 ---
 
@@ -144,13 +145,14 @@ kubectl exec -n eventticketing statefulset/sales-postgres -- \
 
 ---
 
-### Step 6 — Verify all 17 pods are healthy
+### Step 6 — Verify all pods are healthy
 
 ```bash
 kubectl get pods -n eventticketing
+kubectl get pods -n monitoring
 ```
 
-Expected pods and their roles:
+**eventticketing namespace — 17 pods:**
 
 | Pod | Role |
 |-----|------|
@@ -166,18 +168,50 @@ Expected pods and their roles:
 | `ticket-postgres-0` | PostgreSQL for tickets (etdb-tickets) |
 | `sales-postgres-0` | PostgreSQL for sales (etdb-sales) |
 | `redis-0` | Redis cache (booking analytics, activity feed) |
-| `mongo-0` | MongoDB (event logs, ticket scan metadata) |
+| `mongodb-0` | MongoDB (event logs, ticket scan metadata) |
 | `cassandra-0` | Cassandra (ticket scan history — keyspace `eventticketingks`) |
 | `neo4j-0` | Neo4j (booking recommendations graph) |
 | `elasticsearch-0` | Elasticsearch (event full-text search) |
 | `rabbitmq-0` | RabbitMQ (saga async events) |
 
-All 17 pods should show `Running` with `1/1` READY. The API gateway is exposed at `localhost:30080`.
+**monitoring namespace — 3 pods:**
+
+| Pod | Role |
+|-----|------|
+| `grafana-*` | Grafana dashboards, NodePort 30030 |
+| `prometheus-*` | Prometheus metrics scraper |
+| `loki-0` | Loki log aggregation |
+
+All 20 pods should show `Running` with `1/1` READY. The API gateway is exposed at `localhost:30080`.
 
 ```bash
 # Quick health check via gateway
 curl -s http://localhost:30080/actuator/health | jq .status
 # Expected: "UP"
+```
+
+---
+
+### Step 7 — Verify monitoring stack
+
+Grafana is exposed at `localhost:30030` (credentials: `admin` / `admin`).
+
+```bash
+# Confirm all 5 services are shipping logs to Loki
+curl -s -u admin:admin \
+  "http://localhost:30030/api/datasources/proxy/uid/loki/loki/api/v1/label/service/values"
+# Expected: {"status":"success","data":["booking-service","event-service","sales-service","ticket-service","user-service"]}
+```
+
+Navigate to **Dashboards → Microservices** in Grafana to find the five per-service dashboards.
+Each dashboard has Prometheus panels (HTTP request rate, JVM heap, HikariCP connections) and
+Loki panels (error rate, RabbitMQ routing keys, correlation-ID trace). Set the time range to
+**Last 1 hour** if panels appear empty.
+
+To populate the dashboards with a representative data set, run the saga script:
+
+```bash
+python eval/saga_test.py
 ```
 
 ---
@@ -516,7 +550,7 @@ Spring context is needed.
 
 ### Prerequisites
 
-The full cluster must be running (all 17 pods `Running 1/1` — see Section 1).
+The full cluster must be running (all 20 pods `Running 1/1` across both namespaces — see Section 1).
 
 #### Pre-flight: verify sales-postgres status column
 
