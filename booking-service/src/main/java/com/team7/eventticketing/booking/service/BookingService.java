@@ -29,6 +29,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashMap;
@@ -324,16 +326,24 @@ public class BookingService implements EntitySubject {
 		Booking savedBooking = bookingRepository.saveAndFlush(booking);
 		log.info("Booking {} transitioning to COMPLETING", savedBooking.getId());
 
-		// Publish event to trigger the Payment Saga in sales-service
-		bookingEventPublisher.publishBookingCompleted(
-				new com.team7.eventticketing.contracts.events.BookingCompletedEvent(
-						savedBooking.getId(),
-						savedBooking.getUserId(),
-						savedBooking.getEventId(),
-						BigDecimal.valueOf(savedBooking.getTotalAmount()),
-						LocalDateTime.now()
-				)
-		);
+		// Defer publish until after commit so payment.initiated cannot arrive before
+		// the COMPLETING status is visible to handlePaymentInitiated.
+		final long bookingId = savedBooking.getId();
+		final long userId = savedBooking.getUserId();
+		final long eventId = savedBooking.getEventId();
+		final double totalAmount = savedBooking.getTotalAmount();
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				bookingEventPublisher.publishBookingCompleted(
+						new com.team7.eventticketing.contracts.events.BookingCompletedEvent(
+								bookingId, userId, eventId,
+								BigDecimal.valueOf(totalAmount),
+								LocalDateTime.now()
+						)
+				);
+			}
+		});
 		// ------------------------------------------------------------------
 
 		this.notifyObservers("BOOKING_COMPLETING",
