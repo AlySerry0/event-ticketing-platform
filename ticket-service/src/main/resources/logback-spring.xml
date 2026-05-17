@@ -1,26 +1,18 @@
 <configuration>
-    <springProperty scope="context" name="lokiUrl" source="loki.url" defaultValue="http://loki:3100"/>
-
-    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} [%X{correlationId}] - %msg%n</pattern>
-        </encoder>
-    </appender>
-
     <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
         <http>
             <url>http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push</url>
         </http>
         <format>
             <label>
-                <pattern>app=eventticketing,service=${spring.application.name:-ticket-service},level=%level,env=k8s</pattern>
+                <pattern>app=eventticketing,service=${spring.application.name},level=%level,env=k8s</pattern>
             </label>
             <message>
                 <pattern>
                     {
                     "timestamp": "%d{ISO8601}",
                     "level": "%level",
-                    "service": "${spring.application.name:-ticket-service}",
+                    "service": "${spring.application.name}",
                     "thread": "%thread",
                     "logger": "%logger{36}",
                     "correlationId": "%X{correlationId:-}",
@@ -36,9 +28,6 @@
     </appender>
 
     <root level="INFO">
-        <appender-ref ref="CONSOLE"/>
         <appender-ref ref="LOKI"/>
     </root>
-
-    <logger name="com.team7.eventticketing.ticket" level="DEBUG"/>
 </configuration>
