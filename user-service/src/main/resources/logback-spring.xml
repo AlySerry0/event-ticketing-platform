@@ -1,34 +1,21 @@
 <configuration>
-    <springProperty scope="context" name="appName" source="spring.application.name"/>
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
+
     <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
         <http>
             <url>http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push</url>
         </http>
+        <labels>app=eventticketing
+service=user-service
+env=k8s</labels>
         <structuredMetadata>off</structuredMetadata>
-        <format>
-            <label>
-                <pattern>app=eventticketing,service=user-service,level=%level,env=k8s</pattern>
-            </label>
-            <message>
-                <pattern>
-                    {
-                    "timestamp": "%d{ISO8601}",
-                    "level": "%level",
-                    "service": "user-service",
-                    "thread": "%thread",
-                    "logger": "%logger{36}",
-                    "correlationId": "%X{correlationId:-}",
-                    "userId": "%X{userId:-}",
-                    "message": "%msg"
-                    }
-                </pattern>
-            </message>
-        </format>
+        <message class="ch.qos.logback.classic.PatternLayout">
+            <pattern>{"timestamp":"%d{ISO8601}","level":"%level","service":"user-service","thread":"%thread","logger":"%logger{36}","correlationId":"%X{correlationId:-}","userId":"%X{userId:-}","message":"%msg"}</pattern>
+        </message>
     </appender>
 
     <root level="INFO">
