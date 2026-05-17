@@ -265,6 +265,24 @@ public class TicketSaleService {
         cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + saleId);
     }
 
+    @Transactional
+    public TicketSale directRefundFailedSale(Long saleId, String reason) {
+        TicketSale sale = ticketSaleRepository.findById(saleId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket sale not found"));
+        if (sale.getStatus() != TicketSaleStatus.FAILED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "directRefundFailedSale: sale " + saleId + " is not FAILED (status=" + sale.getStatus() + ")");
+        }
+        Map<String, Object> details = new HashMap<>(
+                sale.getTransactionDetails() != null ? sale.getTransactionDetails() : new HashMap<>());
+        details.put("refundReason", reason);
+        details.put("refundTriggeredBy", "booking.cancelled");
+        sale.setStatus(TicketSaleStatus.REFUNDED);
+        sale.setTransactionDetails(details);
+        TicketSale saved = ticketSaleRepository.saveAndFlush(sale);
+        invalidateAfterTicketSaleWrite(saved);
+        return saved;
+    }
 
     @Transactional
     public TicketSale applyPromotionToSale(Long saleId, Long promotionId) {

@@ -4,6 +4,8 @@
 
 1. [Environment Setup (Docker Desktop Kubernetes)](#1-environment-setup)
 2. [End-to-End Flow (Saga Happy Path)](#2-end-to-end-flow-saga-happy-path)
+3. [Running the Saga Integration Tests (§8.6)](#3-running-the-saga-integration-tests)
+4. [Monitoring (Grafana / Prometheus / Loki)](#step-7--verify-monitoring-stack)
 
 ---
 
@@ -77,7 +79,12 @@ kubectl apply -f k8s/statefulsets/
 # 7. Application Deployments
 kubectl apply -f k8s/deployments/
 
-# 8. API Gateway (last — depends on all upstream services being registered)
+# 8. Monitoring stack (Loki, Prometheus, Grafana — deploys into the monitoring namespace)
+kubectl apply -f k8s/monitoring/loki/
+kubectl apply -f k8s/monitoring/prometheus/
+kubectl apply -f k8s/monitoring/grafana/
+
+# 9. API Gateway (last — depends on all upstream services being registered)
 kubectl apply -f k8s/api-gateway/
 ```
 
@@ -128,15 +135,24 @@ kubectl exec -n eventticketing statefulset/user-postgres -- \
   "
 ```
 
+**sales-service** (symptom: saga `booking.completed` events DLQ'd, bookings stuck at `COMPLETING`):
+```bash
+kubectl exec -n eventticketing statefulset/sales-postgres -- \
+  psql -U postgres -d etdb-sales -c "
+    ALTER TABLE ticket_sales ADD COLUMN IF NOT EXISTS status ticketsalestatus NOT NULL DEFAULT 'PENDING';
+  "
+```
+
 ---
 
-### Step 6 — Verify all 17 pods are healthy
+### Step 6 — Verify all pods are healthy
 
 ```bash
 kubectl get pods -n eventticketing
+kubectl get pods -n monitoring
 ```
 
-Expected pods and their roles:
+**eventticketing namespace — 17 pods:**
 
 | Pod | Role |
 |-----|------|
@@ -152,18 +168,50 @@ Expected pods and their roles:
 | `ticket-postgres-0` | PostgreSQL for tickets (etdb-tickets) |
 | `sales-postgres-0` | PostgreSQL for sales (etdb-sales) |
 | `redis-0` | Redis cache (booking analytics, activity feed) |
-| `mongo-0` | MongoDB (event logs, ticket scan metadata) |
+| `mongodb-0` | MongoDB (event logs, ticket scan metadata) |
 | `cassandra-0` | Cassandra (ticket scan history — keyspace `eventticketingks`) |
 | `neo4j-0` | Neo4j (booking recommendations graph) |
 | `elasticsearch-0` | Elasticsearch (event full-text search) |
 | `rabbitmq-0` | RabbitMQ (saga async events) |
 
-All 17 pods should show `Running` with `1/1` READY. The API gateway is exposed at `localhost:30080`.
+**monitoring namespace — 3 pods:**
+
+| Pod | Role |
+|-----|------|
+| `grafana-*` | Grafana dashboards, NodePort 30030 |
+| `prometheus-*` | Prometheus metrics scraper |
+| `loki-0` | Loki log aggregation |
+
+All 20 pods should show `Running` with `1/1` READY. The API gateway is exposed at `localhost:30080`.
 
 ```bash
 # Quick health check via gateway
 curl -s http://localhost:30080/actuator/health | jq .status
 # Expected: "UP"
+```
+
+---
+
+### Step 7 — Verify monitoring stack
+
+Grafana is exposed at `localhost:30030` (credentials: `admin` / `admin`).
+
+```bash
+# Confirm all 5 services are shipping logs to Loki
+curl -s -u admin:admin \
+  "http://localhost:30030/api/datasources/proxy/uid/loki/loki/api/v1/label/service/values"
+# Expected: {"status":"success","data":["booking-service","event-service","sales-service","ticket-service","user-service"]}
+```
+
+Navigate to **Dashboards → Microservices** in Grafana to find the five per-service dashboards.
+Each dashboard has Prometheus panels (HTTP request rate, JVM heap, HikariCP connections) and
+Loki panels (error rate, RabbitMQ routing keys, correlation-ID trace). Set the time range to
+**Last 1 hour** if panels appear empty.
+
+To populate the dashboards with a representative data set, run the saga script:
+
+```bash
+python eval/saga_test.py
 ```
 
 ---
@@ -491,3 +539,78 @@ kubectl port-forward -n eventticketing rabbitmq-0 15672:15672
 # Force restart a crashed pod
 kubectl rollout restart deployment/ticket-service -n eventticketing
 ```
+
+---
+
+## 3 — Running the Saga Integration Tests
+
+These are JUnit black-box integration tests that validate the §8.6 saga scenarios end-to-end.
+All calls route through the API gateway NodePort (`localhost:30080`) — no port-forwarding or
+Spring context is needed.
+
+### Prerequisites
+
+The full cluster must be running (all 20 pods `Running 1/1` across both namespaces — see Section 1).
+
+#### Pre-flight: verify sales-postgres status column
+
+After any `sales-service` pod restart, Hibernate's `ddl-auto: update` may drop the
+`ticket_sales.status` column (see Step 5b above). If the column is missing, `booking.completed`
+events will DLQ and bookings will be stuck at `COMPLETING`.
+
+Check and fix before running tests:
+
+```bash
+# Check — should return 1 row
+kubectl exec -n eventticketing statefulset/sales-postgres -- \
+  psql -U postgres -d etdb-sales -c "
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name='ticket_sales' AND column_name='status';
+  "
+
+# Fix if the query returned 0 rows
+kubectl exec -n eventticketing statefulset/sales-postgres -- \
+  psql -U postgres -d etdb-sales -c "
+    ALTER TABLE ticket_sales ADD COLUMN IF NOT EXISTS status ticketsalestatus NOT NULL DEFAULT 'PENDING';
+  "
+```
+
+### Running the tests
+
+From the repo root:
+
+```bash
+mvn test -pl user-service -Dtest=SagaIntegrationTests
+```
+
+Expected output (~6 s):
+
+```
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
+### What each scenario covers
+
+| Scenario | Description | Key assertion |
+|----------|-------------|---------------|
+| A — success path | Full happy path through saga | Booking reaches `PAID`; PENDING `TicketSale` exists after `completeBooking` |
+| B — payment failure + compensation | `?simulateFailure=true` triggers rollback | Booking reaches `REFUNDED`; `TicketSale` reaches `REFUNDED` |
+| C — pre-saga check failure | No USED tickets → `completeBooking` → 400 | Booking stays `CHECKED_IN`; saga never starts |
+
+### Diagnosing failures
+
+**Scenarios A/B time out waiting for `PAYMENT_PENDING`**
+
+1. Check the RabbitMQ DLQ for dead-lettered events:
+   ```bash
+   kubectl port-forward -n eventticketing rabbitmq-0 15672:15672
+   # Open http://localhost:15672 → Queues → payment.saga-listener.dlq → Get messages
+   ```
+2. Most likely cause: `ticket_sales.status` column missing — apply the pre-flight fix above.
+3. Re-run after the fix; each test creates fresh bookings, so stale DLQ messages are irrelevant.
+
+**Scenario C returns 200 instead of 400**
+
+The event must be created with status `COMPLETED`. The test does this so only the USED-ticket
+count check fires (not the event-status check).

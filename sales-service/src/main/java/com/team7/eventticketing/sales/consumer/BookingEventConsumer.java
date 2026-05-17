@@ -174,6 +174,17 @@ public class BookingEventConsumer {
             return;
         }
 
+        // Payment never succeeded — no window policy check needed; directly mark REFUNDED
+        if (sale.getStatus() == TicketSaleStatus.FAILED) {
+            TicketSale refunded = ticketSaleService.directRefundFailedSale(
+                    sale.getId(), event.reason() != null ? event.reason() : "booking.cancelled");
+            paymentEventPublisher.publishPaymentRefunded(
+                    refunded.getId(), refunded.getBookingId(), refunded.getAmount());
+            log.info("Directly refunded FAILED TicketSale saleId={} for bookingId={}",
+                    refunded.getId(), refunded.getBookingId());
+            return;
+        }
+
         if (sale.getStatus() != TicketSaleStatus.COMPLETED
                 && sale.getStatus() != TicketSaleStatus.PENDING) {
             log.warn(
