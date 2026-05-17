@@ -1,5 +1,8 @@
 package com.team7.eventticketing.ticket.service;
 
+import com.team7.eventticketing.contracts.events.TicketCancelledEvent;
+import com.team7.eventticketing.contracts.events.TicketIssuedEvent;
+import com.team7.eventticketing.contracts.events.TicketStatusChangedEvent;
 import com.team7.eventticketing.contracts.feign.BookingServiceClient;
 import com.team7.eventticketing.contracts.feign.EventServiceClient;
 import com.team7.eventticketing.contracts.dto.BookingDTO;
@@ -8,6 +11,7 @@ import com.team7.eventticketing.contracts.dto.VenueCoordsDTO;
 import com.team7.eventticketing.ticket.adapter.*;
 import com.team7.eventticketing.ticket.dto.*;
 import com.team7.eventticketing.ticket.dto.BatchTicketRequestDTO;
+import com.team7.eventticketing.ticket.messaging.publishers.TicketEventPublisher;
 import com.team7.eventticketing.ticket.model.Ticket;
 import com.team7.eventticketing.ticket.model.TicketStatus;
 import com.team7.eventticketing.ticket.repository.TicketRepository;
@@ -63,6 +67,7 @@ public class TicketService implements EntitySubject {
     private final NearbyTicketAdapter nearbyTicketAdapter;
     private final BookingServiceClient bookingServiceClient;
     private final EventServiceClient eventServiceClient;
+    private final TicketEventPublisher ticketEventPublisher;
 
     @Autowired
     public TicketService(
@@ -77,7 +82,8 @@ public class TicketService implements EntitySubject {
         TicketScanEventAdapter ticketScanEventAdapter,
         NearbyTicketAdapter nearbyTicketAdapter,
         BookingServiceClient bookingServiceClient,
-        EventServiceClient eventServiceClient
+        EventServiceClient eventServiceClient,
+        TicketEventPublisher ticketEventPublisher
     ) {
         this.mongoEventLogger = mongoEventLogger;
         this.ticketRepository = ticketRepository;
@@ -91,6 +97,7 @@ public class TicketService implements EntitySubject {
         this.nearbyTicketAdapter = nearbyTicketAdapter;
         this.bookingServiceClient = bookingServiceClient;
         this.eventServiceClient = eventServiceClient;
+        this.ticketEventPublisher = ticketEventPublisher;
         register(mongoEventLogger);
     }
 
@@ -293,6 +300,13 @@ public class TicketService implements EntitySubject {
         ticket.setStatus(TicketStatus.VALID);
         Ticket savedTicket = ticketRepository.save(ticket);
 
+        ticketEventPublisher.publishTicketIssued(new TicketIssuedEvent(
+                savedTicket.getId(),
+                savedTicket.getBookingId(),
+                savedTicket.getAttendeeName(),
+                savedTicket.getTicketCode()));
+
+
         this.notifyObservers("TICKET_ISSUED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
@@ -406,6 +420,9 @@ public class TicketService implements EntitySubject {
         }).toList();
 
         List<Ticket> savedTickets = ticketRepository.saveAll(ticketsToSave);
+        savedTickets.forEach(t -> ticketEventPublisher.publishTicketIssued(
+                new TicketIssuedEvent(t.getId(), t.getBookingId(), t.getAttendeeName(), t.getTicketCode())));
+
 
         this.notifyObservers("BATCH_ISSUED", Map.of("bookingId", batchRequest.getBookingId(), "size", savedTickets.size()));
         cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
@@ -463,6 +480,7 @@ public class TicketService implements EntitySubject {
     @Transactional
     public Optional<TicketDTO> updateTicket(Long id, TicketDTO ticketDetails) {
         return ticketRepository.findById(id).map(ticket -> {
+            TicketStatus previousStatus = ticket.getStatus();
             if (ticketDetails.getTicketCode() != null && !ticketDetails.getTicketCode().equals(ticket.getTicketCode())) {
                 if (ticketRepository.existsByTicketCode(ticketDetails.getTicketCode())) {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ticket code already exists");
@@ -488,6 +506,13 @@ public class TicketService implements EntitySubject {
             }
 
             Ticket savedTicket = ticketRepository.saveAndFlush(ticket);
+
+            if (ticketDetails.getStatus() != null && ticketDetails.getStatus() != previousStatus) {
+                ticketEventPublisher.publishTicketStatusChanged(new TicketStatusChangedEvent(
+                        savedTicket.getId(),
+                        savedTicket.getBookingId(),
+                        savedTicket.getStatus().name()));
+            }
 
             this.notifyObservers("TICKET_UPDATED", Map.of("ticketId", savedTicket.getId(), "status", savedTicket.getStatus().name()));
             cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
@@ -561,5 +586,60 @@ public class TicketService implements EntitySubject {
         }
 
         return events.stream().map(cassandraRowAdapter::adapt).toList();
+    }
+
+    @Transactional
+    public void captureEventIdForBooking(Long bookingId, Long eventId) {
+        List<Ticket> tickets = ticketRepository.findByBookingId(bookingId);
+        for (Ticket ticket : tickets) {
+            if (ticket.getEventId() == null) {
+                ticket.setEventId(eventId);
+                ticketRepository.save(ticket);
+                log.debug("captureEventId: set eventId={} on ticketId={}", eventId, ticket.getId());
+            }
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public void auditTicketsForCompletedBooking(Long bookingId) {
+        List<Ticket> tickets = ticketRepository.findByBookingId(bookingId);
+        for (Ticket ticket : tickets) {
+            if (ticket.getStatus() != TicketStatus.USED) {
+                log.debug("auditTickets: ticketId={} status={} — skipping (not USED)", ticket.getId(), ticket.getStatus());
+                continue;
+            }
+            ticketEventPublisher.publishTicketStatusChanged(new TicketStatusChangedEvent(
+                    ticket.getId(),
+                    ticket.getBookingId(),
+                    ticket.getStatus().name()));
+            log.debug("auditTickets: published ticket.status-changed (audit) for ticketId={}", ticket.getId());
+        }
+    }
+
+
+
+    @Transactional
+    public void cancelTicketsForBooking(Long bookingId) {
+        List<Ticket> tickets = ticketRepository.findByBookingId(bookingId);
+        for (Ticket ticket : tickets) {
+            if (ticket.getStatus() == TicketStatus.CANCELLED) {
+                log.debug("cancelTickets: ticketId={} already CANCELLED — skipping", ticket.getId());
+                continue;
+            }
+
+            String previousStatus = ticket.getStatus().name();
+            ticket.setStatus(TicketStatus.CANCELLED);
+            ticketRepository.save(ticket);
+
+            ticketEventPublisher.publishTicketCancelled(
+                    new TicketCancelledEvent(ticket.getId(), ticket.getBookingId()));
+
+            log.info("cancelTickets: ticketId={} cancelled (was {})", ticket.getId(), previousStatus);
+        }
+
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F10::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F5::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::S4-F6::*");
+        cacheInvalidationService.invalidateCacheWildcard("ticket-service::ticket::*");
     }
 }

@@ -237,6 +237,15 @@ public class BookingService implements EntitySubject {
 
 		Booking savedBooking = bookingRepository.save(booking);
 
+		bookingEventPublisher.publishBookingPlaced(
+				new com.team7.eventticketing.contracts.events.BookingPlacedEvent(
+						savedBooking.getId(),
+						savedBooking.getUserId(),
+						savedBooking.getEventId(),
+						LocalDateTime.now()
+				)
+		);
+
 		this.notifyObservers("BOOKING_CONFIRMED",
 				Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
 		invalidateBookingCaches(savedBooking.getId());
@@ -477,8 +486,13 @@ public class BookingService implements EntitySubject {
 			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only view your own recommendations");
 		}
 
-		if (!bookingRepository.userExistsById(userId)) {
+		try {
+			userServiceClient.getUser(userId);
+		} catch (feign.FeignException.NotFound e) {
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+		} catch (feign.FeignException e) {
+			log.warn("user-service unavailable for recommendations userId={}: {}", userId, e.getMessage());
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "User service temporarily unavailable");
 		}
 
 		int recommendationLimit = limit == null ? 5 : limit;

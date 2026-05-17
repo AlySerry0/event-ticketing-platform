@@ -54,6 +54,52 @@
         "wrapLogMessage": true
       }
     }
+  ,
+    {
+      "id": 4,
+      "title": "HTTP Request Rate — event-service (PromQL)",
+      "description": "Requests per second per endpoint.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (uri) (rate(http_server_requests_seconds_count{job=\"event-service\"}[5m]))",
+          "legendFormat": "{{uri}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "HTTP P95 Latency — event-service (PromQL)",
+      "description": "95th percentile request duration.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job=\"event-service\"}[5m])))",
+          "legendFormat": "p95 {{uri}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "JVM Heap Used — event-service (PromQL)",
+      "description": "Heap memory usage over time.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(jvm_memory_used_bytes{job=\"event-service\", area=\"heap\"})",
+          "legendFormat": "heap used"
+        }
+      ]
+    }
   ],
   "templating": {
     "list": [

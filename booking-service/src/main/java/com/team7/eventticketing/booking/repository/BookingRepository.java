@@ -26,13 +26,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
 	List<Booking> findAllByOrderByBookingDateDesc();
 
-	@Query(value = "SELECT status FROM events WHERE id = :eventId", nativeQuery = true)
-	String findEventStatusById(@Param("eventId") Long eventId);
-
-	@Query(value = "SELECT AVG(capacity) FROM event_sessions WHERE event_id = :eventId", nativeQuery = true)
-	Double getAverageSessionCapacityByEventId(@Param("eventId") Long eventId);
-
-	@Query(value = "SELECT COUNT(*) FROM bookings WHERE event_id = :eventId AND status IN ('PENDING', 'CONFIRMED', 'CHECKED_IN')", nativeQuery = true)
+@Query(value = "SELECT COUNT(*) FROM bookings WHERE event_id = :eventId AND status IN ('PENDING', 'CONFIRMED', 'CHECKED_IN')", nativeQuery = true)
 	long countActiveBookingsForEvent(@Param("eventId") Long eventId);
 
 	@Modifying
@@ -59,12 +53,6 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Transactional
     @Query(value = "UPDATE tickets SET status = 'CANCELLED' WHERE booking_id = :bookingId AND status = 'VALID'", nativeQuery = true)
     int cancelValidTicketsByBookingId(@Param("bookingId") Long bookingId);
-
-    @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE email = :email", nativeQuery = true)
-    boolean userExistsByEmail(String email);
-
-    @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE id = :userId", nativeQuery = true)
-    boolean userExistsById(@Param("userId") Long userId);
 
     @Query(value = """
         SELECT COALESCE(SUM(ts.amount), 0)

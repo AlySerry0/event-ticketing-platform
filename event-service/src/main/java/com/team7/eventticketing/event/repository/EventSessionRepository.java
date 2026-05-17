@@ -56,11 +56,11 @@ public interface EventSessionRepository extends JpaRepository<EventSession, Long
     /**
      * Check if a user is an admin
      */
-    @Query(value = """
-        SELECT COUNT(*) > 0
-        FROM users
-        WHERE id = :userId
-          AND role = 'ADMIN'
-        """, nativeQuery = true)
-    boolean isAdminUser(@Param("userId") Long userId);
+//    @Query(value = """
+//        SELECT COUNT(*) > 0
+//        FROM users
+//        WHERE id = :userId
+//          AND role = 'ADMIN'
+//        """, nativeQuery = true)
+//    boolean isAdminUser(@Param("userId") Long userId);
 }

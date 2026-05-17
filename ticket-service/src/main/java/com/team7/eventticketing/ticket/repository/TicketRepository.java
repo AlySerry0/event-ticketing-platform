@@ -20,8 +20,8 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
         SELECT
             t.event_id AS eventId,
             COUNT(*) AS totalTickets,
-            SUM(CASE WHEN t.status = 'USED' THEN 1 ELSE 0 END) AS usedTickets,
-            SUM(CASE WHEN t.status = 'VALID' THEN 1 ELSE 0 END) AS validTickets,
+            COALESCE(SUM(CASE WHEN t.status = 'USED' THEN 1 ELSE 0 END), 0) AS usedTickets,
+            COALESCE(SUM(CASE WHEN t.status = 'VALID' THEN 1 ELSE 0 END), 0) AS validTickets,
             MAX(t.issued_at) FILTER (WHERE t.status = 'USED') AS lastCheckIn
         FROM tickets t
         WHERE t.event_id = :eventId
@@ -64,9 +64,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     List<Ticket> findByStatusAndIssuedAtBetweenOrderByIssuedAtAsc(TicketStatus status, LocalDateTime start, LocalDateTime end);
 
     boolean existsByTicketCode(String ticketCode);
-
-    @Query(value = "SELECT COUNT(*) > 0 FROM users WHERE email = :email", nativeQuery = true)
-    boolean userExistsByEmail(String email);
+    List<Ticket> findByBookingId(Long bookingId);
 
     @Query(value = """
         SELECT

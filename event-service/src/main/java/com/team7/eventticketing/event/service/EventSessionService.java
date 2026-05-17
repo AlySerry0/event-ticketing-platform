@@ -28,13 +28,16 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import java.util.HashMap;
 import java.util.Map;
+import com.team7.eventticketing.contracts.dto.UserDTO;
+import com.team7.eventticketing.contracts.feign.UserServiceClient;
+import feign.FeignException;
 
 @Service
 @Transactional(readOnly = true)
 public class EventSessionService {
     private static final Logger log = LoggerFactory.getLogger(EventSessionService.class);
     private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
-
+    private final UserServiceClient userServiceClient;
     private final EventSessionRepository eventSessionRepository;
     private final EventRepository eventRepository;
     private final EventService eventService;
@@ -44,13 +47,14 @@ public class EventSessionService {
                                EventRepository eventRepository,
                                EventService eventService,
                                MongoEventLogger mongoEventLogger,
-                              CacheInvalidationService cacheInvalidationService) {  // ← add this
+                               CacheInvalidationService cacheInvalidationService,
+                               UserServiceClient userServiceClient) {
         this.eventSessionRepository = eventSessionRepository;
-        this.eventRepository        = eventRepository;
-        this.eventService           = eventService;
-        this.register(mongoEventLogger);  // ← add this
+        this.eventRepository = eventRepository;
+        this.eventService = eventService;
+        this.register(mongoEventLogger);
         this.cacheInvalidationService = cacheInvalidationService;
-
+        this.userServiceClient = userServiceClient;
     }
 
     public void register(EntityObserver observer) {
@@ -323,10 +327,7 @@ public class EventSessionService {
 
             Long verifiedBy = request.getVerifiedBy();
 
-            if (!eventSessionRepository.isAdminUser(verifiedBy)) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                        "Verifier must be an admin user");
-            }
+            validateAdminUser(verifiedBy, "Verifier");
 
             session.setVerified(true);
 
@@ -401,10 +402,7 @@ public class EventSessionService {
                     "unverifiedBy is required");
         }
 
-        if (!eventSessionRepository.isAdminUser(unverifiedBy)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "Unverifier must be an admin user");
-        }
+        validateAdminUser(unverifiedBy, "Unverifier");
 
         session.setVerified(false);
 
@@ -495,6 +493,40 @@ public class EventSessionService {
         if (capacity == null || capacity < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Capacity must be greater than or equal to 0");
+        }
+    }
+
+    private void validateAdminUser(Long userId, String actionName) {
+        UserDTO user;
+
+        try {
+            log.info("Calling user-service.getUser for {} userId={}", actionName, userId);
+
+            user = userServiceClient.getUser(userId);
+
+            log.info("user-service.getUser returned successfully for {} userId={}", actionName, userId);
+
+        } catch (FeignException.NotFound e) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    actionName + " user not found"
+            );
+
+        } catch (FeignException e) {
+            log.warn("user-service unavailable while validating {} user {}: {}",
+                    actionName, userId, e.getMessage());
+
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "User service temporarily unavailable"
+            );
+        }
+
+        if (user.role() == null || !"ADMIN".equalsIgnoreCase(user.role().name())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    actionName + " must be an admin user"
+            );
         }
     }
 
