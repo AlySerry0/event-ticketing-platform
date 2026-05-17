@@ -9,6 +9,7 @@
         <http>
             <url>http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push</url>
         </http>
+        <structuredMetadata>off</structuredMetadata>
         <format>
             <label>
                 <pattern>app=eventticketing,service=ticket-service,level=%level,env=k8s</pattern>
