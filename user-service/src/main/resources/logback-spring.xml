@@ -1,18 +1,24 @@
 <configuration>
+    <springProperty scope="context" name="appName" source="spring.application.name"/>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
     <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
         <http>
             <url>http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push</url>
         </http>
         <format>
             <label>
-                <pattern>app=eventticketing,service=${spring.application.name},level=%level,env=k8s</pattern>
+                <pattern>app=eventticketing,service=${appName},level=%level,env=k8s</pattern>
             </label>
             <message>
                 <pattern>
                     {
                     "timestamp": "%d{ISO8601}",
                     "level": "%level",
-                    "service": "${spring.application.name}",
+                    "service": "${appName}",
                     "thread": "%thread",
                     "logger": "%logger{36}",
                     "correlationId": "%X{correlationId:-}",
@@ -25,6 +31,7 @@
     </appender>
 
     <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
         <appender-ref ref="LOKI"/>
     </root>
 </configuration>
