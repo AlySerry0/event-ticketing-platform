@@ -41,6 +41,9 @@ import java.util.Comparator;
 
 import com.team7.eventticketing.contracts.dto.BookingSummaryDTO;
 import com.team7.eventticketing.contracts.dto.EventBookingRevenueDTO;
+import com.team7.eventticketing.contracts.dto.UserDTO;
+import com.team7.eventticketing.contracts.enums.UserStatus;
+import feign.FeignException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -263,20 +266,47 @@ public class BookingService implements EntitySubject {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking is not CHECKED_IN");
 		}
 
-		// --- REFACTORED (S3-F4): Three Feign Pre-Checks ---
+		// S3-F4 pre-checks (§8.3): all three must pass before any event is published
+
+		// 1. Event must exist and be ONGOING or COMPLETED
+		EventDTO event;
 		try {
-			// 1. Check Event Service
-			eventServiceClient.getEvent(booking.getEventId());
-
-			// 2. Check User Service
-			userServiceClient.getUser(booking.getUserId());
-
-			// 3. Check Ticket Service (Ensure count doesn't throw errors)
-			ticketServiceClient.getUsedTicketCount(booking.getId());
-		} catch (Exception e) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Validation failed across microservices: " + e.getMessage());
+			event = eventServiceClient.getEvent(booking.getEventId());
+		} catch (FeignException.NotFound e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Event not found");
+		} catch (FeignException e) {
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Event service temporarily unavailable");
 		}
-		// --------------------------------------------------
+		String eventStatus = event.status() != null ? event.status().toUpperCase() : "";
+		if (!"ONGOING".equals(eventStatus) && !"COMPLETED".equals(eventStatus)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Event has not yet occurred or was cancelled");
+		}
+
+		// 2. User must exist and be ACTIVE
+		UserDTO user;
+		try {
+			user = userServiceClient.getUser(booking.getUserId());
+		} catch (FeignException.NotFound e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User not found");
+		} catch (FeignException e) {
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "User service temporarily unavailable");
+		}
+		if (user.status() != UserStatus.ACTIVE) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User account is not active");
+		}
+
+		// 3. At least one USED ticket must exist for this booking
+		int usedCount;
+		try {
+			usedCount = ticketServiceClient.getUsedTicketCount(booking.getId());
+		} catch (FeignException.NotFound e) {
+			usedCount = 0;
+		} catch (FeignException e) {
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Ticket service temporarily unavailable");
+		}
+		if (usedCount < 1) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No attendance recorded for this booking");
+		}
 
 		// Calculate Total Amount
 		if (booking.getTotalAmount() == null || booking.getTotalAmount() == 0.0) {
