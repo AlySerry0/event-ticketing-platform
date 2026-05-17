@@ -804,8 +804,12 @@ public class TicketSaleService {
     }
 
     public BigDecimal getUserTotalCompletedSales(Long userId, LocalDate startDate, LocalDate endDate) {
-        LocalDateTime startDateTime = startDate != null ? startDate.atStartOfDay() : null;
-        LocalDateTime endDateTime = endDate != null ? endDate.atTime(23, 59, 59) : null;
+        LocalDateTime startDateTime = startDate != null
+                ? startDate.atStartOfDay()
+                : LocalDateTime.of(2000, 1, 1, 0, 0, 0);
+        LocalDateTime endDateTime = endDate != null
+                ? endDate.atTime(23, 59, 59)
+                : LocalDateTime.of(2100, 1, 1, 0, 0, 0);
 
         return ticketSaleRepository.getUserTotalCompletedSales(userId, startDateTime, endDateTime);
     }

@@ -1,4 +1,4 @@
-package com.team7.eventticketing.ticket.config;
+package com.team7.eventticketing.sales.config;
 
 import feign.RequestInterceptor;
 import jakarta.servlet.http.HttpServletRequest;
@@ -8,15 +8,17 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.UUID;
+
 @Configuration
 public class FeignCorrelationConfig {
 
     @Bean
     public RequestInterceptor correlationIdInterceptor() {
         return template -> {
-            String correlationId = MDC.get("correlationId");
-            if (correlationId != null) template.header("X-Correlation-ID", correlationId);
-
+            String id = MDC.get("correlationId");
+            if (id == null || id.isBlank()) id = UUID.randomUUID().toString();
+            template.header("X-Correlation-ID", id);
             ServletRequestAttributes attrs =
                     (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
             if (attrs != null) {

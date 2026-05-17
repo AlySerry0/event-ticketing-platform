@@ -133,7 +133,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
         String path = request.getRequestURI();
-        return path.startsWith("/api/auth/") || path.equals("/api/users/health") || path.equals("/api/seed");
+        return path.startsWith("/actuator") || path.startsWith("/api/auth/") || path.equals("/api/users/health") || path.equals("/api/seed");
     }
 
     private static final class EndpointRule {

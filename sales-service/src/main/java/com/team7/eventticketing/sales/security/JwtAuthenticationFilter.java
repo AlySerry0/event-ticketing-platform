@@ -84,6 +84,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
         String path = request.getRequestURI();
         // List all your public endpoints here. The filter will completely skip them.
-        return path.equals("/api/sales/health") || path.equals("/api/seed");
+        return path.startsWith("/actuator") || path.equals("/api/sales/health") || path.equals("/api/seed");
     }
 }

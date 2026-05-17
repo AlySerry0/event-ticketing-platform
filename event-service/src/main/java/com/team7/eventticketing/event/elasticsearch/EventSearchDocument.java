@@ -10,7 +10,7 @@ import org.springframework.data.elasticsearch.annotations.InnerField;
 
 import java.time.LocalDateTime;
 
-@Document(indexName = "events")
+@Document(indexName = "events", createIndex = false)
 public class EventSearchDocument {
 
     @Id

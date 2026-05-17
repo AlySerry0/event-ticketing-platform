@@ -38,7 +38,7 @@ spec:
         - name: api-gateway
           # For Minikube: build locally with eval $(minikube docker-env) then use Never
           image: api-gateway:latest
-          imagePullPolicy: Never      # Change to IfNotPresent or Always for a real registry
+          imagePullPolicy: IfNotPresent
 
           ports:
             - containerPort: 8080

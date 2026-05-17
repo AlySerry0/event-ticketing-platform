@@ -3,13 +3,10 @@
         <http>
             <url>http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push</url>
         </http>
-
         <format>
-
             <label>
                 <pattern>app=eventticketing,service=${spring.application.name},level=%level,env=k8s</pattern>
             </label>
-
             <message>
                 <pattern>
                     {
@@ -27,7 +24,6 @@
                     }
                 </pattern>
             </message>
-
         </format>
     </appender>
 
