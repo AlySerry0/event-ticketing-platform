@@ -4,6 +4,7 @@
 
 1. [Environment Setup (Docker Desktop Kubernetes)](#1-environment-setup)
 2. [End-to-End Flow (Saga Happy Path)](#2-end-to-end-flow-saga-happy-path)
+3. [Running the Saga Integration Tests (§8.6)](#3-running-the-saga-integration-tests)
 
 ---
 
@@ -125,6 +126,14 @@ kubectl exec -n eventticketing statefulset/user-postgres -- \
   psql -U postgres -d etdb-users -c "
     ALTER TABLE users ADD COLUMN IF NOT EXISTS role   userrole   NOT NULL DEFAULT 'ATTENDEE';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS status userstatus NOT NULL DEFAULT 'ACTIVE';
+  "
+```
+
+**sales-service** (symptom: saga `booking.completed` events DLQ'd, bookings stuck at `COMPLETING`):
+```bash
+kubectl exec -n eventticketing statefulset/sales-postgres -- \
+  psql -U postgres -d etdb-sales -c "
+    ALTER TABLE ticket_sales ADD COLUMN IF NOT EXISTS status ticketsalestatus NOT NULL DEFAULT 'PENDING';
   "
 ```
 
@@ -491,3 +500,78 @@ kubectl port-forward -n eventticketing rabbitmq-0 15672:15672
 # Force restart a crashed pod
 kubectl rollout restart deployment/ticket-service -n eventticketing
 ```
+
+---
+
+## 3 — Running the Saga Integration Tests
+
+These are JUnit black-box integration tests that validate the §8.6 saga scenarios end-to-end.
+All calls route through the API gateway NodePort (`localhost:30080`) — no port-forwarding or
+Spring context is needed.
+
+### Prerequisites
+
+The full cluster must be running (all 17 pods `Running 1/1` — see Section 1).
+
+#### Pre-flight: verify sales-postgres status column
+
+After any `sales-service` pod restart, Hibernate's `ddl-auto: update` may drop the
+`ticket_sales.status` column (see Step 5b above). If the column is missing, `booking.completed`
+events will DLQ and bookings will be stuck at `COMPLETING`.
+
+Check and fix before running tests:
+
+```bash
+# Check — should return 1 row
+kubectl exec -n eventticketing statefulset/sales-postgres -- \
+  psql -U postgres -d etdb-sales -c "
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name='ticket_sales' AND column_name='status';
+  "
+
+# Fix if the query returned 0 rows
+kubectl exec -n eventticketing statefulset/sales-postgres -- \
+  psql -U postgres -d etdb-sales -c "
+    ALTER TABLE ticket_sales ADD COLUMN IF NOT EXISTS status ticketsalestatus NOT NULL DEFAULT 'PENDING';
+  "
+```
+
+### Running the tests
+
+From the repo root:
+
+```bash
+mvn test -pl user-service -Dtest=SagaIntegrationTests
+```
+
+Expected output (~6 s):
+
+```
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
+### What each scenario covers
+
+| Scenario | Description | Key assertion |
+|----------|-------------|---------------|
+| A — success path | Full happy path through saga | Booking reaches `PAID`; PENDING `TicketSale` exists after `completeBooking` |
+| B — payment failure + compensation | `?simulateFailure=true` triggers rollback | Booking reaches `REFUNDED`; `TicketSale` reaches `REFUNDED` |
+| C — pre-saga check failure | No USED tickets → `completeBooking` → 400 | Booking stays `CHECKED_IN`; saga never starts |
+
+### Diagnosing failures
+
+**Scenarios A/B time out waiting for `PAYMENT_PENDING`**
+
+1. Check the RabbitMQ DLQ for dead-lettered events:
+   ```bash
+   kubectl port-forward -n eventticketing rabbitmq-0 15672:15672
+   # Open http://localhost:15672 → Queues → payment.saga-listener.dlq → Get messages
+   ```
+2. Most likely cause: `ticket_sales.status` column missing — apply the pre-flight fix above.
+3. Re-run after the fix; each test creates fresh bookings, so stale DLQ messages are irrelevant.
+
+**Scenario C returns 200 instead of 400**
+
+The event must be created with status `COMPLETED`. The test does this so only the USED-ticket
+count check fires (not the event-status check).
