@@ -187,6 +187,16 @@ public class SagaIntegrationTests {
         );
 
         assertThat(res.getStatusCode().is2xxSuccessful() || res.getStatusCode() == HttpStatus.CREATED).isTrue();
+
+        // save() always forces VALID; completeBooking pre-check requires USED → mark USED now
+        Long ticketId = parse(res.getBody()).get("id").asLong();
+        ResponseEntity<String> updateRes = restTemplate.exchange(
+                TICKET_SVC + "/api/tickets/" + ticketId,
+                HttpMethod.PUT,
+                new HttpEntity<>(Map.of("status", "USED"), authHeader(token)),
+                String.class
+        );
+        assertThat(updateRes.getStatusCode().is2xxSuccessful()).isTrue();
     }
 
     private ResponseEntity<String> completeBooking(String token, Long bookingId) {
