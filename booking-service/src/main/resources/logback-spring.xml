@@ -12,14 +12,14 @@
         </http>
         <format>
             <label>
-                <pattern>app=eventticketing,service=${appName},level=%level,env=k8s</pattern>
+                <pattern>app=eventticketing,service=booking-service,level=%level,env=k8s</pattern>
             </label>
             <message>
                 <pattern>
                     {
                     "timestamp": "%d{ISO8601}",
                     "level": "%level",
-                    "service": "${appName}",
+                    "service": "booking-service",
                     "thread": "%thread",
                     "logger": "%logger{36}",
                     "correlationId": "%X{correlationId:-}",
