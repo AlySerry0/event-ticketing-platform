@@ -29,6 +29,13 @@ spec:
               value: "EventTicketing"
             - name: CASSANDRA_DC
               value: "datacenter1"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1280Mi" # Tight but enough breathing room for off-heap allocations
+              cpu: "1"
           volumeMounts:
             - name: cassandra-storage
               mountPath: /var/lib/cassandra
