@@ -33,6 +33,7 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                        .requestMatchers("/actuator/**").permitAll()
                         // Public endpoints — user-service only has these two + health
                         .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
                         // Health checks are public in every service
