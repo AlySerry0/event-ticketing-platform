@@ -5,7 +5,7 @@ metadata:
   namespace: eventticketing
 data:
   SPRING_DATASOURCE_URL: jdbc:postgresql://user-postgres:5432/etdb-users
-  SPRING_DATA_MONGODB_URI: mongodb://root:rootpass@mongo:27017/eventticketingmongo?authSource=admin
+  SPRING_DATA_MONGODB_URI: mongodb://root:rootpass@mongodb:27017/eventticketingmongo?authSource=admin
   SPRING_DATA_REDIS_HOST: redis
   SPRING_DATA_REDIS_PASSWORD: redispass
   SPRING_RABBITMQ_HOST: rabbitmq

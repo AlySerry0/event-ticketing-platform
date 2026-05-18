@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: booking-service-config
+  namespace: eventticketing
+data:
+  SERVER_PORT: "8080"
+  SPRING_PROFILES_ACTIVE: "prod"
+
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://booking-postgres:5432/etdb-bookings"
+  SPRING_DATA_MONGODB_URI: "mongodb://root:rootpass@mongodb:27017/eventticketingmongo?authSource=admin"
+  SPRING_NEO4J_URI: "bolt://neo4j:7687"
+  SPRING_NEO4J_AUTHENTICATION_USERNAME: "neo4j"
+  SPRING_NEO4J_AUTHENTICATION_PASSWORD: "password"
+  MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: "always"
+  SPRING_DATA_REDIS_HOST: "redis"
+  SPRING_REDIS_HOST: "redis"
+  SPRING_REDIS_PORT: "6379"
+
+  SPRING_RABBITMQ_HOST: "rabbitmq"
+  SPRING_RABBITMQ_PORT: "5672"
+  SPRING_RABBITMQ_USERNAME: "guest"
+  SPRING_RABBITMQ_PASSWORD: "guest"
+
+  FEIGN_EVENT_SERVICE_URL: "http://event-service:8080"
+  FEIGN_USER_SERVICE_URL: "http://user-service:8080"
+  FEIGN_TICKET_SERVICE_URL: "http://ticket-service:8080"
+  FEIGN_SALES_SERVICE_URL: "http://sales-service:8080"

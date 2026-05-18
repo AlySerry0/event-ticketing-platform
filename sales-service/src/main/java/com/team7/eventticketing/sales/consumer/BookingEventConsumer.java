@@ -1,7 +1,6 @@
 package com.team7.eventticketing.sales.consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.team7.eventticketing.contracts.dto.BookingDTO;
 import com.team7.eventticketing.contracts.dto.UserDTO;
 import com.team7.eventticketing.contracts.events.BookingCancelledEvent;
 import com.team7.eventticketing.contracts.events.BookingCompletedEvent;
@@ -50,7 +49,7 @@ public class BookingEventConsumer {
     ) {
         this.ticketSaleRepository = ticketSaleRepository;
         this.paymentEventPublisher = paymentEventPublisher;
-        this.bookingServiceClient = bookingServiceClient;
+        this.bookingServiceClient = bookingServiceClient;  // kept for cancellation path
         this.userServiceClient = userServiceClient;
         this.objectMapper = objectMapper;
         this.ticketSaleService = ticketSaleService;
@@ -118,16 +117,9 @@ public class BookingEventConsumer {
                     event.userId(), e.getMessage());
         }
 
-        BookingDTO booking;
-        try {
-            booking = bookingServiceClient.getBooking(event.bookingId());
-        } catch (feign.FeignException.NotFound e) {
-            log.error("Booking not found for bookingId={}, cannot create TicketSale", event.bookingId());
-            throw new RuntimeException("Booking not found for bookingId=" + event.bookingId());
-        } catch (feign.FeignException e) {
-            log.error("booking-service unavailable for bookingId={}: {}", event.bookingId(), e.getMessage());
-            throw new RuntimeException("Booking service temporarily unavailable for bookingId=" + event.bookingId());
-        }
+        // totalAmount is embedded in the event — no Feign call to booking-service needed
+        // (and not possible without auth in an AMQP listener context)
+        double amount = event.totalAmount() != null ? event.totalAmount().doubleValue() : 0.0;
 
         PaymentMethod paymentMethod = PaymentMethod.CREDIT_CARD;
         if (user != null && user.preferences() != null) {
@@ -145,7 +137,7 @@ public class BookingEventConsumer {
         TicketSale sale = new TicketSale();
         sale.setBookingId(event.bookingId());
         sale.setUserId(event.userId());
-        sale.setAmount(booking.totalAmount() != null ? booking.totalAmount().doubleValue() : 0.0);
+        sale.setAmount(amount);
         sale.setMethod(paymentMethod);
         sale.setStatus(TicketSaleStatus.PENDING);
         sale.setCreatedAt(LocalDateTime.now());
@@ -179,6 +171,17 @@ public class BookingEventConsumer {
                     sale.getBookingId(),
                     sale.getId()
             );
+            return;
+        }
+
+        // Payment never succeeded — no window policy check needed; directly mark REFUNDED
+        if (sale.getStatus() == TicketSaleStatus.FAILED) {
+            TicketSale refunded = ticketSaleService.directRefundFailedSale(
+                    sale.getId(), event.reason() != null ? event.reason() : "booking.cancelled");
+            paymentEventPublisher.publishPaymentRefunded(
+                    refunded.getId(), refunded.getBookingId(), refunded.getAmount());
+            log.info("Directly refunded FAILED TicketSale saleId={} for bookingId={}",
+                    refunded.getId(), refunded.getBookingId());
             return;
         }
 

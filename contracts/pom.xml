@@ -35,6 +35,12 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
+        <!-- LocalDateTime serializers used by contract event records -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
         <!-- Validation annotations (@NotNull, @NotBlank) on DTO fields -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -17,11 +17,20 @@ import com.team7.eventticketing.booking.observer.MongoEventLogger;
 import com.team7.eventticketing.booking.util.CacheInvalidationService;
 import com.team7.eventticketing.booking.adapter.EventDetailsAdapter;
 
+import com.team7.eventticketing.contracts.dto.AvgCapacityDTO;
+import com.team7.eventticketing.contracts.dto.EventDTO;
+import com.team7.eventticketing.contracts.feign.EventServiceClient;
+import com.team7.eventticketing.contracts.feign.TicketServiceClient;
+import com.team7.eventticketing.contracts.feign.UserServiceClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashMap;
@@ -34,6 +43,9 @@ import java.util.Comparator;
 
 import com.team7.eventticketing.contracts.dto.BookingSummaryDTO;
 import com.team7.eventticketing.contracts.dto.EventBookingRevenueDTO;
+import com.team7.eventticketing.contracts.dto.UserDTO;
+import com.team7.eventticketing.contracts.enums.UserStatus;
+import feign.FeignException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -43,7 +55,7 @@ import java.time.LocalTime;
 
 @Service
 public class BookingService implements EntitySubject {
-
+	private static final Logger log = LoggerFactory.getLogger(BookingService.class);
 	@Autowired
 	private BookingRepository bookingRepository;
 
@@ -61,6 +73,18 @@ public class BookingService implements EntitySubject {
 
 	@Autowired
 	private CacheInvalidationService cacheInvalidationService;
+
+	@Autowired
+	private EventServiceClient eventServiceClient;
+
+	@Autowired
+	private com.team7.eventticketing.booking.messaging.publisher.BookingEventPublisher bookingEventPublisher;
+
+	@Autowired
+	private UserServiceClient userServiceClient;
+
+	@Autowired
+	private TicketServiceClient ticketServiceClient;
 
 	private final List<EntityObserver> observers = new CopyOnWriteArrayList<>();
 
@@ -197,19 +221,35 @@ public class BookingService implements EntitySubject {
 			throw new IllegalArgumentException("Booking is not PENDING");
 		}
 
-		String eventStatus = bookingRepository.findEventStatusById(eventId);
-		if (eventStatus == null) {
-			throw new NoSuchElementException("Event not found");
-		}
-		if (!"UPCOMING".equals(eventStatus)) {
-			throw new IllegalArgumentException("Event is not UPCOMING");
+		String eventStatus;
+		try {
+			EventDTO eventDetails = eventServiceClient.getEvent(eventId);
+			if (eventDetails == null) {
+				throw new NoSuchElementException("Event not found");
+			}
+			eventStatus = eventDetails.status();
+			// NOTE: Depending on your EventDTO record structure, this might be eventDetails.getStatus()
+		} catch (Exception e) {
+			throw new NoSuchElementException("Event not found or unavailable");
 		}
 
+		if (!"UPCOMING".equalsIgnoreCase(eventStatus)) {
+			throw new IllegalArgumentException("Event is not UPCOMING");
+		}
 		booking.setEventId(eventId);
 		booking.setStatus(BookingStatus.CONFIRMED);
 		booking.setConfirmedAt(LocalDateTime.now());
 
 		Booking savedBooking = bookingRepository.save(booking);
+
+		bookingEventPublisher.publishBookingPlaced(
+				new com.team7.eventticketing.contracts.events.BookingPlacedEvent(
+						savedBooking.getId(),
+						savedBooking.getUserId(),
+						savedBooking.getEventId(),
+						LocalDateTime.now()
+				)
+		);
 
 		this.notifyObservers("BOOKING_CONFIRMED",
 				Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
@@ -227,7 +267,50 @@ public class BookingService implements EntitySubject {
 		if (booking.getStatus() != BookingStatus.CHECKED_IN) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking is not CHECKED_IN");
 		}
-		booking.setStatus(BookingStatus.COMPLETED);
+
+		// S3-F4 pre-checks (§8.3): all three must pass before any event is published
+
+		// 1. Event must exist and be ONGOING or COMPLETED
+		EventDTO event;
+		try {
+			event = eventServiceClient.getEvent(booking.getEventId());
+		} catch (FeignException.NotFound e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Event not found");
+		} catch (FeignException e) {
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Event service temporarily unavailable");
+		}
+		String eventStatus = event.status() != null ? event.status().toUpperCase() : "";
+		if (!"ONGOING".equals(eventStatus) && !"COMPLETED".equals(eventStatus)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Event has not yet occurred or was cancelled");
+		}
+
+		// 2. User must exist and be ACTIVE
+		UserDTO user;
+		try {
+			user = userServiceClient.getUser(booking.getUserId());
+		} catch (FeignException.NotFound e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User not found");
+		} catch (FeignException e) {
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "User service temporarily unavailable");
+		}
+		if (user.status() != UserStatus.ACTIVE) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User account is not active");
+		}
+
+		// 3. At least one USED ticket must exist for this booking
+		int usedCount;
+		try {
+			usedCount = ticketServiceClient.getUsedTicketCount(booking.getId());
+		} catch (FeignException.NotFound e) {
+			usedCount = 0;
+		} catch (FeignException e) {
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Ticket service temporarily unavailable");
+		}
+		if (usedCount < 1) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No attendance recorded for this booking");
+		}
+
+		// Calculate Total Amount
 		if (booking.getTotalAmount() == null || booking.getTotalAmount() == 0.0) {
 			double total = 0.0;
 			if (booking.getBookingItems() != null) {
@@ -237,13 +320,33 @@ public class BookingService implements EntitySubject {
 			}
 			booking.setTotalAmount(total);
 		}
-		Booking savedBooking = bookingRepository.saveAndFlush(booking);
-		bookingRepository.createPendingTicketSale(
-				savedBooking.getId(),
-				savedBooking.getUserId(),
-				savedBooking.getTotalAmount());
 
-		this.notifyObservers("BOOKING_COMPLETED",
+		// --- REFACTORED (S3-F4): Saga State & Removed Direct SQL Insert ---
+		booking.setStatus(BookingStatus.COMPLETING); // Changed from COMPLETED
+		Booking savedBooking = bookingRepository.saveAndFlush(booking);
+		log.info("Booking {} transitioning to COMPLETING", savedBooking.getId());
+
+		// Defer publish until after commit so payment.initiated cannot arrive before
+		// the COMPLETING status is visible to handlePaymentInitiated.
+		final long bookingId = savedBooking.getId();
+		final long userId = savedBooking.getUserId();
+		final long eventId = savedBooking.getEventId();
+		final double totalAmount = savedBooking.getTotalAmount();
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				bookingEventPublisher.publishBookingCompleted(
+						new com.team7.eventticketing.contracts.events.BookingCompletedEvent(
+								bookingId, userId, eventId,
+								BigDecimal.valueOf(totalAmount),
+								LocalDateTime.now()
+						)
+				);
+			}
+		});
+		// ------------------------------------------------------------------
+
+		this.notifyObservers("BOOKING_COMPLETING",
 				Map.of("bookingId", savedBooking.getId(), "status", savedBooking.getStatus()));
 		invalidateBookingCaches(id);
 		cacheInvalidationService.invalidateCacheWildcard("event-service::S2-F12::*");
@@ -256,12 +359,25 @@ public class BookingService implements EntitySubject {
 		if (request.getEventId() == null || request.getTicketCount() == null || request.getTicketCount() <= 0) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "eventId and ticketCount (>=1) are required");
 		}
-
-		Double avgCapacity = bookingRepository.getAverageSessionCapacityByEventId(request.getEventId());
+		Double avgCapacity = null;
+		try {
+			AvgCapacityDTO capacityDto = eventServiceClient.getEventAvgCapacity(request.getEventId());
+			if (capacityDto != null && capacityDto.avgCapacity() != null) {
+				avgCapacity = capacityDto.avgCapacity();
+			}
+		} catch (Exception e) {
+			// Feign might throw an exception if the endpoint returns a 404 (e.g., no sessions found)
+			// We safely catch it and leave avgCapacity as null so it falls to the fallback logic
+		}
 
 		if (avgCapacity == null) {
-			Object[] eventDetails = bookingRepository.findEventDetailsById(request.getEventId());
-			if (eventDetails == null || eventDetails.length == 0) {
+			try {
+				EventDTO eventDetails = eventServiceClient.getEvent(request.getEventId());
+				if (eventDetails == null) {
+					throw new IllegalArgumentException("Event not found for ID: " + request.getEventId());
+				}
+			} catch (Exception e) {
+				// Catches FeignException.NotFound if the event genuinely doesn't exist
 				throw new IllegalArgumentException("Event not found for ID: " + request.getEventId());
 			}
 			avgCapacity = 100.0;
@@ -410,8 +526,13 @@ public class BookingService implements EntitySubject {
 			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only view your own recommendations");
 		}
 
-		if (!bookingRepository.userExistsById(userId)) {
+		try {
+			userServiceClient.getUser(userId);
+		} catch (feign.FeignException.NotFound e) {
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+		} catch (feign.FeignException e) {
+			log.warn("user-service unavailable for recommendations userId={}: {}", userId, e.getMessage());
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "User service temporarily unavailable");
 		}
 
 		int recommendationLimit = limit == null ? 5 : limit;
@@ -427,11 +548,23 @@ public class BookingService implements EntitySubject {
 			return recommendations;
 		}
 
-		Map<Long, Object[]> eventDetails = bookingRepository.findEventRecommendationDetails(eventIds)
-				.stream()
-				.collect(java.util.stream.Collectors.toMap(
-						row -> ((Number) row[0]).longValue(),
-						row -> row));
+		Map<Long, Object[]> eventDetails = new HashMap<>();
+		for (Long eid : eventIds) {
+			try {
+				com.team7.eventticketing.contracts.dto.EventDTO event = eventServiceClient.getEvent(eid);
+				if (event != null) {
+					// Pack it into the Object[] array that the legacy adapter expects
+					eventDetails.put(eid, new Object[]{
+							event.id(),
+							event.name(),
+							event.category(),
+							event.eventDate()
+					});
+				}
+			} catch (Exception e) {
+				// If event-service fails for one event, just skip enriching it
+			}
+		}
 
 		return recommendations.stream()
 				.map(recommendation -> {
@@ -465,6 +598,20 @@ public class BookingService implements EntitySubject {
 		if (itemDTOs == null || itemDTOs.isEmpty()) {
 			throw new IllegalArgumentException("At least one item must be provided");
 		}
+		// --- REFACTORED (S3-F8) ---
+		// Check event-service to ensure the event is valid before adding items
+		if (booking.getEventId() != null) {
+			try {
+				EventDTO eventDetails = eventServiceClient.getEvent(booking.getEventId());
+				if (eventDetails == null) {
+					throw new IllegalArgumentException("Event not found for ID: " + booking.getEventId());
+				}
+			} catch (Exception e) {
+				// Feign throws an exception on 404 Not Found
+				throw new IllegalArgumentException("Event not found or unavailable for ID: " + booking.getEventId());
+			}
+		}
+		// ---------------------------
 
 		int currentMaxOrder = booking.getBookingItems() == null ? 0
 				: booking.getBookingItems().stream()
@@ -522,10 +669,20 @@ public class BookingService implements EntitySubject {
 
 		booking.setStatus(BookingStatus.CANCELLED);
 
-		if (bookingRepository.ticketsTableExists()) {
-			bookingRepository.cancelValidTicketsByBookingId(bookingId);
-		}
+		// --- REFACTORED (S3-F7): Removed direct tickets UPDATE ---
 		Booking savedBooking = bookingRepository.save(booking);
+
+		// Publish the event so ticket-service can cancel the tickets itself
+		bookingEventPublisher.publishBookingCancelled(
+				new com.team7.eventticketing.contracts.events.BookingCancelledEvent(
+						savedBooking.getId(),
+						savedBooking.getUserId(),
+						savedBooking.getEventId(),
+						"user_cancelled",
+						LocalDateTime.now()
+				)
+		);
+		// ---------------------------------------------------------
 
 		Map<String, Object> payload = new HashMap<>();
 		payload.put("bookingId", savedBooking.getId());
@@ -626,18 +783,27 @@ public class BookingService implements EntitySubject {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking has no assigned event");
 		}
 
-		String userName = bookingRepository.findUserNameById(booking.getUserId());
-		if (userName == null)
-			userName = "Unknown User";
-
-		Object[] eventDetails = (Object[]) bookingRepository.findEventDetailsById(booking.getEventId());
-		String eventName = "Unknown Event";
-		String eventCategory = "UNSPECIFIED";
-		if (eventDetails != null && eventDetails.length >= 2) {
-			eventName = eventDetails[0] != null ? (String) eventDetails[0] : "Unknown Event";
-			eventCategory = eventDetails[1] != null ? eventDetails[1].toString() : "UNSPECIFIED";
+		String userName = "Unknown User";
+		try {
+			com.team7.eventticketing.contracts.dto.UserDTO user = userServiceClient.getUser(booking.getUserId());
+			if (user != null) {
+				userName = user.name(); // Assuming your UserDTO record uses name()
+			}
+		} catch (Exception e) {
+			log.warn("Could not fetch user details for attendance: {}", e.getMessage());
 		}
 
+		String eventName = "Unknown Event";
+		String eventCategory = "UNSPECIFIED";
+		try {
+			com.team7.eventticketing.contracts.dto.EventDTO event = eventServiceClient.getEvent(booking.getEventId());
+			if (event != null) {
+				eventName = event.name() != null ? event.name() : "Unknown Event";
+				eventCategory = event.category() != null ? event.category() : "UNSPECIFIED";
+			}
+		} catch (Exception e) {
+			log.warn("Could not fetch event details for attendance: {}", e.getMessage());
+		}
 		Map<String, Object> params = new HashMap<>();
 		params.put("userId", booking.getUserId());
 		params.put("userName", userName);

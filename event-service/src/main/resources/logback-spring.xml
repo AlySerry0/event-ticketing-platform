@@ -1,31 +1,25 @@
 <configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
     <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
         <http>
             <url>http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push</url>
         </http>
-        <format>
-            <label>
-                <pattern>app="eventticketing",service="${spring.application.name}"</pattern>
-            </label>
-            <message>
-                <pattern>
-                    {
-                    "timestamp": "%d{ISO8601}",
-                    "level": "%level",
-                    "service": "${spring.application.name}",
-                    "thread": "%thread",
-                    "correlationId": "%X{correlationId:-}",
-                    "eventId": "%X{eventId:-}",
-                    "bookingId": "%X{bookingId:-}",
-                    "routingKey": "%X{routingKey:-}",
-                    "message": "%msg"
-                    }
-                </pattern>
-            </message>
-        </format>
+        <labels>app=eventticketing
+service=event-service
+env=k8s</labels>
+        <structuredMetadata>off</structuredMetadata>
+        <message class="ch.qos.logback.classic.PatternLayout">
+            <pattern>{"timestamp":"%d{ISO8601}","level":"%level","service":"event-service","thread":"%thread","logger":"%logger{36}","correlationId":"%X{correlationId:-}","eventId":"%X{eventId:-}","bookingId":"%X{bookingId:-}","routingKey":"%X{routingKey:-}","message":"%msg"}</pattern>
+        </message>
     </appender>
 
     <root level="INFO">
-        <appender-ref ref="LOKI" />
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="LOKI"/>
     </root>
 </configuration>

@@ -265,6 +265,24 @@ public class TicketSaleService {
         cacheInvalidationService.invalidateCacheWildcard("sales-service::S5-F11::" + saleId);
     }
 
+    @Transactional
+    public TicketSale directRefundFailedSale(Long saleId, String reason) {
+        TicketSale sale = ticketSaleRepository.findById(saleId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ticket sale not found"));
+        if (sale.getStatus() != TicketSaleStatus.FAILED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "directRefundFailedSale: sale " + saleId + " is not FAILED (status=" + sale.getStatus() + ")");
+        }
+        Map<String, Object> details = new HashMap<>(
+                sale.getTransactionDetails() != null ? sale.getTransactionDetails() : new HashMap<>());
+        details.put("refundReason", reason);
+        details.put("refundTriggeredBy", "booking.cancelled");
+        sale.setStatus(TicketSaleStatus.REFUNDED);
+        sale.setTransactionDetails(details);
+        TicketSale saved = ticketSaleRepository.saveAndFlush(sale);
+        invalidateAfterTicketSaleWrite(saved);
+        return saved;
+    }
 
     @Transactional
     public TicketSale applyPromotionToSale(Long saleId, Long promotionId) {
@@ -804,8 +822,12 @@ public class TicketSaleService {
     }
 
     public BigDecimal getUserTotalCompletedSales(Long userId, LocalDate startDate, LocalDate endDate) {
-        LocalDateTime startDateTime = startDate != null ? startDate.atStartOfDay() : null;
-        LocalDateTime endDateTime = endDate != null ? endDate.atTime(23, 59, 59) : null;
+        LocalDateTime startDateTime = startDate != null
+                ? startDate.atStartOfDay()
+                : LocalDateTime.of(2000, 1, 1, 0, 0, 0);
+        LocalDateTime endDateTime = endDate != null
+                ? endDate.atTime(23, 59, 59)
+                : LocalDateTime.of(2100, 1, 1, 0, 0, 0);
 
         return ticketSaleRepository.getUserTotalCompletedSales(userId, startDateTime, endDateTime);
     }

@@ -31,7 +31,7 @@ public class RedisConfig implements CachingConfigurer {
 
     private static final Logger log = LoggerFactory.getLogger(RedisConfig.class);
 
-    @Value("${spring.application.name}")
+    @Value("${spring.application.name:event-service}")
     private String serviceName;
 
     @Bean

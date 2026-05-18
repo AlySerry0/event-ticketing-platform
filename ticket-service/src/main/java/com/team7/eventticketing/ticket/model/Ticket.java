@@ -6,6 +6,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.UUID;
 
 @Entity
 @Table(name = "tickets")
@@ -46,6 +47,9 @@ public class Ticket {
         }
         if (status == null) {
             status = TicketStatus.VALID;
+        }
+        if (ticketCode == null || ticketCode.isBlank()) {
+            ticketCode = "TKT-" + UUID.randomUUID().toString().toUpperCase().replace("-", "").substring(0, 12);
         }
     }
 

@@ -821,12 +821,16 @@ public class EventService {
         // 🔹 Execute using StringQuery
         StringQuery searchQuery = new StringQuery(jsonQuery);
 
-        SearchHits<EventSearchDocument> searchHits =
-                elasticsearchOperations.search(searchQuery, EventSearchDocument.class);
-
-        return searchHits.getSearchHits().stream()
-                .map(elasticsearchHitAdapter::adapt)
-                .collect(Collectors.toList());
+        try {
+            SearchHits<EventSearchDocument> searchHits =
+                    elasticsearchOperations.search(searchQuery, EventSearchDocument.class);
+            return searchHits.getSearchHits().stream()
+                    .map(elasticsearchHitAdapter::adapt)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.warn("Elasticsearch full-text search failed, returning empty result: {}", e.getMessage());
+            return java.util.Collections.emptyList();
+        }
     }
 
     public AvgCapacityDTO calculateAvgCapacity(Long id) {

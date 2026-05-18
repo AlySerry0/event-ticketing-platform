@@ -3,16 +3,20 @@ package com.team7.eventticketing.user.security;
 public class GatewayHeaderHandler extends AuthHandler {
     @Override
     public AuthResult handle(AuthContext ctx) {
-        // Headers forwarded by Spring Cloud Gateway 
+        // Headers forwarded by Spring Cloud Gateway
         String userIdHeader = ctx.getRequest().getHeader("X-User-Id");
         String roleHeader = ctx.getRequest().getHeader("X-User-Role");
 
         if (userIdHeader != null && roleHeader != null) {
-            // If Gateway sent these, it already validated the JWT [cite: 21, 243]
+            // Gateway already validated the JWT signature [cite: 21, 243]; skip re-validation.
+            // Still enforce per-endpoint role rules — that is a separate concern from JWT validity.
             ctx.setAuthenticatedUserId(Long.parseLong(userIdHeader));
             ctx.setAuthenticatedRole(roleHeader);
-            
-            // Return success immediately to bypass the rest of the JWT chain
+
+            java.util.Set<String> allowed = ctx.getAllowedRoles();
+            if (allowed != null && !allowed.isEmpty() && !allowed.contains(roleHeader)) {
+                return AuthResult.forbidden("Insufficient role. Allowed: " + allowed);
+            }
             return AuthResult.success();
         }
 
